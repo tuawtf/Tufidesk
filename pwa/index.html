@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>TufiDESK</title>
+
+  <!-- PWA & iOS Specific Meta Tags -->
+  <meta name="theme-color" content="#141414">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="TufiDESK">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='128' fill='%231D4ED8'/%3E%3Cpath d='M256 120L64 220l192 100 160-83.3V340h32V220L256 120zm0 240l-128-66.7V340l128 66.7 128-66.7v-46.7L256 360z' fill='%23ffffff'/%3E%3C/svg%3E">
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Firebase Compat SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #141414;
+      color: #FFFFFF;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+      overflow-x: hidden;
+    }
+
+    /* Screen Transitions */
+    .screen {
+      display: none;
+      width: 100%;
+      min-height: 100vh;
+      flex-direction: column;
+    }
+    .screen.active {
+      display: flex;
+    }
+
+    /* Netflix Profile Selection Screen */
+    #profile-screen {
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      text-align: center;
+      min-height: 100vh;
+      background: radial-gradient(circle at 50% 30%, #1e2638 0%, #141414 70%);
+    }
+
+    .netflix-title {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 40px;
+      color: #FFFFFF;
+    }
+
+    .profiles-container {
+      display: flex;
+      flex-direction: row;
+      gap: 20px;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      max-width: 500px;
+    }
+
+    .profile-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+      transition: transform 0.15s ease, filter 0.15s ease;
+    }
+
+    .profile-card:active {
+      transform: scale(0.94);
+    }
+
+    .profile-avatar {
+      width: 96px;
+      height: 96px;
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 42px;
+      border: 3px solid transparent;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .profile-card.selected .profile-avatar,
+    .profile-card:hover .profile-avatar {
+      border-color: #FFFFFF;
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
+    }
+
+    .avatar-tuna {
+      background: linear-gradient(135deg, #1D4ED8, #3B82F6);
+    }
+    .avatar-elif {
+      background: linear-gradient(135deg, #BE185D, #EC4899);
+    }
+    .avatar-yonetim {
+      background: linear-gradient(135deg, #B45309, #F59E0B);
+    }
+
+    .profile-name {
+      margin-top: 12px;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #9CA3AF;
+      transition: color 0.2s ease;
+    }
+
+    .profile-card.selected .profile-name,
+    .profile-card:hover .profile-name {
+      color: #FFFFFF;
+    }
+
+    /* Main App Screen */
+    #main-screen {
+      padding: 16px 20px 80px 20px;
+      max-width: 680px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 0 20px 0;
+      border-bottom: 1px solid #262626;
+      margin-bottom: 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-logo {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, #2563EB, #7C3AED);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      padding: 6px 10px;
+      border-radius: 20px;
+      background: #1F2937;
+      color: #9CA3AF;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10B981;
+    }
+    .status-dot.offline {
+      background: #EF4444;
+    }
+
+    .btn-profile {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #262626;
+      border: 1px solid #383838;
+      color: #FFFFFF;
+      padding: 6px 12px;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Filters Bar */
+    .filters-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 18px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .filter-chip {
+      background: #212121;
+      border: 1px solid #333333;
+      color: #A3A3A3;
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+
+    .filter-chip.active {
+      background: #2563EB;
+      border-color: #2563EB;
+      color: #FFFFFF;
+    }
+
+    /* Homework Cards */
+    .homework-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .homework-card {
+      background: #1C1C1E;
+      border: 1px solid #2C2C2E;
+      border-radius: 16px;
+      padding: 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      transition: all 0.2s ease;
+    }
+
+    .homework-card.completed {
+      opacity: 0.55;
+      background: #161618;
+    }
+
+    .custom-checkbox {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      border: 2px solid #4B5563;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      margin-top: 2px;
+      transition: all 0.15s ease;
+      background: transparent;
+    }
+
+    .homework-card.completed .custom-checkbox {
+      background: #10B981;
+      border-color: #10B981;
+    }
+
+    .custom-checkbox svg {
+      display: none;
+      width: 16px;
+      height: 16px;
+      stroke: #FFFFFF;
+      stroke-width: 3;
+      fill: none;
+    }
+
+    .homework-card.completed .custom-checkbox svg {
+      display: block;
+    }
+
+    .homework-content {
+      flex: 1;
+    }
+
+    .homework-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #FFFFFF;
+      margin-bottom: 4px;
+      transition: text-decoration 0.2s;
+    }
+
+    .homework-card.completed .homework-title {
+      text-decoration: line-through;
+      color: #9CA3AF;
+    }
+
+    .homework-desc {
+      font-size: 0.88rem;
+      color: #9CA3AF;
+      margin-bottom: 8px;
+      line-height: 1.4;
+    }
+
+    .homework-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 0.75rem;
+    }
+
+    .meta-tag {
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: #2C2C2E;
+      color: #D1D5DB;
+      font-weight: 500;
+    }
+
+    .meta-tag.student-tag {
+      background: rgba(59, 130, 246, 0.2);
+      color: #60A5FA;
+    }
+
+    .meta-tag.priority-high {
+      background: rgba(239, 68, 68, 0.2);
+      color: #F87171;
+    }
+
+    .btn-delete {
+      background: none;
+      border: none;
+      color: #EF4444;
+      font-size: 0.8rem;
+      cursor: pointer;
+      padding: 4px;
+      opacity: 0.7;
+    }
+    .btn-delete:hover {
+      opacity: 1;
+    }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #6B7280;
+    }
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    /* Floating Action Button */
+    .fab {
+      position: fixed;
+      bottom: max(24px, env(safe-area-inset-bottom) + 16px);
+      right: 24px;
+      width: 58px;
+      height: 58px;
+      border-radius: 29px;
+      background: linear-gradient(135deg, #2563EB, #1D4ED8);
+      color: white;
+      font-size: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 10px 25px rgba(37, 99, 235, 0.5);
+      border: none;
+      cursor: pointer;
+      z-index: 100;
+      transition: transform 0.15s ease;
+    }
+    .fab:active {
+      transform: scale(0.92);
+    }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(4px);
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      padding: 20px;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-box {
+      background: #1C1C1E;
+      border: 1px solid #333333;
+      border-radius: 20px;
+      padding: 24px;
+      width: 100%;
+      max-width: 440px;
+    }
+
+    .modal-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 18px;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.8rem;
+      color: #9CA3AF;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    .form-input, .form-select {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      background: #2C2C2E;
+      border: 1px solid #3E3E42;
+      color: white;
+      font-size: 0.95rem;
+      outline: none;
+    }
+    .form-input:focus, .form-select:focus {
+      border-color: #2563EB;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .btn-secondary {
+      background: #2C2C2E;
+      border: none;
+      color: #D1D5DB;
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: #2563EB;
+      border: none;
+      color: white;
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 1. Netflix Profile Selection Screen -->
+  <section id="profile-screen" class="screen active">
+    <h1 class="netflix-title">Kimin Masası?</h1>
+    <div class="profiles-container">
+      <div class="profile-card selected" onclick="selectProfile('tuna')">
+        <div class="profile-avatar avatar-tuna">🎓</div>
+        <div class="profile-name">Tuna</div>
+      </div>
+      <div class="profile-card" onclick="selectProfile('elif')">
+        <div class="profile-avatar avatar-elif">🌸</div>
+        <div class="profile-name">Elif</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Main Homeworks & Dashboard Screen -->
+  <section id="main-screen" class="screen">
+    <header>
+      <div class="brand">
+        <div class="brand-logo">🎓</div>
+        <div class="brand-title">TufiDESK</div>
+      </div>
+      <div class="header-actions">
+        <div class="status-pill">
+          <div class="status-dot" id="status-dot"></div>
+          <span id="status-text">Canlı</span>
+        </div>
+        <div class="btn-profile">
+          <span id="active-avatar">🎓</span>
+          <span id="active-name">Tuna</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Filters -->
+    <div class="filters-bar">
+      <button class="filter-chip active" onclick="setFilter('all', this)">Tümü</button>
+      <button class="filter-chip" onclick="setFilter('pending', this)">Bekleyenler</button>
+      <button class="filter-chip" onclick="setFilter('completed', this)">Tamamlananlar</button>
+    </div>
+
+    <!-- Homework List -->
+    <div class="homework-list" id="homework-list">
+      <!-- Cards populated dynamically by real-time listener -->
+    </div>
+
+    <!-- Floating Action Button for adding homework (Yönetim & Tuna) -->
+    <button class="fab" id="fab-add" onclick="openAddModal()">+</button>
+  </section>
+
+  <!-- 3. Add Homework Modal -->
+  <div class="modal-overlay" id="add-modal">
+    <div class="modal-box">
+      <h2 class="modal-title">Yeni Ödev Ekle</h2>
+      <form id="add-form" onsubmit="handleSaveHomework(event)">
+        <div class="form-group">
+          <label>Ders Başlığı / Konu</label>
+          <input type="text" id="hw-title" class="form-input" placeholder="Örn: Matematik Türev Testi" required>
+        </div>
+        <div class="form-group">
+          <label>Açıklama</label>
+          <input type="text" id="hw-desc" class="form-input" placeholder="Sayfa ve soru detayları">
+        </div>
+        <div class="form-group" id="group-assign">
+          <label>Kime Atanacak?</label>
+          <select id="hw-assign" class="form-select">
+            <option value="Elif">Elif</option>
+            <option value="Tuna">Tuna</option>
+            <option value="Herkes">Herkes</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Öncelik</label>
+          <select id="hw-priority" class="form-select">
+            <option value="HIGH">Yüksek Öncelik</option>
+            <option value="MEDIUM" selected>Normal</option>
+            <option value="LOW">Düşük</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" onclick="closeAddModal()">İptal</button>
+          <button type="submit" class="btn-primary">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Firebase Configuration matching Android app
+    const firebaseConfig = {
+      apiKey: "AIzaSyC5mIBDPChrJMHnuEWl1QTlL1fFNBL_uwA",
+      projectId: "tufidesk",
+      storageBucket: "tufidesk.firebasestorage.app",
+      appId: "1:604652700316:web:tufidesk_pwa"
+    };
+
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.firestore();
+    try {
+      db.enablePersistence({ synchronizeTabs: true });
+    } catch (_) {}
+
+    // Profiles definition
+    const PROFILES = {
+      tuna: { id: 'tuna', name: 'Tuna', emoji: '🎓', canManage: true },
+      elif: { id: 'elif', name: 'Elif', emoji: '🌸', canManage: true }
+    };
+
+    let currentProfile = null;
+    let currentFilter = 'all';
+    let allHomeworks = [];
+    let unsubscribeFirestore = null;
+
+    // Service Worker Registration for iOS / PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+
+    // Check saved profile
+    window.addEventListener('DOMContentLoaded', () => {
+      const saved = localStorage.getItem('tufidesk_active_profile');
+      if (saved && PROFILES[saved]) {
+        selectProfile(saved);
+      }
+    });
+
+    function selectProfile(profileId) {
+      currentProfile = PROFILES[profileId];
+      localStorage.setItem('tufidesk_active_profile', profileId);
+
+      document.getElementById('active-avatar').textContent = currentProfile.emoji;
+      document.getElementById('active-name').textContent = currentProfile.name;
+
+      // Both Tuna & Elif have add button
+      const fab = document.getElementById('fab-add');
+      fab.style.display = 'flex';
+
+      document.getElementById('profile-screen').classList.remove('active');
+      document.getElementById('main-screen').classList.add('active');
+
+      startRealtimeSync();
+    }
+
+    function switchProfile() {
+      if (unsubscribeFirestore) unsubscribeFirestore();
+      localStorage.removeItem('tufidesk_active_profile');
+      document.getElementById('main-screen').classList.remove('active');
+      document.getElementById('profile-screen').classList.add('active');
+    }
+
+    // Sub-second Realtime Listener with Firestore
+    function startRealtimeSync() {
+      if (unsubscribeFirestore) unsubscribeFirestore();
+
+      const statusDot = document.getElementById('status-dot');
+      const statusText = document.getElementById('status-text');
+
+      unsubscribeFirestore = db.collection('homeworks')
+        .onSnapshot((snapshot) => {
+          statusDot.classList.remove('offline');
+          statusText.textContent = 'Canlı';
+
+          const items = [];
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            items.push({ id: doc.id, ...data });
+          });
+
+          // Sort by creation or update
+          items.sort((a, b) => (b.updatedAtMillis || b.createdAtMillis || 0) - (a.updatedAtMillis || a.createdAtMillis || 0));
+          allHomeworks = items;
+          renderHomeworks();
+        }, (error) => {
+          console.error("Firestore sync error:", error);
+          statusDot.classList.add('offline');
+          statusText.textContent = 'Çevrimdışı';
+        });
+    }
+
+    function renderHomeworks() {
+      const container = document.getElementById('homework-list');
+      container.innerHTML = '';
+
+      let filtered = allHomeworks;
+
+      // Filter by profile
+      if (currentProfile.id === 'tuna') {
+        filtered = filtered.filter(h => !h.assignedTo || h.assignedTo === 'Tuna' || h.assignedTo === 'Herkes');
+      } else if (currentProfile.id === 'elif') {
+        filtered = filtered.filter(h => h.assignedTo === 'Elif' || h.assignedTo === 'Herkes');
+      }
+
+      // Filter by completion status
+      if (currentFilter === 'pending') {
+        filtered = filtered.filter(h => !h.isCompleted);
+      } else if (currentFilter === 'completed') {
+        filtered = filtered.filter(h => h.isCompleted);
+      }
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">🎉</div>
+            <p>Burada henüz ödev bulunmuyor.</p>
+          </div>
+        `;
+        return;
+      }
+
+      filtered.forEach((hw) => {
+        const isComp = !!hw.isCompleted;
+        const card = document.createElement('div');
+        card.className = `homework-card ${isComp ? 'completed' : ''}`;
+
+        const canDelete = currentProfile.canManage;
+
+        card.innerHTML = `
+          <div class="custom-checkbox" onclick="toggleHomework('${hw.id}', ${!isComp})">
+            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          </div>
+          <div class="homework-content" onclick="toggleHomework('${hw.id}', ${!isComp})">
+            <div class="homework-title">${escapeHtml(hw.title || 'Başlıksız Ödev')}</div>
+            ${hw.description ? `<div class="homework-desc">${escapeHtml(hw.description)}</div>` : ''}
+            <div class="homework-meta">
+              <span class="meta-tag student-tag">👤 ${escapeHtml(hw.assignedTo || 'Genel')}</span>
+              ${hw.priority === 'HIGH' ? '<span class="meta-tag priority-high">🔥 Yüksek</span>' : ''}
+              ${isComp ? '<span class="meta-tag" style="color:#10B981;">✓ Tamamlandı</span>' : ''}
+            </div>
+          </div>
+          ${canDelete ? `<button class="btn-delete" onclick="deleteHomework(event, '${hw.id}')">✕</button>` : ''}
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // Instant Checkbox sync (Veriyi yazan öncelikli!)
+    async function toggleHomework(id, newStatus) {
+      const now = Date.now();
+      try {
+        await db.collection('homeworks').doc(id.toString()).set({
+          isCompleted: newStatus,
+          completedAtMillis: newStatus ? now : 0,
+          updatedAtMillis: now
+        }, { merge: true });
+      } catch (e) {
+        console.error("Checkbox güncellenemedi:", e);
+      }
+    }
+
+    async function deleteHomework(event, id) {
+      event.stopPropagation();
+      if (!confirm("Bu ödevi silmek istiyor musunuz?")) return;
+      try {
+        await db.collection('homeworks').doc(id.toString()).delete();
+      } catch (e) {
+        console.error("Ödev silinemedi:", e);
+      }
+    }
+
+    function setFilter(type, btn) {
+      currentFilter = type;
+      document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      renderHomeworks();
+    }
+
+    function openAddModal() {
+      const assignGroup = document.getElementById('group-assign');
+      const assignSelect = document.getElementById('hw-assign');
+      assignSelect.value = currentProfile.id === 'elif' ? 'Elif' : 'Tuna';
+      assignGroup.style.display = 'block';
+      document.getElementById('add-modal').classList.add('active');
+    }
+
+    function closeAddModal() {
+      document.getElementById('add-modal').classList.remove('active');
+      document.getElementById('add-form').reset();
+    }
+
+    async function handleSaveHomework(e) {
+      e.preventDefault();
+      const title = document.getElementById('hw-title').value.trim();
+      const desc = document.getElementById('hw-desc').value.trim();
+      const assign = document.getElementById('hw-assign').value;
+      const priority = document.getElementById('hw-priority').value;
+
+      if (!title) return;
+
+      const now = Date.now();
+      const newId = now;
+
+      try {
+        await db.collection('homeworks').doc(newId.toString()).set({
+          id: newId,
+          courseId: 1,
+          title: title,
+          description: desc,
+          dueDateMillis: now + 86400000,
+          dueTimeText: "23:59",
+          priority: priority,
+          estimatedMinutes: 45,
+          isCompleted: false,
+          createdAtMillis: now,
+          completedAtMillis: 0,
+          assignedTo: assign,
+          updatedAtMillis: now
+        });
+        closeAddModal();
+      } catch (err) {
+        alert("Ödev kaydedilemedi: " + err.message);
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>

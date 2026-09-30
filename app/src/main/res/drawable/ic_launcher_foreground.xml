@@ -1,0 +1,67 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group>
+        <!-- Shadow -->
+        <path
+            android:fillColor="#33000000"
+            android:pathData="M34,26 L74,26 A5,5 0 0,1 79,31 L79,81 A5,5 0 0,1 74,86 L34,86 A5,5 0 0,1 29,81 L29,31 A5,5 0 0,1 34,26 Z" />
+        <!-- Main Notebook White Sheet -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M32,24 L72,24 A5,5 0 0,1 77,29 L77,79 A5,5 0 0,1 72,84 L32,84 A5,5 0 0,1 27,79 L27,29 A5,5 0 0,1 32,24 Z" />
+        <!-- Top Clipboard / Header bar -->
+        <path
+            android:fillColor="#3B82F6"
+            android:pathData="M40,21 L64,21 A3,3 0 0,1 67,24 L67,27 L37,27 L37,24 A3,3 0 0,1 40,21 Z" />
+        <!-- Bookmark ribbon in Amber -->
+        <path
+            android:fillColor="#F59E0B"
+            android:pathData="M65,24 L65,38 L68.5,35.5 L72,38 L72,24 Z" />
+        <!-- Checklist Item 1: Circle & Checkmark -->
+        <path
+            android:fillColor="#10B981"
+            android:pathData="M40,36 A5,5 0 1,1 40,46 A5,5 0 1,1 40,36 Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M37.5,41 L39.3,42.8 L42.8,39.3 L43.8,40.3 L39.3,44.8 L36.5,42 Z" />
+        <!-- Line 1 -->
+        <path
+            android:fillColor="#64748B"
+            android:pathData="M48,39 L63,39 A2,2 0 0,1 63,43 L48,43 A2,2 0 0,1 48,39 Z" />
+        <!-- Checklist Item 2: Circle & Checkmark -->
+        <path
+            android:fillColor="#10B981"
+            android:pathData="M40,50 A5,5 0 1,1 40,60 A5,5 0 1,1 40,50 Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M37.5,55 L39.3,56.8 L42.8,53.3 L43.8,54.3 L39.3,58.8 L36.5,56 Z" />
+        <!-- Line 2 -->
+        <path
+            android:fillColor="#64748B"
+            android:pathData="M48,53 L68,53 A2,2 0 0,1 68,57 L48,57 A2,2 0 0,1 48,53 Z" />
+        <!-- Checklist Item 3: Pending circle -->
+        <path
+            android:fillColor="#E2E8F0"
+            android:pathData="M40,64 A5,5 0 1,1 40,74 A5,5 0 1,1 40,64 Z" />
+        <!-- Line 3 -->
+        <path
+            android:fillColor="#94A3B8"
+            android:pathData="M48,67 L65,67 A2,2 0 0,1 65,71 L48,71 A2,2 0 0,1 48,67 Z" />
+        <!-- Floating Pencil Accent -->
+        <path
+            android:fillColor="#EF4444"
+            android:pathData="M76,60 L83,67 L80,70 L73,63 Z" />
+        <path
+            android:fillColor="#FBBF24"
+            android:pathData="M72,64 L79,71 L73,77 L66,70 Z" />
+        <path
+            android:fillColor="#FDE68A"
+            android:pathData="M66,70 L73,77 L68,81 L65,81 L65,78 Z" />
+        <path
+            android:fillColor="#1E293B"
+            android:pathData="M65,78 L65,81 L62,81 Z" />
+    </group>
+</vector>

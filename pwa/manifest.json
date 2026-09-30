@@ -1,0 +1,17 @@
+{
+  "name": "TufiDESK",
+  "short_name": "TufiDESK",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#141414",
+  "theme_color": "#141414",
+  "description": "TufiDESK Ödev ve Ders Takip Uygulaması",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='128' fill='%231D4ED8'/%3E%3Cpath d='M256 120L64 220l192 100 160-83.3V340h32V220L256 120zm0 240l-128-66.7V340l128 66.7 128-66.7v-46.7L256 360z' fill='%23ffffff'/%3E%3C/svg%3E",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
