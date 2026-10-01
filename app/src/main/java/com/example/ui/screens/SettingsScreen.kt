@@ -80,6 +80,19 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.saveable.rememberSaveable
+import android.widget.Toast
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import com.google.firebase.FirebaseApp
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.DeveloperMode
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.foundation.verticalScroll
 import com.example.data.firebase.SyncState
 import com.example.data.model.UserAccount
 import com.example.ui.components.UserFlowerAvatar
@@ -122,6 +135,9 @@ fun SettingsScreen(
 ) {
     var showThemeDialog by remember { mutableStateOf(false) }
     var showPaletteDialog by remember { mutableStateOf(false) }
+    var versionTapCount by remember { mutableStateOf(0) }
+    var isDeveloperModeActive by rememberSaveable { mutableStateOf(false) }
+    var showDevOptionsDialog by remember { mutableStateOf(false) }
 
     val paletteOptions = listOf(
         MaterialPaletteOption(
@@ -420,6 +436,21 @@ fun SettingsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable {
+                            if (!isDeveloperModeActive) {
+                                versionTapCount++
+                                if (versionTapCount >= 5) {
+                                    isDeveloperModeActive = true
+                                    Toast.makeText(context, "🎉 Geliştirici Seçenekleri Aktif Edildi!", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    val remaining = 5 - versionTapCount
+                                    Toast.makeText(context, "Geliştirici modu için $remaining dokunuş kaldı", Toast.LENGTH_SHORT).show()
+                                }
+                            } else {
+                                showDevOptionsDialog = true
+                            }
+                        }
                         .padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -430,7 +461,7 @@ fun SettingsScreen(
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(14.dp))
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "TufiDESK",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
@@ -442,6 +473,73 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                    if (isDeveloperModeActive) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.padding(start = 8.dp)
+                        ) {
+                            Text(
+                                text = "DEV",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Section 4: Developer Options & Diagnostics (Active after 5 taps on version)
+        if (isDeveloperModeActive) {
+            item {
+                SettingsCategoryCard(title = "🛠️ Geliştirici Seçenekleri & Teşhis") {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DeveloperMode,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Senkronizasyon ve Hata Teşhisi",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Bulut senkronizasyonunun neden başarısız olduğunu, Firebase bağlantısını ve hata loglarını canlı olarak inceleyin.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { showDevOptionsDialog = true },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.BugReport,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Hata ve Teşhis Paneli")
+                            }
+                        }
                     }
                 }
             }
@@ -590,6 +688,230 @@ fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showPaletteDialog = false }) {
+                    Text("Kapat")
+                }
+            }
+        )
+    }
+
+    // Developer Options & Sync Diagnostics Dialog
+    if (showDevOptionsDialog) {
+        val isFirebaseInitialized = remember(context) {
+            try {
+                FirebaseApp.getApps(context).isNotEmpty()
+            } catch (_: Exception) {
+                false
+            }
+        }
+
+        val diagnosticSummary = buildString {
+            appendLine("=== TUFIDESK SENKRONİZASYON VE HATA RAPORU ===")
+            appendLine("Tarih: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())}")
+            appendLine("Uygulama Sürümü: $appVersion")
+            appendLine("Paket Adı: ${context.packageName}")
+            appendLine("----------------------------------------")
+            appendLine("1. FİREBASE DURUMU:")
+            appendLine("   - FirebaseApp Başlatıldı: ${if (isFirebaseInitialized) "EVET (Aktif)" else "HAYIR (google-services.json eksik veya başlatılamadı)"}")
+            appendLine("   - Proje Yapılandırması: ${if (isFirebaseInitialized) "google-services.json yüklü" else "Eksik"}")
+            appendLine()
+            appendLine("2. AĞ VE İNTERNET:")
+            appendLine("   - İnternet Erişimi: ${if (isOnline) "ONLINE (Bağlantı Var)" else "OFFLINE (Bağlantı Yok)"}")
+            appendLine()
+            appendLine("3. SENKRONİZASYON DURUMU:")
+            appendLine("   - Durum Kodu: ${syncState.name}")
+            appendLine("   - Hata Mesajı: ${syncErrorMessage ?: "Kayıtlı bir hata yok."}")
+            appendLine("----------------------------------------")
+            if (!isFirebaseInitialized) {
+                appendLine("👉 TEŞHİS: google-services.json dosyası APK içinde bulunamadı. GitHub Actions'ta bu dosyayı derleme sürecine ekleyin.")
+            } else if (syncErrorMessage?.contains("PERMISSION_DENIED", ignoreCase = true) == true) {
+                appendLine("👉 TEŞHİS: Firestore Güvenlik Kuralları kilitli! Firebase Console > Firestore Database > Kurallar (Rules) sekmesinde 'allow read, write: if true;' izni vermelisiniz.")
+            } else if (syncErrorMessage?.contains("NOT_FOUND", ignoreCase = true) == true) {
+                appendLine("👉 TEŞHİS: Firebase projesinde Cloud Firestore veritabanı henüz oluşturulmamış. Firebase Console'dan veritabanını oluşturun.")
+            } else if (syncErrorMessage?.contains("UNAVAILABLE", ignoreCase = true) == true) {
+                appendLine("👉 TEŞHİS: Firebase sunucularına erişilemiyor. İnternet bağlantınızı, DNS veya operatör kısıtlamalarını kontrol edin.")
+            } else if (!isOnline) {
+                appendLine("👉 TEŞHİS: Telefonunuz çevrimdışı modda. Veriler yerel Room veritabanında güvenle saklanıyor.")
+            } else {
+                appendLine("👉 TEŞHİS: Sistem sağlıklı ve senkronizasyon çalışıyor.")
+            }
+        }
+
+        AlertDialog(
+            onDismissRequest = { showDevOptionsDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.BugReport,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Geliştirici Teşhis Paneli", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Firebase Card
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isFirebaseInitialized) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                        border = BorderStroke(1.dp, if (isFirebaseInitialized) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (isFirebaseInitialized) Icons.Default.CheckCircle else Icons.Default.ErrorOutline,
+                                    contentDescription = null,
+                                    tint = if (isFirebaseInitialized) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (isFirebaseInitialized) "Firebase Bağlantısı: Hazır ✅" else "Firebase Başlatılamadı ❌",
+                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                    color = if (isFirebaseInitialized) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = if (isFirebaseInitialized) "google-services.json yüklü ve Firestore motoru aktif." else "google-services.json dosyası APK'ya dahil edilmemiş. GitHub Actions build sürecini kontrol edin.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isFirebaseInitialized) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+
+                    // Network & Sync State
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Ağ Durumu:", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(if (isOnline) "Çevrimiçi (Online) 🟢" else "Çevrimdışı (Offline) 🔴", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Senkronizasyon:", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(syncState.name, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = if (syncState == SyncState.ERROR) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Paket Kimliği:", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(context.packageName, style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+
+                    // Error Log / Analysis
+                    if (!syncErrorMessage.isNullOrBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = "Son Hata Kaydı:",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = syncErrorMessage,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
+                    }
+
+                    // Recommendations
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "💡 Teşhis & Çözüm İpucu:",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            val advice = when {
+                                !isFirebaseInitialized -> "GitHub Actions ile derlenen APK'ya google-services.json dosyası eklenmemiş. GitHub reponuza veya GitHub Secret olarak google-services.json ekleyin."
+                                syncErrorMessage?.contains("PERMISSION_DENIED", ignoreCase = true) == true -> "Firebase Console > Firestore > Kurallar (Rules) sekmesinde izinleri 'allow read, write: if true;' olarak güncelleyin."
+                                syncErrorMessage?.contains("NOT_FOUND", ignoreCase = true) == true -> "Firebase projenizde Cloud Firestore henüz oluşturulmamış. Firebase Console'dan 'Create database' yapın."
+                                syncErrorMessage?.contains("UNAVAILABLE", ignoreCase = true) == true -> "Firestore sunucularına ulaşılamadı. Farklı bir Wi-Fi veya mobil internet ile tekrar deneyin."
+                                !isOnline -> "Cihazınızda internet bağlantısı yok. Yerel Room veritabanı aktif şekilde çalışıyor."
+                                else -> "Firebase ve senkronizasyon sağlıklı çalışıyor. Herhangi bir blokaj yok."
+                            }
+                            Text(
+                                text = advice,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+
+                    // Actions
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                val clip = ClipData.newPlainText("TufiDESK Teşhis Raporu", diagnosticSummary)
+                                clipboard.setPrimaryClip(clip)
+                                Toast.makeText(context, "Teşhis raporu panoya kopyalandı!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Kopyala", style = MaterialTheme.typography.labelMedium)
+                        }
+
+                        Button(
+                            onClick = {
+                                onManualSync()
+                                Toast.makeText(context, "Eşitleme tetiklendi...", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Test Et", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+
+                    TextButton(
+                        onClick = {
+                            isDeveloperModeActive = false
+                            versionTapCount = 0
+                            showDevOptionsDialog = false
+                            Toast.makeText(context, "Geliştirici modu kapatıldı", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    ) {
+                        Text("Geliştirici Modunu Kapat", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showDevOptionsDialog = false }) {
                     Text("Kapat")
                 }
             }

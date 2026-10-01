@@ -68,10 +68,9 @@ class FirebaseSyncManager(
         return try {
             val activeNetwork = connectivityManager.activeNetwork ?: return false
             val caps = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return false
-            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-            (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) || !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED))
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
         } catch (_: Exception) {
-            false
+            true
         }
     }
 
