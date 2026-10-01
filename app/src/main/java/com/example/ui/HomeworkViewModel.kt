@@ -258,6 +258,12 @@ class HomeworkViewModel(
         }
     }
 
+    fun updateFolder(folder: NoteFolder) {
+        viewModelScope.launch {
+            notesRepository.insertFolder(folder)
+        }
+    }
+
     fun deleteFolder(folder: NoteFolder) {
         viewModelScope.launch {
             if (selectedNoteFolderId.value == folder.id) {

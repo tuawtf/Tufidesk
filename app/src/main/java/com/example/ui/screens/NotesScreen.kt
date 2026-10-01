@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
@@ -48,6 +49,27 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.graphics.graphicsLayer
+import android.widget.Toast
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.DriveFileMove
+import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -216,6 +238,7 @@ fun NotesScreen(
     onDeleteNote: (Note) -> Unit,
     onTogglePin: (Note) -> Unit,
     onCreateFolder: (name: String, colorHex: String) -> Unit,
+    onUpdateFolder: (NoteFolder) -> Unit = {},
     onDeleteFolder: (NoteFolder) -> Unit,
     canManage: Boolean = true,
     currentUser: UserAccount? = null,
@@ -228,6 +251,8 @@ fun NotesScreen(
     onSwitchProfile: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
     var isFabMenuOpen by remember { mutableStateOf(false) }
 
     // Multi-selection mode state
@@ -238,6 +263,12 @@ fun NotesScreen(
         selectedNoteIds = emptySet()
     }
 
+    // Drag and drop states
+    val folderBounds = remember { mutableStateMapOf<Long, Rect>() }
+    var draggedNote by remember { mutableStateOf<Note?>(null) }
+    var dragPositionInRoot by remember { mutableStateOf<Offset?>(null) }
+    var hoveredFolderId by remember { mutableStateOf<Long?>(null) }
+
     // Dialog states
     var showTextNoteDialog by remember { mutableStateOf(false) }
     var showChecklistDialog by remember { mutableStateOf(false) }
@@ -245,11 +276,18 @@ fun NotesScreen(
     var showImageNoteDialog by remember { mutableStateOf(false) }
     var showFolderDialog by remember { mutableStateOf(false) }
     var showReportDialog by remember { mutableStateOf(false) }
+    var showMoveToFolderDialog by remember { mutableStateOf(false) }
+    var showBatchColorDialog by remember { mutableStateOf(false) }
+    var showBatchDeleteConfirm by remember { mutableStateOf(false) }
+
+    var folderOptionsToManage by remember { mutableStateOf<NoteFolder?>(null) }
+    var folderToEdit by remember { mutableStateOf<NoteFolder?>(null) }
+    var folderToDeleteConfirm by remember { mutableStateOf<NoteFolder?>(null) }
+
     var noteToEdit by remember { mutableStateOf<Note?>(null) }
     var noteToDeleteConfirm by remember { mutableStateOf<Note?>(null) }
 
     // Photo picker for Image Note
-    val context = LocalContext.current
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -275,6 +313,13 @@ fun NotesScreen(
     val pinnedNotes = remember(currentFolderNotes) { currentFolderNotes.filter { it.isPinned } }
     val otherNotes = remember(currentFolderNotes) { currentFolderNotes.filter { !it.isPinned } }
 
+    val denemeFolder = remember(folders) {
+        folders.find { it.name.contains("Deneme", ignoreCase = true) }
+    }
+    val regularFolders = remember(folders) {
+        folders.filter { !it.name.contains("Deneme", ignoreCase = true) }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -284,134 +329,76 @@ fun NotesScreen(
         LazyVerticalStaggeredGrid(
             columns = StaggeredGridCells.Fixed(if (isGridLayout) 2 else 1),
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 80.dp),
+            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = if (isSelectionMode) 100.dp else 80.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalItemSpacing = 8.dp
         ) {
-            // Header Item: Search Bar or Selection Toolbar
+            // Header Item: Google Keep Style Floating Pill Search Bar
             item(span = StaggeredGridItemSpan.FullLine) {
-                if (isSelectionMode) {
-                    // Contextual Selection Toolbar
-                    Surface(
-                        shape = RoundedCornerShape(24.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+                Surface(
+                    shape = RoundedCornerShape(28.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(2.dp, RoundedCornerShape(28.dp))
+                ) {
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .shadow(3.dp, RoundedCornerShape(24.dp))
+                            .padding(horizontal = 14.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 10.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(onClick = { selectedNoteIds = emptySet() }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Seçimi Kapat",
-                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Ara",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = onSearchQueryChange,
+                            placeholder = {
                                 Text(
-                                    text = "${selectedNoteIds.size} not seçildi",
-                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    "Notlarınızda arayın...",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                )
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("notes_search_bar"),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent,
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent
+                            )
+                        )
+
+                        if (searchQuery.isNotBlank()) {
+                            IconButton(onClick = { onSearchQueryChange("") }) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Temizle",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(onClick = {
-                                    selectedNoteIds = if (selectedNoteIds.size == currentFolderNotes.size) emptySet() else currentFolderNotes.map { it.id }.toSet()
-                                }) {
-                                    Icon(
-                                        imageVector = if (selectedNoteIds.size == currentFolderNotes.size && currentFolderNotes.isNotEmpty()) Icons.Default.CheckBox else Icons.Default.SelectAll,
-                                        contentDescription = "Tümünü Seç",
-                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                }
-                                IconButton(onClick = {
-                                    selectedNoteIds.forEach { id ->
-                                        currentFolderNotes.find { it.id == id }?.let { onDeleteNote(it) }
-                                    }
-                                    selectedNoteIds = emptySet()
-                                }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = "Seçilenleri Sil",
-                                        tint = MaterialTheme.colorScheme.error
-                                    )
-                                }
-                            }
                         }
-                    }
-                } else {
-                    // Google Keep Style Floating Pill Search Bar
-                    Surface(
-                        shape = RoundedCornerShape(28.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .shadow(2.dp, RoundedCornerShape(28.dp))
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+
+                        // Layout Toggle (Single Column vs Multi Column Grid)
+                        IconButton(onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onToggleLayoutGrid(!isGridLayout)
+                        }) {
                             Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = "Ara",
+                                imageVector = if (isGridLayout) Icons.Default.ViewAgenda else Icons.Default.GridView,
+                                contentDescription = if (isGridLayout) "Tek Sütun Liste" else "Çift Sütun Kılavuz",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(22.dp)
                             )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            OutlinedTextField(
-                                value = searchQuery,
-                                onValueChange = onSearchQueryChange,
-                                placeholder = {
-                                    Text(
-                                        "Notlarınızda arayın...",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                                    )
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("notes_search_bar"),
-                                singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = Color.Transparent,
-                                    unfocusedBorderColor = Color.Transparent,
-                                    focusedContainerColor = Color.Transparent,
-                                    unfocusedContainerColor = Color.Transparent
-                                )
-                            )
-
-                            if (searchQuery.isNotBlank()) {
-                                IconButton(onClick = { onSearchQueryChange("") }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Temizle",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-
-                            // Layout Toggle (Single Column vs Multi Column Grid)
-                            IconButton(onClick = { onToggleLayoutGrid(!isGridLayout) }) {
-                                Icon(
-                                    imageVector = if (isGridLayout) Icons.Default.ViewAgenda else Icons.Default.GridView,
-                                    contentDescription = if (isGridLayout) "Tek Sütun Liste" else "Çift Sütun Kılavuz",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
                         }
                     }
                 }
@@ -421,6 +408,7 @@ fun NotesScreen(
             if (selectedFolderId != null) {
                 item(span = StaggeredGridItemSpan.FullLine) {
                     val currentFolder = folders.find { it.id == selectedFolderId }
+                    val isDeneme = currentFolder?.name?.contains("Deneme", ignoreCase = true) == true
                     val fColor = remember(currentFolder?.colorHex) {
                         try { Color(android.graphics.Color.parseColor(currentFolder?.colorHex ?: "#1B65D4")) } catch (_: Exception) { Color(0xFF1B65D4) }
                     }
@@ -441,7 +429,10 @@ fun NotesScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(10.dp))
-                                    .clickable { onSelectFolder(null) }
+                                    .clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onSelectFolder(null)
+                                    }
                                     .padding(vertical = 4.dp, horizontal = 6.dp)
                             ) {
                                 Icon(
@@ -465,8 +456,11 @@ fun NotesScreen(
                                 }
                             }
 
-                            if (currentFolder != null) {
-                                IconButton(onClick = { onDeleteFolder(currentFolder) }) {
+                            if (currentFolder != null && !isDeneme) {
+                                IconButton(onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    folderToDeleteConfirm = currentFolder
+                                }) {
                                     Icon(
                                         imageVector = Icons.Default.DeleteOutline,
                                         contentDescription = "Klasörü Sil",
@@ -506,7 +500,10 @@ fun NotesScreen(
                             )
                         }
                         TextButton(
-                            onClick = { showFolderDialog = true },
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                showFolderDialog = true
+                            },
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
@@ -516,8 +513,34 @@ fun NotesScreen(
                     }
                 }
 
+                // 1. Featured Long Card: Deneme Sınavları (Non-deletable, distinct exam banner card)
+                if (denemeFolder != null) {
+                    item(span = StaggeredGridItemSpan.FullLine) {
+                        val reportCount = remember(notes, denemeFolder.id) {
+                            notes.count { it.folderId == denemeFolder.id || it.type == NoteType.REPORT }
+                        }
+                        DenemeExamFolderCard(
+                            folder = denemeFolder,
+                            noteCount = reportCount,
+                            isHovered = hoveredFolderId == denemeFolder.id,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onSelectFolder(denemeFolder.id)
+                            },
+                            onLongClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                folderOptionsToManage = denemeFolder
+                            },
+                            modifier = Modifier.onGloballyPositioned { coords ->
+                                folderBounds[denemeFolder.id] = coords.boundsInRoot()
+                            }
+                        )
+                    }
+                }
+
+                // 2. Regular Folders (Material Theme styled, delete button removed, long-press to manage)
                 items(
-                    items = folders,
+                    items = regularFolders,
                     key = { "folder_${it.id}" }
                 ) { folder ->
                     val count = remember(notes, folder.id) {
@@ -526,8 +549,18 @@ fun NotesScreen(
                     NoteFolderCard(
                         folder = folder,
                         noteCount = count,
-                        onClick = { onSelectFolder(folder.id) },
-                        onDelete = { onDeleteFolder(folder) }
+                        isHovered = hoveredFolderId == folder.id,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onSelectFolder(folder.id)
+                        },
+                        onLongClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            folderOptionsToManage = folder
+                        },
+                        modifier = Modifier.onGloballyPositioned { coords ->
+                            folderBounds[folder.id] = coords.boundsInRoot()
+                        }
                     )
                 }
             }
@@ -608,12 +641,14 @@ fun NotesScreen(
                     val isSelected = selectedNoteIds.contains(note.id)
                     val clickAction = {
                         if (isSelectionMode) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             selectedNoteIds = if (isSelected) selectedNoteIds - note.id else selectedNoteIds + note.id
                         } else {
                             noteToEdit = note
                         }
                     }
                     val longClickAction = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         selectedNoteIds = if (isSelected) selectedNoteIds - note.id else selectedNoteIds + note.id
                     }
 
@@ -623,7 +658,47 @@ fun NotesScreen(
                             isSelected = isSelected,
                             onClick = clickAction,
                             onLongClick = longClickAction,
-                            onTogglePin = { onTogglePin(note) }
+                            onTogglePin = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onTogglePin(note)
+                            },
+                            onStartDrag = { n, startPos ->
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                draggedNote = n
+                                dragPositionInRoot = startPos
+                            },
+                            onDragAmount = { delta ->
+                                val cur = dragPositionInRoot ?: Offset.Zero
+                                val next = cur + delta
+                                dragPositionInRoot = next
+                                val target = folderBounds.entries.firstOrNull { (_, rect) -> rect.contains(next) }
+                                if (hoveredFolderId != target?.key) {
+                                    if (target != null) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    }
+                                    hoveredFolderId = target?.key
+                                }
+                            },
+                            onDragEnd = {
+                                val targetId = hoveredFolderId
+                                val currentDragged = draggedNote
+                                if (currentDragged != null && targetId != null) {
+                                    val targetFolder = folders.find { it.id == targetId }
+                                    if (targetFolder != null && currentDragged.folderId != targetFolder.id) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        onUpdateNote(currentDragged.copy(folderId = targetFolder.id, updatedAtMillis = System.currentTimeMillis()))
+                                        Toast.makeText(context, "'${currentDragged.title.ifBlank { "Rapor" }}' -> '${targetFolder.name}' klasörüne taşındı 📁", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                draggedNote = null
+                                dragPositionInRoot = null
+                                hoveredFolderId = null
+                            },
+                            onDragCancel = {
+                                draggedNote = null
+                                dragPositionInRoot = null
+                                hoveredFolderId = null
+                            }
                         )
                     } else {
                         GoogleKeepNoteCard(
@@ -632,7 +707,47 @@ fun NotesScreen(
                             isSelected = isSelected,
                             onClick = clickAction,
                             onLongClick = longClickAction,
-                            onTogglePin = { onTogglePin(note) }
+                            onTogglePin = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onTogglePin(note)
+                            },
+                            onStartDrag = { n, startPos ->
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                draggedNote = n
+                                dragPositionInRoot = startPos
+                            },
+                            onDragAmount = { delta ->
+                                val cur = dragPositionInRoot ?: Offset.Zero
+                                val next = cur + delta
+                                dragPositionInRoot = next
+                                val target = folderBounds.entries.firstOrNull { (_, rect) -> rect.contains(next) }
+                                if (hoveredFolderId != target?.key) {
+                                    if (target != null) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    }
+                                    hoveredFolderId = target?.key
+                                }
+                            },
+                            onDragEnd = {
+                                val targetId = hoveredFolderId
+                                val currentDragged = draggedNote
+                                if (currentDragged != null && targetId != null) {
+                                    val targetFolder = folders.find { it.id == targetId }
+                                    if (targetFolder != null && currentDragged.folderId != targetFolder.id) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        onUpdateNote(currentDragged.copy(folderId = targetFolder.id, updatedAtMillis = System.currentTimeMillis()))
+                                        Toast.makeText(context, "'${currentDragged.title.ifBlank { "Not" }}' -> '${targetFolder.name}' klasörüne taşındı 📁", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                draggedNote = null
+                                dragPositionInRoot = null
+                                hoveredFolderId = null
+                            },
+                            onDragCancel = {
+                                draggedNote = null
+                                dragPositionInRoot = null
+                                hoveredFolderId = null
+                            }
                         )
                     }
                 }
@@ -662,12 +777,14 @@ fun NotesScreen(
                 val isSelected = selectedNoteIds.contains(note.id)
                 val clickAction = {
                     if (isSelectionMode) {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         selectedNoteIds = if (isSelected) selectedNoteIds - note.id else selectedNoteIds + note.id
                     } else {
                         noteToEdit = note
                     }
                 }
                 val longClickAction = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     selectedNoteIds = if (isSelected) selectedNoteIds - note.id else selectedNoteIds + note.id
                 }
 
@@ -677,7 +794,47 @@ fun NotesScreen(
                         isSelected = isSelected,
                         onClick = clickAction,
                         onLongClick = longClickAction,
-                        onTogglePin = { onTogglePin(note) }
+                        onTogglePin = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onTogglePin(note)
+                        },
+                        onStartDrag = { n, startPos ->
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            draggedNote = n
+                            dragPositionInRoot = startPos
+                        },
+                        onDragAmount = { delta ->
+                            val cur = dragPositionInRoot ?: Offset.Zero
+                            val next = cur + delta
+                            dragPositionInRoot = next
+                            val target = folderBounds.entries.firstOrNull { (_, rect) -> rect.contains(next) }
+                            if (hoveredFolderId != target?.key) {
+                                if (target != null) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                }
+                                hoveredFolderId = target?.key
+                            }
+                        },
+                        onDragEnd = {
+                            val targetId = hoveredFolderId
+                            val currentDragged = draggedNote
+                            if (currentDragged != null && targetId != null) {
+                                val targetFolder = folders.find { it.id == targetId }
+                                if (targetFolder != null && currentDragged.folderId != targetFolder.id) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onUpdateNote(currentDragged.copy(folderId = targetFolder.id, updatedAtMillis = System.currentTimeMillis()))
+                                    Toast.makeText(context, "'${currentDragged.title.ifBlank { "Rapor" }}' -> '${targetFolder.name}' klasörüne taşındı 📁", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                            draggedNote = null
+                            dragPositionInRoot = null
+                            hoveredFolderId = null
+                        },
+                        onDragCancel = {
+                            draggedNote = null
+                            dragPositionInRoot = null
+                            hoveredFolderId = null
+                        }
                     )
                 } else {
                     GoogleKeepNoteCard(
@@ -686,8 +843,224 @@ fun NotesScreen(
                         isSelected = isSelected,
                         onClick = clickAction,
                         onLongClick = longClickAction,
-                        onTogglePin = { onTogglePin(note) }
+                        onTogglePin = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onTogglePin(note)
+                        },
+                        onStartDrag = { n, startPos ->
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            draggedNote = n
+                            dragPositionInRoot = startPos
+                        },
+                        onDragAmount = { delta ->
+                            val cur = dragPositionInRoot ?: Offset.Zero
+                            val next = cur + delta
+                            dragPositionInRoot = next
+                            val target = folderBounds.entries.firstOrNull { (_, rect) -> rect.contains(next) }
+                            if (hoveredFolderId != target?.key) {
+                                if (target != null) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                }
+                                hoveredFolderId = target?.key
+                            }
+                        },
+                        onDragEnd = {
+                            val targetId = hoveredFolderId
+                            val currentDragged = draggedNote
+                            if (currentDragged != null && targetId != null) {
+                                val targetFolder = folders.find { it.id == targetId }
+                                if (targetFolder != null && currentDragged.folderId != targetFolder.id) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onUpdateNote(currentDragged.copy(folderId = targetFolder.id, updatedAtMillis = System.currentTimeMillis()))
+                                    Toast.makeText(context, "'${currentDragged.title.ifBlank { "Not" }}' -> '${targetFolder.name}' klasörüne taşındı 📁", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                            draggedNote = null
+                            dragPositionInRoot = null
+                            hoveredFolderId = null
+                        },
+                        onDragCancel = {
+                            draggedNote = null
+                            dragPositionInRoot = null
+                            hoveredFolderId = null
+                        }
                     )
+                }
+            }
+        }
+
+        // ================= FLOATING CONTEXTUAL CONTROL BAR =================
+        // Ekranda yüzer şekilde açılır; kullanıcı sayfanın en altında olsa bile yukarı çıkmadan silme, taşıma, renklendirme yapar.
+        AnimatedVisibility(
+            visible = isSelectionMode,
+            enter = slideInVertically(initialOffsetY = { it * 2 }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it * 2 }) + fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(horizontal = 14.dp, vertical = 12.dp)
+                .navigationBarsPadding()
+                .zIndex(95f)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                tonalElevation = 8.dp,
+                shadowElevation = 8.dp,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                modifier = Modifier.shadow(10.dp, RoundedCornerShape(28.dp))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    IconButton(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        selectedNoteIds = emptySet()
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Seçimi Temizle",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Text(
+                        text = "${selectedNoteIds.size}",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+
+                    // Select all / deselect
+                    IconButton(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        selectedNoteIds = if (selectedNoteIds.size == currentFolderNotes.size) {
+                            emptySet()
+                        } else {
+                            currentFolderNotes.map { it.id }.toSet()
+                        }
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.SelectAll,
+                            contentDescription = "Tümünü Seç",
+                            tint = if (selectedNoteIds.size == currentFolderNotes.size) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    // Pin / Unpin
+                    IconButton(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        val selectedNotes = notes.filter { selectedNoteIds.contains(it.id) }
+                        val anyUnpinned = selectedNotes.any { !it.isPinned }
+                        selectedNotes.forEach { note ->
+                            onUpdateNote(note.copy(isPinned = anyUnpinned))
+                        }
+                    }) {
+                        val allPinned = notes.filter { selectedNoteIds.contains(it.id) }.all { it.isPinned }
+                        Icon(
+                            imageVector = if (allPinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
+                            contentDescription = "Sabitle / Kaldır",
+                            tint = if (allPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    // Move to folder
+                    IconButton(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        showMoveToFolderDialog = true
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.DriveFileMove,
+                            contentDescription = "Klasöre Taşı",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    // Batch theme color
+                    IconButton(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        showBatchColorDialog = true
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Palette,
+                            contentDescription = "Renk Değiştir",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    // Batch delete
+                    IconButton(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (confirmDelete) {
+                            showBatchDeleteConfirm = true
+                        } else {
+                            notes.filter { selectedNoteIds.contains(it.id) }.forEach { onDeleteNote(it) }
+                            selectedNoteIds = emptySet()
+                        }
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteOutline,
+                            contentDescription = "Sil",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+        }
+
+        // ================= DRAG & DROP FLOATING PREVIEW =================
+        if (draggedNote != null && dragPositionInRoot != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(100f)
+            ) {
+                val pos = dragPositionInRoot!!
+                val targetFolder = folders.find { it.id == hoveredFolderId }
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shadowElevation = 14.dp,
+                    border = BorderStroke(
+                        2.dp,
+                        if (hoveredFolderId != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                    ),
+                    modifier = Modifier
+                        .graphicsLayer {
+                            translationX = (pos.x - 110.dp.toPx()).coerceAtLeast(0f)
+                            translationY = (pos.y - 70.dp.toPx()).coerceAtLeast(0f)
+                            rotationZ = -3f
+                            alpha = 0.95f
+                        }
+                        .width(220.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (hoveredFolderId != null) Icons.Default.DriveFileMove else Icons.Default.Description,
+                                contentDescription = null,
+                                tint = if (hoveredFolderId != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (targetFolder != null) "${targetFolder.name} Klasörüne Bırak 📥" else "Klasöre Taşı...",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = if (hoveredFolderId != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = draggedNote!!.title.ifBlank { "Başlıksız Not" },
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
         }
@@ -705,110 +1078,121 @@ fun NotesScreen(
             )
         }
 
-        // Google Keep Floating Action Button + Speed Dial Menu
-        Column(
-            horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 4.dp)
-        ) {
-            // Speed Dial Pill Buttons (Visible when open)
-            AnimatedVisibility(
-                visible = isFabMenuOpen,
-                enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
-                exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 })
+        // Google Keep Floating Action Button + Speed Dial Menu (Hidden in Selection Mode)
+        if (!isSelectionMode) {
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 4.dp)
             ) {
-                Column(
-                    horizontalAlignment = Alignment.End,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                // Speed Dial Pill Buttons (Visible when open)
+                AnimatedVisibility(
+                    visible = isFabMenuOpen,
+                    enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
+                    exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 })
                 ) {
-                    // 1. Rapor
-                    KeepSpeedDialPill(
-                        text = "Rapor",
-                        icon = Icons.Default.Assessment,
-                        accentColor = Color(0xFFE53935),
-                        onClick = {
-                            isFabMenuOpen = false
-                            showReportDialog = true
-                        }
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // 1. Rapor
+                        KeepSpeedDialPill(
+                            text = "Rapor",
+                            icon = Icons.Default.Assessment,
+                            accentColor = Color(0xFFE53935),
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                isFabMenuOpen = false
+                                showReportDialog = true
+                            }
+                        )
 
-                    // 2. Klasör
-                    KeepSpeedDialPill(
-                        text = "Klasör",
-                        icon = Icons.Default.Folder,
-                        accentColor = Color(0xFF1E88E5),
-                        onClick = {
-                            isFabMenuOpen = false
-                            showFolderDialog = true
-                        }
-                    )
+                        // 2. Klasör
+                        KeepSpeedDialPill(
+                            text = "Klasör",
+                            icon = Icons.Default.Folder,
+                            accentColor = Color(0xFF1E88E5),
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                isFabMenuOpen = false
+                                showFolderDialog = true
+                            }
+                        )
 
-                    // 3. Resim
-                    KeepSpeedDialPill(
-                        text = "Resim",
-                        icon = Icons.Default.Image,
-                        accentColor = Color(0xFF43A047),
-                        onClick = {
-                            isFabMenuOpen = false
-                            photoPickerLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                            )
-                        }
-                    )
+                        // 3. Resim
+                        KeepSpeedDialPill(
+                            text = "Resim",
+                            icon = Icons.Default.Image,
+                            accentColor = Color(0xFF43A047),
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                isFabMenuOpen = false
+                                photoPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            }
+                        )
 
-                    // 4. Çizim
-                    KeepSpeedDialPill(
-                        text = "Çizim",
-                        icon = Icons.Default.Brush,
-                        accentColor = Color(0xFF8E24AA),
-                        onClick = {
-                            isFabMenuOpen = false
-                            showDrawingDialog = true
-                        }
-                    )
+                        // 4. Çizim
+                        KeepSpeedDialPill(
+                            text = "Çizim",
+                            icon = Icons.Default.Brush,
+                            accentColor = Color(0xFF8E24AA),
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                isFabMenuOpen = false
+                                showDrawingDialog = true
+                            }
+                        )
 
-                    // 5. Liste
-                    KeepSpeedDialPill(
-                        text = "Liste",
-                        icon = Icons.Default.FormatListBulleted,
-                        accentColor = Color(0xFFFB8C00),
-                        onClick = {
-                            isFabMenuOpen = false
-                            showChecklistDialog = true
-                        }
-                    )
+                        // 5. Liste
+                        KeepSpeedDialPill(
+                            text = "Liste",
+                            icon = Icons.Default.FormatListBulleted,
+                            accentColor = Color(0xFFFB8C00),
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                isFabMenuOpen = false
+                                showChecklistDialog = true
+                            }
+                        )
 
-                    // 6. Metin
-                    KeepSpeedDialPill(
-                        text = "Metin",
-                        icon = Icons.Default.TextFields,
-                        accentColor = MaterialTheme.colorScheme.primary,
-                        onClick = {
-                            isFabMenuOpen = false
-                            showTextNoteDialog = true
-                        }
+                        // 6. Metin
+                        KeepSpeedDialPill(
+                            text = "Metin",
+                            icon = Icons.Default.TextFields,
+                            accentColor = MaterialTheme.colorScheme.primary,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                isFabMenuOpen = false
+                                showTextNoteDialog = true
+                            }
+                        )
+                    }
+                }
+
+                // Main FAB: Toggle '+' or '✕' - Rounded square shape matching Homework FAB
+                FloatingActionButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        isFabMenuOpen = !isFabMenuOpen
+                    },
+                    shape = RoundedCornerShape(16.dp),
+                    containerColor = if (isFabMenuOpen) Color(0xFFA6D0F2) else MaterialTheme.colorScheme.primary,
+                    contentColor = if (isFabMenuOpen) Color(0xFF003355) else MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier
+                        .size(56.dp)
+                        .shadow(6.dp, RoundedCornerShape(16.dp))
+                        .testTag("notes_fab_toggle")
+                ) {
+                    Icon(
+                        imageVector = if (isFabMenuOpen) Icons.Default.Close else Icons.Default.Add,
+                        contentDescription = if (isFabMenuOpen) "Kapat" else "Yeni Ekle",
+                        modifier = Modifier.size(28.dp)
                     )
                 }
-            }
-
-            // Main FAB: Toggle '+' or '✕' - Rounded square shape matching Homework FAB
-            FloatingActionButton(
-                onClick = { isFabMenuOpen = !isFabMenuOpen },
-                shape = RoundedCornerShape(16.dp),
-                containerColor = if (isFabMenuOpen) Color(0xFFA6D0F2) else MaterialTheme.colorScheme.primary,
-                contentColor = if (isFabMenuOpen) Color(0xFF003355) else MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier
-                    .size(56.dp)
-                    .shadow(6.dp, RoundedCornerShape(16.dp))
-                    .testTag("notes_fab_toggle")
-            ) {
-                Icon(
-                    imageVector = if (isFabMenuOpen) Icons.Default.Close else Icons.Default.Add,
-                    contentDescription = if (isFabMenuOpen) "Kapat" else "Yeni Ekle",
-                    modifier = Modifier.size(28.dp)
-                )
             }
         }
     }
@@ -984,7 +1368,177 @@ fun NotesScreen(
         }
     }
 
-    // Delete Confirmation Dialog
+    // Batch Move to Folder Dialog
+    if (showMoveToFolderDialog) {
+        KeepMoveNotesToFolderDialog(
+            selectedCount = selectedNoteIds.size,
+            folders = folders,
+            onDismiss = { showMoveToFolderDialog = false },
+            onSelectTargetFolder = { targetFolderId ->
+                val selectedNotes = notes.filter { selectedNoteIds.contains(it.id) }
+                selectedNotes.forEach { note ->
+                    onUpdateNote(note.copy(folderId = targetFolderId, updatedAtMillis = System.currentTimeMillis()))
+                }
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                val targetName = folders.find { it.id == targetFolderId }?.name ?: "Genel / Klasörsüz"
+                Toast.makeText(context, "${selectedNotes.size} not '$targetName' klasörüne taşındı 📁", Toast.LENGTH_SHORT).show()
+                selectedNoteIds = emptySet()
+                showMoveToFolderDialog = false
+            }
+        )
+    }
+
+    // Batch Change Color Dialog
+    if (showBatchColorDialog) {
+        KeepBatchColorDialog(
+            selectedCount = selectedNoteIds.size,
+            onDismiss = { showBatchColorDialog = false },
+            onColorSelected = { colorHex ->
+                val selectedNotes = notes.filter { selectedNoteIds.contains(it.id) }
+                selectedNotes.forEach { note ->
+                    onUpdateNote(note.copy(colorHex = colorHex, updatedAtMillis = System.currentTimeMillis()))
+                }
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                Toast.makeText(context, "${selectedNotes.size} notun teması güncellendi 🎨", Toast.LENGTH_SHORT).show()
+                selectedNoteIds = emptySet()
+                showBatchColorDialog = false
+            }
+        )
+    }
+
+    // Batch Delete Confirmation Dialog
+    if (showBatchDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showBatchDeleteConfirm = false },
+            title = { Text("Seçilen Notları Sil") },
+            text = { Text("Seçili ${selectedNoteIds.size} not silinsin mi? Bu işlem geri alınamaz.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    val toDelete = notes.filter { selectedNoteIds.contains(it.id) }
+                    toDelete.forEach { onDeleteNote(it) }
+                    selectedNoteIds = emptySet()
+                    showBatchDeleteConfirm = false
+                    Toast.makeText(context, "${toDelete.size} not silindi", Toast.LENGTH_SHORT).show()
+                }) {
+                    Text("Sil", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBatchDeleteConfirm = false }) {
+                    Text("İptal")
+                }
+            }
+        )
+    }
+
+    // Folder Options Dialog (Triggered on folder long-press)
+    if (folderOptionsToManage != null) {
+        val folder = folderOptionsToManage!!
+        val isDeneme = folder.name.contains("Deneme", ignoreCase = true)
+        AlertDialog(
+            onDismissRequest = { folderOptionsToManage = null },
+            icon = {
+                Icon(
+                    imageVector = if (isDeneme) Icons.Default.Assessment else Icons.Default.Folder,
+                    contentDescription = null,
+                    tint = try { Color(android.graphics.Color.parseColor(folder.colorHex)) } catch (_: Exception) { MaterialTheme.colorScheme.primary }
+                )
+            },
+            title = { Text(folder.name) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (isDeneme) {
+                        Text(
+                            text = "Bu klasör TYT & AYT Deneme Sınavları ve Net Karneleri için özel olarak ayrılmış kalıcı bir sistem klasörüdür ve silinemez.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Text(
+                            text = "Bu klasör için yapmak istediğiniz işlemi seçin:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        OutlinedButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                folderToEdit = folder
+                                folderOptionsToManage = null
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Klasörü Düzenle (Ad & Renk)")
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                folderToDeleteConfirm = folder
+                                folderOptionsToManage = null
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.DeleteOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Klasörü Sil", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { folderOptionsToManage = null }) {
+                    Text("Tamam")
+                }
+            }
+        )
+    }
+
+    // Edit Folder Dialog
+    if (folderToEdit != null) {
+        KeepEditFolderDialog(
+            folder = folderToEdit!!,
+            onDismiss = { folderToEdit = null },
+            onSave = { updatedFolder ->
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onUpdateFolder(updatedFolder)
+                folderToEdit = null
+            }
+        )
+    }
+
+    // Delete Folder Confirmation Dialog
+    if (folderToDeleteConfirm != null) {
+        val folder = folderToDeleteConfirm!!
+        val isDeneme = folder.name.contains("Deneme", ignoreCase = true)
+        if (!isDeneme) {
+            AlertDialog(
+                onDismissRequest = { folderToDeleteConfirm = null },
+                title = { Text("Klasörü Sil") },
+                text = { Text("'${folder.name}' klasörü ve içerisindeki notlar silinsin mi?") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onDeleteFolder(folder)
+                        folderToDeleteConfirm = null
+                    }) {
+                        Text("Sil", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { folderToDeleteConfirm = null }) {
+                        Text("İptal")
+                    }
+                }
+            )
+        } else {
+            folderToDeleteConfirm = null
+        }
+    }
+
+    // Delete Note Confirmation Dialog
     if (noteToDeleteConfirm != null) {
         AlertDialog(
             onDismissRequest = { noteToDeleteConfirm = null },
@@ -992,6 +1546,7 @@ fun NotesScreen(
             text = { Text("'${noteToDeleteConfirm?.title?.ifBlank { "Bu not" }}' silinsin mi?") },
             confirmButton = {
                 TextButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     noteToDeleteConfirm?.let { onDeleteNote(it) }
                     noteToDeleteConfirm = null
                 }) {
@@ -1007,17 +1562,119 @@ fun NotesScreen(
     }
 }
 
-// ================= NOTE FOLDER CARDS (IN-GRID) =================
+// ================= 1. FEATURED LONG CARD: DENEME SINAVLARI (NON-DELETABLE) =================
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun DenemeExamFolderCard(
+    folder: NoteFolder,
+    noteCount: Int,
+    isHovered: Boolean = false,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    val haptic = LocalHapticFeedback.current
+    Card(
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isHovered) Color(0xFFDBEAFE) else MaterialTheme.colorScheme.surfaceContainerHigh
+        ),
+        border = BorderStroke(
+            if (isHovered) 2.5.dp else 1.2.dp,
+            if (isHovered) MaterialTheme.colorScheme.primary else Color(0xFF2563EB).copy(alpha = 0.35f)
+        ),
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onLongClick()
+                }
+            )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color(0xFF2563EB).copy(alpha = 0.15f),
+                    modifier = Modifier.size(46.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Assessment,
+                            contentDescription = "Deneme Sınavları",
+                            tint = Color(0xFF2563EB),
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = folder.name,
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Color(0xFF2563EB).copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = "SİSTEM",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                                color = Color(0xFF2563EB),
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = if (isHovered) "📥 Deneme Raporunu Buraya Bırak" else "$noteCount Deneme Raporu • TYT & AYT Net Takibi 📊",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (isHovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Icon(
+                imageVector = Icons.Default.Timeline,
+                contentDescription = null,
+                tint = Color(0xFF2563EB).copy(alpha = 0.75f),
+                modifier = Modifier.size(24.dp)
+            )
+        }
+    }
+}
+
+// ================= 2. REGULAR NOTE FOLDER CARDS (MATERIAL 3 STYLED) =================
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun NoteFolderCard(
     folder: NoteFolder,
     noteCount: Int,
+    isHovered: Boolean = false,
     onClick: () -> Unit,
-    onDelete: () -> Unit,
+    onLongClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val haptic = LocalHapticFeedback.current
     val folderColor = remember(folder.colorHex) {
         try {
             Color(android.graphics.Color.parseColor(folder.colorHex))
@@ -1029,69 +1686,275 @@ fun NoteFolderCard(
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = folderColor.copy(alpha = 0.12f)
+            containerColor = if (isHovered) folderColor.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surfaceContainerHigh
         ),
-        border = BorderStroke(1.2.dp, folderColor.copy(alpha = 0.35f)),
+        border = BorderStroke(
+            if (isHovered) 2.dp else 1.dp,
+            if (isHovered) folderColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        ),
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onLongClick()
+                }
+            )
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = folderColor.copy(alpha = 0.18f),
+                modifier = Modifier.size(38.dp)
             ) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = folderColor.copy(alpha = 0.22f),
-                    modifier = Modifier.size(38.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.Folder,
-                            contentDescription = null,
-                            tint = folderColor,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.width(10.dp))
-                Column {
-                    Text(
-                        text = folder.name,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "$noteCount not",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Folder,
+                        contentDescription = null,
+                        tint = folderColor,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
-
-            IconButton(
-                onClick = onDelete,
-                modifier = Modifier.size(26.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.DeleteOutline,
-                    contentDescription = "Klasörü Sil",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    modifier = Modifier.size(17.dp)
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = folder.name,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = if (isHovered) "📥 Notu Buraya Bırak" else "$noteCount not",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isHovered) folderColor else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
     }
+}
+
+// ================= 3. BATCH & FOLDER DIALOGS =================
+
+@Composable
+fun KeepMoveNotesToFolderDialog(
+    selectedCount: Int,
+    folders: List<NoteFolder>,
+    onDismiss: () -> Unit,
+    onSelectTargetFolder: (Long?) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("$selectedCount Notu Klasöre Taşı 📁") },
+        text = {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 320.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // Option: Root / Genel
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { onSelectTargetFolder(null) }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Description, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Genel (Klasörsüz)", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+                        }
+                    }
+                }
+
+                items(folders) { folder ->
+                    val fColor = remember(folder.colorHex) {
+                        try { Color(android.graphics.Color.parseColor(folder.colorHex)) } catch (_: Exception) { Color(0xFF1B65D4) }
+                    }
+                    val isDeneme = folder.name.contains("Deneme", ignoreCase = true)
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = fColor.copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, fColor.copy(alpha = 0.35f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { onSelectTargetFolder(folder.id) }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = if (isDeneme) Icons.Default.Assessment else Icons.Default.Folder,
+                                contentDescription = null,
+                                tint = fColor,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = folder.name,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("İptal")
+            }
+        }
+    )
+}
+
+@Composable
+fun KeepBatchColorDialog(
+    selectedCount: Int,
+    onDismiss: () -> Unit,
+    onColorSelected: (String) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("$selectedCount Notun Temasını Değiştir 🎨") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "Tüm seçili notlar için bir renk teması seçin:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                LazyVerticalStaggeredGrid(
+                    columns = StaggeredGridCells.Fixed(4),
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalItemSpacing = 8.dp
+                ) {
+                    items(GoogleKeepColors) { (hex, name) ->
+                        val isDefault = hex == "#FFFFFF"
+                        val c = remember(hex) {
+                            try { Color(android.graphics.Color.parseColor(hex)) } catch (_: Exception) { Color.White }
+                        }
+                        Surface(
+                            shape = CircleShape,
+                            color = if (isDefault) MaterialTheme.colorScheme.surfaceVariant else c,
+                            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outlineVariant),
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .clickable { onColorSelected(hex) }
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                if (isDefault) {
+                                    Icon(
+                                        imageVector = Icons.Default.Clear,
+                                        contentDescription = name,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("İptal")
+            }
+        }
+    )
+}
+
+@Composable
+fun KeepEditFolderDialog(
+    folder: NoteFolder,
+    onDismiss: () -> Unit,
+    onSave: (NoteFolder) -> Unit
+) {
+    var name by remember { mutableStateOf(folder.name) }
+    var selectedColor by remember { mutableStateOf(folder.colorHex) }
+
+    val folderColors = listOf(
+        "#1E88E5", "#43A047", "#E53935", "#8E24AA",
+        "#FB8C00", "#00ACC1", "#3949AB", "#D81B60"
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Klasörü Düzenle 📁") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Klasör Adı") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Text("Klasör Rengi:", style = MaterialTheme.typography.labelMedium)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    folderColors.forEach { hex ->
+                        val c = remember(hex) { Color(android.graphics.Color.parseColor(hex)) }
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(c)
+                                .border(
+                                    width = if (selectedColor.equals(hex, ignoreCase = true)) 3.dp else 1.dp,
+                                    color = if (selectedColor.equals(hex, ignoreCase = true)) Color.Black else Color.Transparent,
+                                    shape = CircleShape
+                                )
+                                .clickable { selectedColor = hex }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            OutlinedButton(
+                onClick = {
+                    if (name.isNotBlank()) {
+                        onSave(folder.copy(name = name.trim(), colorHex = selectedColor))
+                    }
+                },
+                enabled = name.isNotBlank()
+            ) {
+                Text("Kaydet")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("İptal")
+            }
+        }
+    )
 }
 
 @Composable
@@ -1150,8 +2013,15 @@ fun TytExamReportCard(
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
     onTogglePin: () -> Unit,
+    onStartDrag: ((Note, Offset) -> Unit)? = null,
+    onDragAmount: ((Offset) -> Unit)? = null,
+    onDragEnd: (() -> Unit)? = null,
+    onDragCancel: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val haptic = LocalHapticFeedback.current
+    var cardOffsetInRoot by remember { mutableStateOf(Offset.Zero) }
+
     Card(
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
@@ -1162,6 +2032,7 @@ fun TytExamReportCard(
         else BorderStroke(1.5.dp, Color(0xFF2563EB).copy(alpha = 0.35f)),
         modifier = modifier
             .fillMaxWidth()
+            .onGloballyPositioned { coords -> cardOffsetInRoot = coords.boundsInRoot().topLeft }
             .clip(RoundedCornerShape(18.dp))
             .combinedClickable(
                 onClick = onClick,
@@ -1169,7 +2040,7 @@ fun TytExamReportCard(
             )
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            // Header: TYT Badge + Pin / Selection
+            // Header: TYT Badge + Drag Handle + Pin / Selection
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1207,6 +2078,30 @@ fun TytExamReportCard(
                             modifier = Modifier.size(22.dp).padding(end = 4.dp)
                         )
                     }
+
+                    // Drag Handle icon for drag & drop
+                    Icon(
+                        imageVector = Icons.Default.DragHandle,
+                        contentDescription = "Sürükle ve Klasöre Bırak",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier
+                            .size(24.dp)
+                            .padding(horizontal = 2.dp)
+                            .pointerInput(note.id) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = { localOffset ->
+                                        onStartDrag?.invoke(note, cardOffsetInRoot + localOffset)
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        onDragAmount?.invoke(dragAmount)
+                                    },
+                                    onDragEnd = { onDragEnd?.invoke() },
+                                    onDragCancel = { onDragCancel?.invoke() }
+                                )
+                            }
+                    )
+
                     IconButton(
                         onClick = onTogglePin,
                         modifier = Modifier.size(24.dp)
@@ -1424,8 +2319,15 @@ fun GoogleKeepNoteCard(
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
     onTogglePin: () -> Unit,
+    onStartDrag: ((Note, Offset) -> Unit)? = null,
+    onDragAmount: ((Offset) -> Unit)? = null,
+    onDragEnd: (() -> Unit)? = null,
+    onDragCancel: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val haptic = LocalHapticFeedback.current
+    var cardOffsetInRoot by remember { mutableStateOf(Offset.Zero) }
+
     val isDefaultColor = remember(note.colorHex) {
         note.colorHex.isBlank() || note.colorHex.equals("#FFFFFF", ignoreCase = true) || note.colorHex.equals("DEFAULT", ignoreCase = true)
     }
@@ -1468,6 +2370,7 @@ fun GoogleKeepNoteCard(
         },
         modifier = modifier
             .fillMaxWidth()
+            .onGloballyPositioned { coords -> cardOffsetInRoot = coords.boundsInRoot().topLeft }
             .clip(RoundedCornerShape(16.dp))
             .combinedClickable(
                 onClick = onClick,
@@ -1479,7 +2382,7 @@ fun GoogleKeepNoteCard(
                 .fillMaxWidth()
                 .padding(12.dp)
         ) {
-            // Header: Title, Pin Icon and Selection Indicator
+            // Header: Title, Drag Handle, Pin Icon and Selection Indicator
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top,
@@ -1507,6 +2410,30 @@ fun GoogleKeepNoteCard(
                             modifier = Modifier.size(20.dp).padding(end = 4.dp)
                         )
                     }
+
+                    // Drag handle for dragging note to folder
+                    Icon(
+                        imageVector = Icons.Default.DragHandle,
+                        contentDescription = "Sürükle ve Klasöre Bırak",
+                        tint = contentTextColor.copy(alpha = 0.6f),
+                        modifier = Modifier
+                            .size(24.dp)
+                            .padding(horizontal = 2.dp)
+                            .pointerInput(note.id) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = { localOffset ->
+                                        onStartDrag?.invoke(note, cardOffsetInRoot + localOffset)
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        onDragAmount?.invoke(dragAmount)
+                                    },
+                                    onDragEnd = { onDragEnd?.invoke() },
+                                    onDragCancel = { onDragCancel?.invoke() }
+                                )
+                            }
+                    )
+
                     IconButton(
                         onClick = onTogglePin,
                         modifier = Modifier.size(24.dp)

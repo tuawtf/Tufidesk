@@ -357,6 +357,12 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                             snackbarHostState.showSnackbar("'$name' klasörü oluşturuldu 📁")
                         }
                     },
+                    onUpdateFolder = { folder ->
+                        viewModel.updateFolder(folder)
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("Klasör güncellendi 📁")
+                        }
+                    },
                     onDeleteFolder = { folder ->
                         viewModel.deleteFolder(folder)
                         coroutineScope.launch {
