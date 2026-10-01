@@ -37,28 +37,26 @@ jobs:
           sed -i 's/versionCode = .*/versionCode = '${{ github.run_number }}'/' app/build.gradle.kts
           sed -i 's/versionName = .*/versionName = "'"$VERSION_NAME"'"/' app/build.gradle.kts
 
-      - name: Kalici Release Keystore Olustur ve Sabitle
+      - name: Kalici Keystore Olustur ve Sabitle
         run: |
           if [ -f ".env.example" ] && [ ! -f ".env" ]; then
             cp .env.example .env
           fi
 
-          # Eger gercek release.jks yoksa, 25 yil gecerli profesyonel anahtar uret
-          if [ ! -f "release.jks" ]; then
-            echo "Kalici Release Keystore uretiliyor..."
-            keytool -genkeypair -v -keystore release.jks -alias tufidesk -keyalg RSA -keysize 2048 -validity 10000 -storepass "TufideskKey2026" -keypass "TufideskKey2026" -dname "CN=Tufidesk, O=Tufi, C=TR"
+          # Gradle'in bekledigi sifreyle (android) 27 yil gecerli kalici anahtar uret
+          if [ ! -f "debug.keystore" ]; then
+            echo "Kalici debug.keystore olusturuluyor..."
+            keytool -genkeypair -v -keystore debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Tufidesk, O=Tufi, C=TR"
             
             git config --global user.name "github-actions[bot]"
             git config --global user.email "github-actions[bot]@users.noreply.github.com"
-            git add -f release.jks
-            git commit -m "ci: kalici resmi release keystore eklendi [skip ci]"
-            git push
+            git add -f debug.keystore
+            git commit -m "ci: kalici debug keystore eklendi [skip ci]" || true
+            git push || true
           else
-            echo "Mevcut sabit release.jks kullaniliyor."
+            echo "Mevcut debug.keystore kullaniliyor."
           fi
 
-          # debug.keystore gereksinimi varsa onu da ayni anahtardan bagla
-          cp release.jks debug.keystore
           gradle wrapper --gradle-version 9.3.1
           chmod +x gradlew
 
