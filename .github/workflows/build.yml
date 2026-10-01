@@ -5,6 +5,9 @@ on:
     branches: [ "main", "master" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -29,7 +32,6 @@ jobs:
           if [ -f ".env.example" ] && [ ! -f ".env" ]; then
             cp .env.example .env
           fi
-          # Hata veren debug.keystore dosyasini burada sanal olarak olusturuyoruz
           keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           gradle wrapper --gradle-version 9.3.1
           chmod +x gradlew
@@ -37,8 +39,13 @@ jobs:
       - name: APK Derle
         run: ./gradlew assembleDebug --stacktrace
 
-      - name: APK Dosyasini Yukle
-        uses: actions/upload-artifact@v4
+      - name: Otomatik Release Olustur ve APK Ekle
+        uses: softprops/action-gh-release@v2
         with:
-          name: app-debug
-          path: app/build/outputs/apk/debug/*.apk
+          tag_name: "v1.0-${{ github.run_number }}"
+          name: "Tufidesk Build #${{ github.run_number }}"
+          draft: false
+          prerelease: false
+          files: app/build/outputs/apk/debug/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
