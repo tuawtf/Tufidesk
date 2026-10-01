@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.CloudDone
@@ -47,6 +48,7 @@ import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.outlined.Assignment
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -82,6 +84,7 @@ import com.example.data.model.Course
 import com.example.data.model.Homework
 import com.example.data.model.UserRole
 import com.example.data.repository.HomeworkRepository
+import com.example.data.repository.NotesRepository
 import com.example.ui.HomeworkViewModel
 import com.example.ui.HomeworkViewModelFactory
 import com.example.ui.components.AddCourseDialog
@@ -90,6 +93,7 @@ import com.example.ui.screens.CalendarScreen
 import com.example.ui.screens.CoursesScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.LoginScreen
+import com.example.ui.screens.NotesScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.StatsScreen
 import com.example.ui.theme.MyApplicationTheme
@@ -106,8 +110,8 @@ sealed class Screen(
 ) {
     data object Home : Screen("home", "Ödevler", Icons.Filled.Assignment, Icons.Outlined.Assignment)
     data object Calendar : Screen("calendar", "Takvim", Icons.Filled.CalendarMonth, Icons.Outlined.CalendarMonth)
-    data object Courses : Screen("courses", "Dersler", Icons.Filled.School, Icons.Outlined.School)
     data object Stats : Screen("stats", "İstatistik", Icons.Filled.BarChart, Icons.Outlined.BarChart)
+    data object Notes : Screen("notes", "Notlar", Icons.Filled.Description, Icons.Outlined.Description)
     data object Settings : Screen("settings", "Ayarlar", Icons.Filled.Settings, Icons.Outlined.Settings)
 }
 
@@ -116,13 +120,14 @@ class MainActivity : ComponentActivity() {
     private val viewModel: HomeworkViewModel by viewModels {
         val database = AppDatabase.getInstance(applicationContext)
         val repository = HomeworkRepository(database.courseDao(), database.homeworkDao())
+        val notesRepository = NotesRepository(database.noteDao())
         val authManager = AuthManager(applicationContext)
         val syncManager = FirebaseSyncManager(
             applicationContext,
             repository,
             CoroutineScope(Dispatchers.IO + SupervisorJob())
         )
-        HomeworkViewModelFactory(repository, authManager, syncManager)
+        HomeworkViewModelFactory(repository, authManager, syncManager, notesRepository)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -168,6 +173,11 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
     val syncErrorMessage by viewModel.syncErrorMessage.collectAsStateWithLifecycle()
     val adminAssignedFilter by viewModel.adminAssignedFilter.collectAsStateWithLifecycle()
 
+    val userNotes by viewModel.userNotes.collectAsStateWithLifecycle()
+    val noteFolders by viewModel.allNoteFolders.collectAsStateWithLifecycle()
+    val selectedNoteFolderId by viewModel.selectedNoteFolderId.collectAsStateWithLifecycle()
+    val noteSearchQuery by viewModel.noteSearchQuery.collectAsStateWithLifecycle()
+
     if (currentUser == null) {
         LoginScreen(
             onSelectProfile = { profile ->
@@ -195,8 +205,8 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
     val navItems = listOf(
         Screen.Home,
         Screen.Calendar,
-        Screen.Courses,
         Screen.Stats,
+        Screen.Notes,
         Screen.Settings
     )
 
@@ -215,8 +225,8 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
             }
         }
         1 -> "Ödev Takvimi"
-        2 -> "Derslerim"
-        3 -> "İstatistikler"
+        2 -> "İstatistikler"
+        3 -> "Notlar & Raporlar"
         4 -> "Ayarlar"
         else -> "TufiDESK"
     }
@@ -286,31 +296,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     canManage = canManage
                 )
 
-                2 -> CoursesScreen(
-                    courses = courses,
-                    allHomeworks = allHomeworks,
-                    onAddCourse = {
-                        courseToEdit = null
-                        showAddEditCourseDialog = true
-                    },
-                    onEditCourse = { course ->
-                        courseToEdit = course
-                        showAddEditCourseDialog = true
-                    },
-                    onDeleteCourse = { course ->
-                        viewModel.deleteCourse(course)
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("${course.name} dersi silindi")
-                        }
-                    },
-                    onSelectCourseToFilter = { courseId ->
-                        viewModel.setCourseFilter(courseId)
-                        currentTab = 0 // Navigate to Home with this course filtered
-                    },
-                    canManage = canManage
-                )
-
-                3 -> StatsScreen(
+                2 -> StatsScreen(
                     stats = stats,
                     courses = courses,
                     homeworks = userHomeworks,
@@ -321,6 +307,50 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                             snackbarHostState.showSnackbar(msg)
                         }
                     }
+                )
+
+                3 -> NotesScreen(
+                    notes = userNotes,
+                    folders = noteFolders,
+                    selectedFolderId = selectedNoteFolderId,
+                    searchQuery = noteSearchQuery,
+                    onSelectFolder = { viewModel.setSelectedNoteFolder(it) },
+                    onSearchQueryChange = { viewModel.setNoteSearchQuery(it) },
+                    onInsertNote = { note ->
+                        viewModel.insertNote(note)
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("Not kaydedildi 📝")
+                        }
+                    },
+                    onUpdateNote = { note ->
+                        viewModel.updateNote(note)
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("Not güncellendi")
+                        }
+                    },
+                    onDeleteNote = { note ->
+                        viewModel.deleteNote(note)
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("Not silindi")
+                        }
+                    },
+                    onTogglePin = { note ->
+                        viewModel.toggleNotePin(note)
+                    },
+                    onCreateFolder = { name, colorHex ->
+                        viewModel.insertFolder(name, colorHex)
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("'$name' klasörü oluşturuldu 📁")
+                        }
+                    },
+                    onDeleteFolder = { folder ->
+                        viewModel.deleteFolder(folder)
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("Klasör silindi")
+                        }
+                    },
+                    canManage = canManage,
+                    currentUserAssigned = currentUser?.name ?: "Tuna"
                 )
 
                 4 -> SettingsScreen(

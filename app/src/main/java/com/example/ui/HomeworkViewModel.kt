@@ -8,8 +8,11 @@ import com.example.data.firebase.FirebaseSyncManager
 import com.example.data.model.Course
 import com.example.data.model.Homework
 import com.example.data.model.HomeworkWithCourse
+import com.example.data.model.Note
+import com.example.data.model.NoteFolder
 import com.example.data.model.UserAccount
 import com.example.data.repository.HomeworkRepository
+import com.example.data.repository.NotesRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -53,13 +56,15 @@ data class HomeworkStats(
 class HomeworkViewModel(
     private val repository: HomeworkRepository,
     private val authManager: AuthManager,
-    private val syncManager: FirebaseSyncManager
+    private val syncManager: FirebaseSyncManager,
+    private val notesRepository: NotesRepository
 ) : ViewModel() {
 
     init {
         viewModelScope.launch {
             repository.cleanupDuplicates()
             repository.seedInitialDataIfNeeded()
+            notesRepository.seedInitialNotesIfNeeded()
             syncManager.startRealtimeListeners()
             syncManager.syncWithCloud(silent = true)
             repository.cleanupDuplicates()
@@ -76,6 +81,101 @@ class HomeworkViewModel(
 
     fun setAdminAssignedFilter(filter: String) {
         adminAssignedFilter.value = filter
+    }
+
+    // Notes & Folders State Flows
+    val allNotes: StateFlow<List<Note>> = notesRepository.allNotes
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val allNoteFolders: StateFlow<List<NoteFolder>> = notesRepository.allFolders
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val selectedNoteFolderId = MutableStateFlow<Long?>(null)
+    val noteSearchQuery = MutableStateFlow("")
+
+    val userNotes: StateFlow<List<Note>> = combine(
+        allNotes,
+        currentUser,
+        selectedNoteFolderId,
+        noteSearchQuery
+    ) { notes, user, folderId, query ->
+        var list = notes
+        if (user != null) {
+            when {
+                user.isTuna -> list = list.filter { it.assignedTo.equals("Tuna", ignoreCase = true) }
+                user.isElif -> list = list.filter { it.assignedTo.equals("Elif", ignoreCase = true) }
+                else -> { /* teacher sees all */ }
+            }
+        }
+        if (folderId != null) {
+            list = list.filter { it.folderId == folderId }
+        }
+        if (query.isNotBlank()) {
+            val q = query.trim()
+            list = list.filter {
+                it.title.contains(q, ignoreCase = true) || it.content.contains(q, ignoreCase = true)
+            }
+        }
+        list
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    fun setSelectedNoteFolder(folderId: Long?) {
+        selectedNoteFolderId.value = folderId
+    }
+
+    fun setNoteSearchQuery(query: String) {
+        noteSearchQuery.value = query
+    }
+
+    fun insertNote(note: Note) {
+        viewModelScope.launch {
+            notesRepository.insertNote(note)
+        }
+    }
+
+    fun updateNote(note: Note) {
+        viewModelScope.launch {
+            notesRepository.updateNote(note)
+        }
+    }
+
+    fun deleteNote(note: Note) {
+        viewModelScope.launch {
+            notesRepository.deleteNote(note)
+        }
+    }
+
+    fun toggleNotePin(note: Note) {
+        viewModelScope.launch {
+            notesRepository.togglePin(note.id, !note.isPinned)
+        }
+    }
+
+    fun insertFolder(name: String, colorHex: String) {
+        viewModelScope.launch {
+            notesRepository.insertFolder(NoteFolder(name = name, colorHex = colorHex))
+        }
+    }
+
+    fun deleteFolder(folder: NoteFolder) {
+        viewModelScope.launch {
+            if (selectedNoteFolderId.value == folder.id) {
+                selectedNoteFolderId.value = null
+            }
+            notesRepository.deleteFolder(folder)
+        }
     }
 
     fun selectProfile(profile: UserAccount) {
@@ -551,12 +651,13 @@ class HomeworkViewModel(
 class HomeworkViewModelFactory(
     private val repository: HomeworkRepository,
     private val authManager: AuthManager,
-    private val syncManager: FirebaseSyncManager
+    private val syncManager: FirebaseSyncManager,
+    private val notesRepository: NotesRepository
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(HomeworkViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return HomeworkViewModel(repository, authManager, syncManager) as T
+            return HomeworkViewModel(repository, authManager, syncManager, notesRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
