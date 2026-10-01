@@ -26,11 +26,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
@@ -189,7 +189,7 @@ fun NotesScreen(
         LazyVerticalStaggeredGrid(
             columns = StaggeredGridCells.Fixed(if (isGridLayout) 2 else 1),
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 100.dp),
+            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 80.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalItemSpacing = 8.dp
         ) {
@@ -406,7 +406,7 @@ fun NotesScreen(
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "Ders notu, kontrol listesi, çizim veya deneme neti raporu eklemek için sağ alttaki '+' butonuna dokunun.",
+                                text = "Ders notu, kontrol listesi, çizim veya TYT deneme raporu eklemek için sağ alttaki '+' butonuna dokunun.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -441,20 +441,25 @@ fun NotesScreen(
                     }
                 }
 
-                items(pinnedNotes, key = { it.id }) { note ->
-                    GoogleKeepNoteCard(
-                        note = note,
-                        folder = folders.find { it.id == note.folderId },
-                        onClick = { noteToEdit = note },
-                        onTogglePin = { onTogglePin(note) },
-                        onDelete = {
-                            if (confirmDelete) {
-                                noteToDeleteConfirm = note
-                            } else {
-                                onDeleteNote(note)
-                            }
-                        }
-                    )
+                items(
+                    items = pinnedNotes,
+                    key = { it.id },
+                    span = { note -> if (note.type == NoteType.REPORT) StaggeredGridItemSpan.FullLine else StaggeredGridItemSpan.SingleLane }
+                ) { note ->
+                    if (note.type == NoteType.REPORT) {
+                        TytExamReportCard(
+                            note = note,
+                            onClick = { noteToEdit = note },
+                            onTogglePin = { onTogglePin(note) }
+                        )
+                    } else {
+                        GoogleKeepNoteCard(
+                            note = note,
+                            folder = folders.find { it.id == note.folderId },
+                            onClick = { noteToEdit = note },
+                            onTogglePin = { onTogglePin(note) }
+                        )
+                    }
                 }
             }
 
@@ -474,20 +479,25 @@ fun NotesScreen(
             }
 
             // Other Notes Items
-            items(otherNotes, key = { it.id }) { note ->
-                GoogleKeepNoteCard(
-                    note = note,
-                    folder = folders.find { it.id == note.folderId },
-                    onClick = { noteToEdit = note },
-                    onTogglePin = { onTogglePin(note) },
-                    onDelete = {
-                        if (confirmDelete) {
-                            noteToDeleteConfirm = note
-                        } else {
-                            onDeleteNote(note)
-                        }
-                    }
-                )
+            items(
+                items = otherNotes,
+                key = { it.id },
+                span = { note -> if (note.type == NoteType.REPORT) StaggeredGridItemSpan.FullLine else StaggeredGridItemSpan.SingleLane }
+            ) { note ->
+                if (note.type == NoteType.REPORT) {
+                    TytExamReportCard(
+                        note = note,
+                        onClick = { noteToEdit = note },
+                        onTogglePin = { onTogglePin(note) }
+                    )
+                } else {
+                    GoogleKeepNoteCard(
+                        note = note,
+                        folder = folders.find { it.id == note.folderId },
+                        onClick = { noteToEdit = note },
+                        onTogglePin = { onTogglePin(note) }
+                    )
+                }
             }
         }
 
@@ -505,12 +515,13 @@ fun NotesScreen(
         }
 
         // Google Keep Floating Action Button + Speed Dial Menu
+        // Lowered to normal natural FAB level directly above the island bottom bar
         Column(
             horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 16.dp)
+                .padding(end = 16.dp, bottom = 4.dp)
         ) {
             // Speed Dial Pill Buttons (Visible when open)
             AnimatedVisibility(
@@ -522,7 +533,7 @@ fun NotesScreen(
                     horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // 1. Rapor (Exam Net Score Report - Red Scratched in Screenshot)
+                    // 1. Rapor (TYT Practice Exam Report - Red Scratched in Screenshot)
                     KeepSpeedDialPill(
                         text = "Rapor",
                         icon = Icons.Default.Assessment,
@@ -599,7 +610,7 @@ fun NotesScreen(
                 containerColor = if (isFabMenuOpen) Color(0xFFA6D0F2) else MaterialTheme.colorScheme.primary,
                 contentColor = if (isFabMenuOpen) Color(0xFF003355) else MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier
-                    .size(58.dp)
+                    .size(56.dp)
                     .shadow(6.dp, CircleShape)
                     .testTag("notes_fab_toggle")
             ) {
@@ -691,9 +702,10 @@ fun NotesScreen(
         )
     }
 
-    // 6. Report Dialog (Rapor - Deneme Sınavı Netleri)
+    // 6. TYT Report Dialog (Deneme Sınavı Raporu)
     if (showReportDialog) {
         KeepReportEditDialog(
+            existingNote = null,
             folders = folders,
             selectedFolderId = selectedFolderId,
             currentUserAssigned = currentUserAssigned,
@@ -776,6 +788,208 @@ fun NotesScreen(
     }
 }
 
+// ================= TYT DENEME RAPORU KARTI =================
+// Deneme raporları bir not görünümü olarak değil, özel bir sınav karnesi Card'ı olarak görünür.
+
+@Composable
+fun TytExamReportCard(
+    note: Note,
+    onClick: () -> Unit,
+    onTogglePin: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+        ),
+        border = BorderStroke(1.5.dp, Color(0xFF2563EB).copy(alpha = 0.35f)),
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            // Header: TYT Badge + Pin
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFF2563EB).copy(alpha = 0.15f)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Assessment,
+                            contentDescription = null,
+                            tint = Color(0xFF2563EB),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "TYT DENEME RAPORU",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp),
+                            color = Color(0xFF2563EB)
+                        )
+                    }
+                }
+
+                IconButton(
+                    onClick = onTogglePin,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = if (note.isPinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
+                        contentDescription = "Sabitle",
+                        tint = if (note.isPinned) MaterialTheme.colorScheme.primary else Color(0xFF5F6368),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Title
+            Text(
+                text = note.title.ifBlank { "TYT Deneme Sınavı" },
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Parse Total Net
+            val totalNetRegex = "TOPLAM NET:\\s*([0-9.]+)\\s*/\\s*120".toRegex()
+            val netMatch = totalNetRegex.find(note.content)
+            val netValue = netMatch?.groupValues?.get(1) ?: run {
+                val altRegex = "TOPLAM NET:\\s*([0-9.]+)".toRegex()
+                altRegex.find(note.content)?.groupValues?.get(1) ?: "--"
+            }
+            val netNum = netValue.toDoubleOrNull() ?: 0.0
+            val percent = Math.round((netNum / 120.0) * 100)
+
+            // Prominent Net Score Dashboard
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text(
+                            text = "HESAPLANAN NET",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f)
+                        )
+                        Text(
+                            text = "$netValue / 120",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "%$percent",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 4 Mini Subject Pills (TYT: Türkçe, Matematik, Fen, Sosyal)
+            val turkceNet = "Türkçe[^:]*:\\s*([0-9.]+) Net".toRegex().find(note.content)?.groupValues?.get(1) ?: "--"
+            val matNet = "Matematik[^:]*:\\s*([0-9.]+) Net".toRegex().find(note.content)?.groupValues?.get(1) ?: "--"
+            val fenNet = "Fen[^:]*:\\s*([0-9.]+) Net".toRegex().find(note.content)?.groupValues?.get(1) ?: "--"
+            val sosyalNet = "Sosyal[^:]*:\\s*([0-9.]+) Net".toRegex().find(note.content)?.groupValues?.get(1) ?: "--"
+
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    MiniSubjectCard("Türkçe", turkceNet, 40, Modifier.weight(1f))
+                    MiniSubjectCard("Matematik", matNet, 40, Modifier.weight(1f))
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    MiniSubjectCard("Fen Bil.", fenNet, 20, Modifier.weight(1f))
+                    MiniSubjectCard("Sosyal Bil.", sosyalNet, 20, Modifier.weight(1f))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Footer
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Öğrenci: ${note.assignedTo}",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                val dateStr = remember(note.updatedAtMillis) {
+                    val sdf = SimpleDateFormat("dd MMM", Locale("tr"))
+                    sdf.format(Date(note.updatedAtMillis))
+                }
+                Text(
+                    text = dateStr,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiniSubjectCard(name: String, net: String, totalQ: Int, modifier: Modifier = Modifier) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = "$net N",
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
 // ================= NOTE CARD (GOOGLE KEEP STYLE) =================
 
 @Composable
@@ -784,7 +998,6 @@ fun GoogleKeepNoteCard(
     folder: NoteFolder?,
     onClick: () -> Unit,
     onTogglePin: () -> Unit,
-    onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val cardColor = remember(note.colorHex) {
@@ -878,44 +1091,6 @@ fun GoogleKeepNoteCard(
                                 )
                             }
                         }
-                    }
-                }
-                NoteType.REPORT -> {
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = Color(0xFFE53935).copy(alpha = 0.1f),
-                        border = BorderStroke(1.dp, Color(0xFFE53935).copy(alpha = 0.3f)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Assessment,
-                                contentDescription = null,
-                                tint = Color(0xFFE53935),
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Deneme Net Raporu",
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                color = Color(0xFFE53935)
-                            )
-                        }
-                    }
-                    if (note.content.isNotBlank()) {
-                        Text(
-                            text = note.content,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF3C4043),
-                            maxLines = 4,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = 2.dp)
-                        )
                     }
                 }
                 NoteType.DRAWING -> {
@@ -1054,6 +1229,8 @@ fun KeepSpeedDialPill(
 }
 
 // ================= 1. TEXT NOTE EDIT DIALOG =================
+// Renk paleti sağ üstteki palet ikonuna basılınca aşağıdan yukarı doğru açılır.
+// Değişiklik yapılmadan çıkıldığında güncelleme uyarısı vermez.
 
 @Composable
 fun KeepNoteEditDialog(
@@ -1066,12 +1243,19 @@ fun KeepNoteEditDialog(
     onDismiss: () -> Unit,
     onSave: (Note) -> Unit
 ) {
-    var title by remember { mutableStateOf(initialNote?.title ?: "") }
-    var content by remember { mutableStateOf(initialNote?.content ?: "") }
-    var selectedFolder by remember { mutableStateOf(initialNote?.folderId ?: selectedFolderId) }
-    var selectedColorHex by remember { mutableStateOf(initialNote?.colorHex ?: "#FFFFFF") }
-    var isPinned by remember { mutableStateOf(initialNote?.isPinned ?: false) }
-    var showColorPalette by remember { mutableStateOf(false) }
+    // Snapshot of original values to accurately prevent unwanted "Not güncellendi" warnings
+    val initialTitle = remember(initialNote) { initialNote?.title ?: "" }
+    val initialContent = remember(initialNote) { initialNote?.content ?: "" }
+    val initialFolder = remember(initialNote) { initialNote?.folderId ?: if (initialNote == null) selectedFolderId else null }
+    val initialColor = remember(initialNote) { initialNote?.colorHex?.ifBlank { "#FFFFFF" } ?: "#FFFFFF" }
+    val initialPinned = remember(initialNote) { initialNote?.isPinned ?: false }
+
+    var title by remember { mutableStateOf(initialTitle) }
+    var content by remember { mutableStateOf(initialContent) }
+    var selectedFolder by remember { mutableStateOf(initialFolder) }
+    var selectedColorHex by remember { mutableStateOf(initialColor) }
+    var isPinned by remember { mutableStateOf(initialPinned) }
+    var showColorPaletteSheet by remember { mutableStateOf(false) }
 
     val bgColor = remember(selectedColorHex) {
         try {
@@ -1081,213 +1265,251 @@ fun KeepNoteEditDialog(
         }
     }
 
+    val isDirty = remember(title, content, selectedFolder, selectedColorHex, isPinned) {
+        if (initialNote == null) {
+            title.isNotBlank() || content.isNotBlank()
+        } else {
+            title.trim() != initialTitle.trim() ||
+            content.trim() != initialContent.trim() ||
+            selectedFolder != initialFolder ||
+            !selectedColorHex.equals(initialColor, ignoreCase = true) ||
+            isPinned != initialPinned
+        }
+    }
+
+    fun handleCloseOrSave() {
+        if (isDirty && (title.isNotBlank() || content.isNotBlank())) {
+            val now = System.currentTimeMillis()
+            val note = initialNote?.copy(
+                title = title.trim(),
+                content = content.trim(),
+                folderId = selectedFolder,
+                colorHex = selectedColorHex,
+                isPinned = isPinned,
+                updatedAtMillis = now
+            ) ?: Note(
+                title = title.trim(),
+                content = content.trim(),
+                folderId = selectedFolder,
+                colorHex = selectedColorHex,
+                isPinned = isPinned,
+                assignedTo = currentUserAssigned,
+                type = initialType,
+                createdAtMillis = now,
+                updatedAtMillis = now
+            )
+            onSave(note)
+        } else {
+            // Nothing changed or blank, exit without updating/saving!
+            onDismiss()
+        }
+    }
+
     Dialog(
-        onDismissRequest = {
-            if (title.isNotBlank() || content.isNotBlank()) {
-                val now = System.currentTimeMillis()
-                val note = initialNote?.copy(
-                    title = title.trim(),
-                    content = content.trim(),
-                    folderId = selectedFolder,
-                    colorHex = selectedColorHex,
-                    isPinned = isPinned,
-                    updatedAtMillis = now
-                ) ?: Note(
-                    title = title.trim(),
-                    content = content.trim(),
-                    folderId = selectedFolder,
-                    colorHex = selectedColorHex,
-                    isPinned = isPinned,
-                    assignedTo = currentUserAssigned,
-                    type = initialType,
-                    createdAtMillis = now,
-                    updatedAtMillis = now
-                )
-                onSave(note)
-            } else {
-                onDismiss()
-            }
-        },
+        onDismissRequest = { handleCloseOrSave() },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = bgColor
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-            ) {
-                // Top Action Bar
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    IconButton(onClick = {
-                        val now = System.currentTimeMillis()
-                        if (title.isNotBlank() || content.isNotBlank()) {
-                            val note = initialNote?.copy(
-                                title = title.trim(),
-                                content = content.trim(),
-                                folderId = selectedFolder,
-                                colorHex = selectedColorHex,
-                                isPinned = isPinned,
-                                updatedAtMillis = now
-                            ) ?: Note(
-                                title = title.trim(),
-                                content = content.trim(),
-                                folderId = selectedFolder,
-                                colorHex = selectedColorHex,
-                                isPinned = isPinned,
-                                assignedTo = currentUserAssigned,
-                                type = initialType,
-                                createdAtMillis = now,
-                                updatedAtMillis = now
-                            )
-                            onSave(note)
-                        } else {
-                            onDismiss()
-                        }
-                    }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Geri ve Kaydet",
-                            tint = Color(0xFF202124)
-                        )
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { isPinned = !isPinned }) {
-                            Icon(
-                                imageVector = if (isPinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
-                                contentDescription = "Sabitle",
-                                tint = if (isPinned) MaterialTheme.colorScheme.primary else Color(0xFF5F6368)
-                            )
-                        }
-                        IconButton(onClick = { showColorPalette = !showColorPalette }) {
-                            Icon(
-                                imageVector = Icons.Default.Palette,
-                                contentDescription = "Renk Seçici",
-                                tint = Color(0xFF5F6368)
-                            )
-                        }
-                        IconButton(onClick = {
-                            val now = System.currentTimeMillis()
-                            val note = initialNote?.copy(
-                                title = title.trim(),
-                                content = content.trim(),
-                                folderId = selectedFolder,
-                                colorHex = selectedColorHex,
-                                isPinned = isPinned,
-                                updatedAtMillis = now
-                            ) ?: Note(
-                                title = title.trim(),
-                                content = content.trim(),
-                                folderId = selectedFolder,
-                                colorHex = selectedColorHex,
-                                isPinned = isPinned,
-                                assignedTo = currentUserAssigned,
-                                type = initialType,
-                                createdAtMillis = now,
-                                updatedAtMillis = now
-                            )
-                            onSave(note)
-                        }) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = "Kaydet",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                }
-
-                // Folder selector chips
-                Row(
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
-                    FilterChip(
-                        selected = selectedFolder == null,
-                        onClick = { selectedFolder = null },
-                        label = { Text("Klasörsüz") },
-                        shape = RoundedCornerShape(10.dp)
-                    )
-                    folders.forEach { f ->
+                    // Top Action Bar
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        IconButton(onClick = { handleCloseOrSave() }) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Geri ve Kaydet",
+                                tint = Color(0xFF202124)
+                            )
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { isPinned = !isPinned }) {
+                                Icon(
+                                    imageVector = if (isPinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
+                                    contentDescription = "Sabitle",
+                                    tint = if (isPinned) MaterialTheme.colorScheme.primary else Color(0xFF5F6368)
+                                )
+                            }
+                            // Color palette button: Toggles sliding bottom palette
+                            IconButton(onClick = { showColorPaletteSheet = !showColorPaletteSheet }) {
+                                Icon(
+                                    imageVector = Icons.Default.Palette,
+                                    contentDescription = "Renk Seçici",
+                                    tint = if (showColorPaletteSheet) MaterialTheme.colorScheme.primary else Color(0xFF5F6368)
+                                )
+                            }
+                            IconButton(onClick = { handleCloseOrSave() }) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "Kaydet",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+
+                    // Folder selector chips
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
                         FilterChip(
-                            selected = selectedFolder == f.id,
-                            onClick = { selectedFolder = if (selectedFolder == f.id) null else f.id },
-                            label = { Text(f.name) },
+                            selected = selectedFolder == null,
+                            onClick = { selectedFolder = null },
+                            label = { Text("Klasörsüz") },
                             shape = RoundedCornerShape(10.dp)
                         )
+                        folders.forEach { f ->
+                            FilterChip(
+                                selected = selectedFolder == f.id,
+                                onClick = { selectedFolder = if (selectedFolder == f.id) null else f.id },
+                                label = { Text(f.name) },
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                        }
+                    }
+
+                    // Title Input
+                    OutlinedTextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        placeholder = {
+                            Text(
+                                "Başlık",
+                                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                                color = Color(0xFF5F6368)
+                            )
+                        },
+                        textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, color = Color(0xFF202124)),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
+                        )
+                    )
+
+                    // Content Input
+                    OutlinedTextField(
+                        value = content,
+                        onValueChange = { content = it },
+                        placeholder = {
+                            Text(
+                                "Not...",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = Color(0xFF5F6368)
+                            )
+                        },
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color(0xFF202124)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
+                        )
+                    )
+
+                    // Word count
+                    if (showWordCount) {
+                        val words = remember(content) { if (content.isBlank()) 0 else content.trim().split("\\s+".toRegex()).size }
+                        Text(
+                            text = "$words kelime • ${content.length} karakter",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF5F6368),
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        )
                     }
                 }
 
-                // Title Input
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    placeholder = {
-                        Text(
-                            "Başlık",
-                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                            color = Color(0xFF5F6368)
-                        )
-                    },
-                    textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, color = Color(0xFF202124)),
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent
-                    )
-                )
-
-                // Content Input
-                OutlinedTextField(
-                    value = content,
-                    onValueChange = { content = it },
-                    placeholder = {
-                        Text(
-                            "Not...",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color(0xFF5F6368)
-                        )
-                    },
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color(0xFF202124)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent
-                    )
-                )
-
-                // Word count & color bar
-                if (showWordCount) {
-                    val words = remember(content) { if (content.isBlank()) 0 else content.trim().split("\\s+".toRegex()).size }
-                    Text(
-                        text = "$words kelime • ${content.length} karakter",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF5F6368),
-                        modifier = Modifier.padding(bottom = 6.dp)
+                // Scrim Backdrop when Color Sheet is open
+                if (showColorPaletteSheet) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.4f))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) { showColorPaletteSheet = false }
                     )
                 }
 
-                // Google Keep Color Palette Swatches
-                KeepColorSwatchesRow(
-                    selectedColorHex = selectedColorHex,
-                    onSelectColor = { selectedColorHex = it }
-                )
+                // Sliding Bottom Sheet for Color Selection
+                AnimatedVisibility(
+                    visible = showColorPaletteSheet,
+                    enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                    exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        shadowElevation = 16.dp,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Palette,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Not Rengi Seçin",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { showColorPaletteSheet = false },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Kapat",
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(14.dp))
+                            KeepColorSwatchesRow(
+                                selectedColorHex = selectedColorHex,
+                                onSelectColor = {
+                                    selectedColorHex = it
+                                    showColorPaletteSheet = false
+                                }
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -1305,10 +1527,17 @@ fun KeepChecklistEditDialog(
     onDismiss: () -> Unit,
     onSave: (Note) -> Unit
 ) {
-    var title by remember { mutableStateOf(initialNote?.title ?: "") }
-    var selectedFolder by remember { mutableStateOf(initialNote?.folderId ?: selectedFolderId) }
-    var selectedColorHex by remember { mutableStateOf(initialNote?.colorHex ?: "#FFFFFF") }
-    var isPinned by remember { mutableStateOf(initialNote?.isPinned ?: false) }
+    val initialTitle = remember(initialNote) { initialNote?.title ?: "" }
+    val initialFolder = remember(initialNote) { initialNote?.folderId ?: if (initialNote == null) selectedFolderId else null }
+    val initialColor = remember(initialNote) { initialNote?.colorHex?.ifBlank { "#FFFFFF" } ?: "#FFFFFF" }
+    val initialPinned = remember(initialNote) { initialNote?.isPinned ?: false }
+    val initialContent = remember(initialNote) { initialNote?.content?.trim() ?: "" }
+
+    var title by remember { mutableStateOf(initialTitle) }
+    var selectedFolder by remember { mutableStateOf(initialFolder) }
+    var selectedColorHex by remember { mutableStateOf(initialColor) }
+    var isPinned by remember { mutableStateOf(initialPinned) }
+    var showColorPaletteSheet by remember { mutableStateOf(false) }
 
     // Parse initial checklist items: format "[x] Item" or "[ ] Item"
     val itemsList = remember {
@@ -1322,13 +1551,11 @@ fun KeepChecklistEditDialog(
                     }
                 }
             }
-            if (isEmpty()) {
+            if (isEmpty() && initialNote == null) {
                 add(false to "")
             }
         }
     }
-
-    var newItemText by remember { mutableStateOf("") }
 
     val bgColor = remember(selectedColorHex) {
         try {
@@ -1350,225 +1577,265 @@ fun KeepChecklistEditDialog(
             }
     }
 
+    fun handleCloseOrSave() {
+        val contentStr = buildContentString().trim()
+        val isDirty = if (initialNote == null) {
+            title.isNotBlank() || contentStr.isNotBlank()
+        } else {
+            title.trim() != initialTitle.trim() ||
+            contentStr != initialContent ||
+            selectedFolder != initialFolder ||
+            !selectedColorHex.equals(initialColor, ignoreCase = true) ||
+            isPinned != initialPinned
+        }
+
+        if (isDirty && (title.isNotBlank() || contentStr.isNotBlank())) {
+            val now = System.currentTimeMillis()
+            val note = initialNote?.copy(
+                title = title.trim(),
+                content = contentStr,
+                folderId = selectedFolder,
+                colorHex = selectedColorHex,
+                isPinned = isPinned,
+                updatedAtMillis = now
+            ) ?: Note(
+                title = title.trim(),
+                content = contentStr,
+                folderId = selectedFolder,
+                colorHex = selectedColorHex,
+                isPinned = isPinned,
+                assignedTo = currentUserAssigned,
+                type = NoteType.CHECKLIST,
+                createdAtMillis = now,
+                updatedAtMillis = now
+            )
+            onSave(note)
+        } else {
+            // Nothing changed, exit quietly without updating!
+            onDismiss()
+        }
+    }
+
     Dialog(
-        onDismissRequest = {
-            val contentStr = buildContentString()
-            if (title.isNotBlank() || contentStr.isNotBlank()) {
-                val now = System.currentTimeMillis()
-                val note = initialNote?.copy(
-                    title = title.trim(),
-                    content = contentStr,
-                    folderId = selectedFolder,
-                    colorHex = selectedColorHex,
-                    isPinned = isPinned,
-                    updatedAtMillis = now
-                ) ?: Note(
-                    title = title.trim(),
-                    content = contentStr,
-                    folderId = selectedFolder,
-                    colorHex = selectedColorHex,
-                    isPinned = isPinned,
-                    assignedTo = currentUserAssigned,
-                    type = NoteType.CHECKLIST,
-                    createdAtMillis = now,
-                    updatedAtMillis = now
-                )
-                onSave(note)
-            } else {
-                onDismiss()
-            }
-        },
+        onDismissRequest = { handleCloseOrSave() },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = bgColor
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-            ) {
-                // Top Bar
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    IconButton(onClick = {
-                        val contentStr = buildContentString()
-                        if (title.isNotBlank() || contentStr.isNotBlank()) {
-                            val now = System.currentTimeMillis()
-                            val note = initialNote?.copy(
-                                title = title.trim(),
-                                content = contentStr,
-                                folderId = selectedFolder,
-                                colorHex = selectedColorHex,
-                                isPinned = isPinned,
-                                updatedAtMillis = now
-                            ) ?: Note(
-                                title = title.trim(),
-                                content = contentStr,
-                                folderId = selectedFolder,
-                                colorHex = selectedColorHex,
-                                isPinned = isPinned,
-                                assignedTo = currentUserAssigned,
-                                type = NoteType.CHECKLIST,
-                                createdAtMillis = now,
-                                updatedAtMillis = now
-                            )
-                            onSave(note)
-                        } else {
-                            onDismiss()
-                        }
-                    }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Geri ve Kaydet",
-                            tint = Color(0xFF202124)
-                        )
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { isPinned = !isPinned }) {
-                            Icon(
-                                imageVector = if (isPinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
-                                contentDescription = "Sabitle",
-                                tint = if (isPinned) MaterialTheme.colorScheme.primary else Color(0xFF5F6368)
-                            )
-                        }
-                        IconButton(onClick = {
-                            val contentStr = buildContentString()
-                            val now = System.currentTimeMillis()
-                            val note = initialNote?.copy(
-                                title = title.trim(),
-                                content = contentStr,
-                                folderId = selectedFolder,
-                                colorHex = selectedColorHex,
-                                isPinned = isPinned,
-                                updatedAtMillis = now
-                            ) ?: Note(
-                                title = title.trim(),
-                                content = contentStr,
-                                folderId = selectedFolder,
-                                colorHex = selectedColorHex,
-                                isPinned = isPinned,
-                                assignedTo = currentUserAssigned,
-                                type = NoteType.CHECKLIST,
-                                createdAtMillis = now,
-                                updatedAtMillis = now
-                            )
-                            onSave(note)
-                        }) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = "Kaydet",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                }
-
-                // Title Input
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    placeholder = {
-                        Text(
-                            "Başlık",
-                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                            color = Color(0xFF5F6368)
-                        )
-                    },
-                    textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, color = Color(0xFF202124)),
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent
-                    )
-                )
-
-                // Checklist Items
-                LazyColumn(
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
-                    itemsIndexed(itemsList) { index, item ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Checkbox(
-                                checked = item.first,
-                                onCheckedChange = { checked ->
-                                    itemsList[index] = checked to item.second
-                                }
+                    // Top Bar
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        IconButton(onClick = { handleCloseOrSave() }) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Geri ve Kaydet",
+                                tint = Color(0xFF202124)
                             )
-                            OutlinedTextField(
-                                value = item.second,
-                                onValueChange = { text ->
-                                    itemsList[index] = item.first to text
-                                },
-                                placeholder = { Text("Liste öğesi...") },
-                                textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                    textDecoration = if (item.first) TextDecoration.LineThrough else TextDecoration.None,
-                                    color = if (item.first) Color(0xFF80868B) else Color(0xFF202124)
-                                ),
-                                modifier = Modifier.weight(1f),
-                                singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = Color.Transparent,
-                                    unfocusedBorderColor = Color.Transparent,
-                                    focusedContainerColor = Color.Transparent,
-                                    unfocusedContainerColor = Color.Transparent
-                                )
-                            )
-                            IconButton(onClick = { itemsList.removeAt(index) }) {
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { isPinned = !isPinned }) {
                                 Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Öğeyi Sil",
-                                    tint = Color(0xFF80868B),
-                                    modifier = Modifier.size(18.dp)
+                                    imageVector = if (isPinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
+                                    contentDescription = "Sabitle",
+                                    tint = if (isPinned) MaterialTheme.colorScheme.primary else Color(0xFF5F6368)
+                                )
+                            }
+                            IconButton(onClick = { showColorPaletteSheet = !showColorPaletteSheet }) {
+                                Icon(
+                                    imageVector = Icons.Default.Palette,
+                                    contentDescription = "Renk Seçici",
+                                    tint = if (showColorPaletteSheet) MaterialTheme.colorScheme.primary else Color(0xFF5F6368)
+                                )
+                            }
+                            IconButton(onClick = { handleCloseOrSave() }) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "Kaydet",
+                                    tint = MaterialTheme.colorScheme.primary
                                 )
                             }
                         }
                     }
 
-                    item {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    itemsList.add(false to "")
-                                }
-                                .padding(vertical = 8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
+                    // Title Input
+                    OutlinedTextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        placeholder = {
                             Text(
-                                text = "Madde ekle",
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                color = MaterialTheme.colorScheme.primary
+                                "Başlık",
+                                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                                color = Color(0xFF5F6368)
                             )
+                        },
+                        textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, color = Color(0xFF202124)),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
+                        )
+                    )
+
+                    // Checklist Items
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        itemsIndexed(itemsList) { index, item ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Checkbox(
+                                    checked = item.first,
+                                    onCheckedChange = { checked ->
+                                        itemsList[index] = checked to item.second
+                                    }
+                                )
+                                OutlinedTextField(
+                                    value = item.second,
+                                    onValueChange = { text ->
+                                        itemsList[index] = item.first to text
+                                    },
+                                    placeholder = { Text("Liste öğesi...") },
+                                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                        textDecoration = if (item.first) TextDecoration.LineThrough else TextDecoration.None,
+                                        color = if (item.first) Color(0xFF80868B) else Color(0xFF202124)
+                                    ),
+                                    modifier = Modifier.weight(1f),
+                                    singleLine = true,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = Color.Transparent,
+                                        unfocusedBorderColor = Color.Transparent,
+                                        focusedContainerColor = Color.Transparent,
+                                        unfocusedContainerColor = Color.Transparent
+                                    )
+                                )
+                                IconButton(onClick = { itemsList.removeAt(index) }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Öğeyi Sil",
+                                        tint = Color(0xFF80868B),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        item {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        itemsList.add(false to "")
+                                    }
+                                    .padding(vertical = 8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Madde ekle",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
                     }
                 }
 
-                // Google Keep Color Palette Swatches
-                KeepColorSwatchesRow(
-                    selectedColorHex = selectedColorHex,
-                    onSelectColor = { selectedColorHex = it }
-                )
+                // Scrim Backdrop when Color Sheet is open
+                if (showColorPaletteSheet) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.4f))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) { showColorPaletteSheet = false }
+                    )
+                }
+
+                // Sliding Bottom Sheet for Color Selection
+                AnimatedVisibility(
+                    visible = showColorPaletteSheet,
+                    enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                    exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        shadowElevation = 16.dp,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Palette,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Liste Rengi Seçin",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { showColorPaletteSheet = false },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Kapat",
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(14.dp))
+                            KeepColorSwatchesRow(
+                                selectedColorHex = selectedColorHex,
+                                onSelectColor = {
+                                    selectedColorHex = it
+                                    showColorPaletteSheet = false
+                                }
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -1585,7 +1852,6 @@ fun KeepDrawingEditDialog(
     onSave: (Note) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
-    var selectedColorHex by remember { mutableStateOf("#FFFFFF") }
     var strokeColor by remember { mutableStateOf(Color.Black) }
     var strokeWidth by remember { mutableStateOf(5f) }
 
@@ -1627,7 +1893,7 @@ fun KeepDrawingEditDialog(
                         val note = Note(
                             title = title.ifBlank { "Çizim Notu" },
                             content = "Serbest El Çizimi",
-                            colorHex = selectedColorHex,
+                            colorHex = "#FFFFFF",
                             assignedTo = currentUserAssigned,
                             type = NoteType.DRAWING,
                             drawingData = "drawing_${paths.size}_strokes",
@@ -1656,7 +1922,6 @@ fun KeepDrawingEditDialog(
                                 },
                                 onDrag = { change, _ ->
                                     currentPath?.lineTo(change.position.x, change.position.y)
-                                    // Trigger canvas redraw
                                     val last = paths.lastOrNull()
                                     if (last != null) {
                                         paths[paths.lastIndex] = last.first to (strokeColor to strokeWidth)
@@ -1721,7 +1986,6 @@ fun KeepImageNoteEditDialog(
 ) {
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
-    var selectedColorHex by remember { mutableStateOf("#FFFFFF") }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -1744,7 +2008,7 @@ fun KeepImageNoteEditDialog(
                             title = title.ifBlank { "Görsel Notu" },
                             content = content,
                             imageUri = imageUri.toString(),
-                            colorHex = selectedColorHex,
+                            colorHex = "#FFFFFF",
                             folderId = selectedFolderId,
                             assignedTo = currentUserAssigned,
                             type = NoteType.IMAGE,
@@ -1796,11 +2060,6 @@ fun KeepImageNoteEditDialog(
                     label = { Text("Açıklama / Not") },
                     modifier = Modifier.fillMaxWidth().weight(1f)
                 )
-
-                KeepColorSwatchesRow(
-                    selectedColorHex = selectedColorHex,
-                    onSelectColor = { selectedColorHex = it }
-                )
             }
         }
     }
@@ -1830,7 +2089,7 @@ fun KeepCreateFolderDialog(
                     value = folderName,
                     onValueChange = { folderName = it },
                     label = { Text("Klasör Adı") },
-                    placeholder = { Text("Örn: LGS Hazırlık, Matematik...") },
+                    placeholder = { Text("Örn: TYT Hazırlık, Matematik...") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -1878,7 +2137,11 @@ fun KeepCreateFolderDialog(
     )
 }
 
-// ================= 6. REPORT EDIT DIALOG (DENEME SINAVI NETLERİ) =================
+// ================= 6. TYT REPORT EDIT DIALOG (DENEME SINAVI RAPORU) =================
+// TYT Sınavı formatı: 120 Soru (Türkçe 40, Temel Mat 40, Fen 20, Sosyal 20).
+// 4 Yanlış 1 Doğruyu Götürür (Net = Doğru - Yanlış / 4).
+// Tema değiştirme kaldırılmıştır; sabit ve profesyonel kart tasarımı kullanılır.
+// Değişiklik yapılmadığında sessizce kapatır, gereksiz bildirim göstermez.
 
 @Composable
 fun KeepReportEditDialog(
@@ -1889,49 +2152,114 @@ fun KeepReportEditDialog(
     onDismiss: () -> Unit,
     onSave: (Note) -> Unit
 ) {
-    var examTitle by remember { mutableStateOf(existingNote?.title ?: "8. Sınıf LGS Deneme Sınavı") }
-    var examDate by remember { mutableStateOf("Bugün") }
-    var selectedColorHex by remember { mutableStateOf(existingNote?.colorHex ?: "#FFF9C4") }
+    // Initial parse from existing content if present
+    fun parseSubjectD(subject: String, defaultVal: String): String {
+        if (existingNote == null) return defaultVal
+        val regex = "$subject[^:]*:\\s*(\\d+)\\s*D".toRegex()
+        return regex.find(existingNote.content)?.groupValues?.get(1) ?: defaultVal
+    }
+    fun parseSubjectY(subject: String, defaultVal: String): String {
+        if (existingNote == null) return defaultVal
+        val regex = "$subject[^:]*:\\s*\\d+\\s*D,\\s*(\\d+)\\s*Y".toRegex()
+        return regex.find(existingNote.content)?.groupValues?.get(1) ?: defaultVal
+    }
 
-    // Course Scores: Pair(Doğru, Yanlış)
-    var turkceD by remember { mutableStateOf("18") }
-    var turkceY by remember { mutableStateOf("2") }
+    val initialTitle = remember(existingNote) { existingNote?.title ?: "TYT 1. Genel Deneme Sınavı" }
+    val initialTurkceD = remember(existingNote) { parseSubjectD("Türkçe", "33") }
+    val initialTurkceY = remember(existingNote) { parseSubjectY("Türkçe", "4") }
+    val initialMatD = remember(existingNote) { parseSubjectD("Temel Matematik", "29") }
+    val initialMatY = remember(existingNote) { parseSubjectY("Temel Matematik", "3") }
+    val initialFenD = remember(existingNote) { parseSubjectD("Fen Bilimleri", "16") }
+    val initialFenY = remember(existingNote) { parseSubjectY("Fen Bilimleri", "2") }
+    val initialSosyalD = remember(existingNote) { parseSubjectD("Sosyal Bilimler", "17") }
+    val initialSosyalY = remember(existingNote) { parseSubjectY("Sosyal Bilimler", "2") }
 
-    var matD by remember { mutableStateOf("16") }
-    var matY by remember { mutableStateOf("3") }
+    val initialEvalNotes = remember(existingNote) {
+        if (existingNote != null) {
+            val noteLine = existingNote.content.lines().find { it.startsWith("Notlar:") }
+            noteLine?.removePrefix("Notlar:")?.trim() ?: ""
+        } else {
+            "Matematikte geometri ve problemler tekrar edilecek. Paragraf netleri oldukça başarılı!"
+        }
+    }
 
-    var fenD by remember { mutableStateOf("19") }
-    var fenY by remember { mutableStateOf("1") }
+    var examTitle by remember { mutableStateOf(initialTitle) }
+    var turkceD by remember { mutableStateOf(initialTurkceD) }
+    var turkceY by remember { mutableStateOf(initialTurkceY) }
+    var matD by remember { mutableStateOf(initialMatD) }
+    var matY by remember { mutableStateOf(initialMatY) }
+    var fenD by remember { mutableStateOf(initialFenD) }
+    var fenY by remember { mutableStateOf(initialFenY) }
+    var sosyalD by remember { mutableStateOf(initialSosyalD) }
+    var sosyalY by remember { mutableStateOf(initialSosyalY) }
+    var evaluationNotes by remember { mutableStateOf(initialEvalNotes) }
 
-    var inkilapD by remember { mutableStateOf("10") }
-    var inkilapY by remember { mutableStateOf("0") }
-
-    var dinD by remember { mutableStateOf("10") }
-    var dinY by remember { mutableStateOf("0") }
-
-    var ingD by remember { mutableStateOf("9") }
-    var ingY by remember { mutableStateOf("1") }
-
-    var evaluationNotes by remember { mutableStateOf("Matematikte çarpanlar ve üslü sayılar tekrar edilecek. Fen ve Türkçe netleri oldukça yüksek!") }
-
-    fun calculateNet(d: String, y: String): Double {
+    // TYT Kuralı: 4 Yanlış 1 Doğruyu Götürür!
+    fun calculateTytNet(d: String, y: String): Double {
         val dogru = d.toDoubleOrNull() ?: 0.0
         val yanlis = y.toDoubleOrNull() ?: 0.0
-        val net = dogru - (yanlis / 3.0)
+        val net = dogru - (yanlis / 4.0)
         return if (net < 0) 0.0 else (Math.round(net * 100.0) / 100.0)
     }
 
-    val totalNet = calculateNet(turkceD, turkceY) +
-            calculateNet(matD, matY) +
-            calculateNet(fenD, fenY) +
-            calculateNet(inkilapD, inkilapY) +
-            calculateNet(dinD, dinY) +
-            calculateNet(ingD, ingY)
+    val totalNet = calculateTytNet(turkceD, turkceY) +
+            calculateTytNet(matD, matY) +
+            calculateTytNet(fenD, fenY) +
+            calculateTytNet(sosyalD, sosyalY)
 
     val roundedTotalNet = Math.round(totalNet * 100.0) / 100.0
+    val successPercent = Math.round((roundedTotalNet / 120.0) * 100)
+
+    fun handleCloseOrSave() {
+        val hasChanged = existingNote == null || (
+            examTitle.trim() != initialTitle.trim() ||
+            turkceD != initialTurkceD ||
+            turkceY != initialTurkceY ||
+            matD != initialMatD ||
+            matY != initialMatY ||
+            fenD != initialFenD ||
+            fenY != initialFenY ||
+            sosyalD != initialSosyalD ||
+            sosyalY != initialSosyalY ||
+            evaluationNotes.trim() != initialEvalNotes.trim()
+        )
+
+        if (hasChanged && examTitle.isNotBlank()) {
+            val summaryText = buildString {
+                appendLine("📊 Sınav: ${examTitle.trim()}")
+                appendLine("Türkçe (40): $turkceD D, $turkceY Y • ${calculateTytNet(turkceD, turkceY)} Net")
+                appendLine("Temel Matematik (40): $matD D, $matY Y • ${calculateTytNet(matD, matY)} Net")
+                appendLine("Fen Bilimleri (20): $fenD D, $fenY Y • ${calculateTytNet(fenD, fenY)} Net")
+                appendLine("Sosyal Bilimler (20): $sosyalD D, $sosyalY Y • ${calculateTytNet(sosyalD, sosyalY)} Net")
+                appendLine()
+                appendLine("🎯 TOPLAM NET: $roundedTotalNet / 120 (%$successPercent Başarı)")
+                if (evaluationNotes.isNotBlank()) {
+                    appendLine("Notlar: ${evaluationNotes.trim()}")
+                }
+            }
+            val now = System.currentTimeMillis()
+            val note = existingNote?.copy(
+                title = examTitle.trim(),
+                content = summaryText.trim(),
+                updatedAtMillis = now
+            ) ?: Note(
+                title = examTitle.trim(),
+                content = summaryText.trim(),
+                colorHex = "#1E293B",
+                folderId = selectedFolderId,
+                assignedTo = currentUserAssigned,
+                type = NoteType.REPORT,
+                createdAtMillis = now,
+                updatedAtMillis = now
+            )
+            onSave(note)
+        } else {
+            onDismiss()
+        }
+    }
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { handleCloseOrSave() },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -1947,53 +2275,21 @@ fun KeepReportEditDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    IconButton(onClick = onDismiss) {
+                    IconButton(onClick = { handleCloseOrSave() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
                     }
                     Text(
-                        text = "Deneme Sınavı Net Raporu 🎯",
+                        text = "TYT Deneme Sınavı Raporu 🎯",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                     )
-                    IconButton(onClick = {
-                        val summaryText = buildString {
-                            appendLine("📊 Sınav: $examTitle ($examDate)")
-                            appendLine("Türkçe: $turkceD D, $turkceY Y • ${calculateNet(turkceD, turkceY)} Net")
-                            appendLine("Matematik: $matD D, $matY Y • ${calculateNet(matD, matY)} Net")
-                            appendLine("Fen Bilimleri: $fenD D, $fenY Y • ${calculateNet(fenD, fenY)} Net")
-                            appendLine("İnkılap: $inkilapD D, $inkilapY Y • ${calculateNet(inkilapD, inkilapY)} Net")
-                            appendLine("Din Kültürü: $dinD D, $dinY Y • ${calculateNet(dinD, dinY)} Net")
-                            appendLine("İngilizce: $ingD D, $ingY Y • ${calculateNet(ingD, ingY)} Net")
-                            appendLine()
-                            appendLine("🎯 TOPLAM NET: $roundedTotalNet / 90")
-                            if (evaluationNotes.isNotBlank()) {
-                                appendLine("Notlar: $evaluationNotes")
-                            }
-                        }
-                        val now = System.currentTimeMillis()
-                        val note = existingNote?.copy(
-                            title = examTitle.trim(),
-                            content = summaryText.trim(),
-                            colorHex = selectedColorHex,
-                            updatedAtMillis = now
-                        ) ?: Note(
-                            title = examTitle.trim(),
-                            content = summaryText.trim(),
-                            colorHex = selectedColorHex,
-                            folderId = selectedFolderId,
-                            assignedTo = currentUserAssigned,
-                            type = NoteType.REPORT,
-                            createdAtMillis = now,
-                            updatedAtMillis = now
-                        )
-                        onSave(note)
-                    }) {
+                    IconButton(onClick = { handleCloseOrSave() }) {
                         Icon(Icons.Default.Check, contentDescription = "Kaydet", tint = MaterialTheme.colorScheme.primary)
                     }
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Total Net Score Card
+                // TYT Total Net Score Card
                 Card(
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
@@ -2008,7 +2304,7 @@ fun KeepReportEditDialog(
                     ) {
                         Column {
                             Text(
-                                text = "HESAPLANAN TOPLAM NET",
+                                text = "HESAPLANAN TYT NETİ",
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                             )
@@ -2019,7 +2315,7 @@ fun KeepReportEditDialog(
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                             Text(
-                                text = "Maksimum 90 Soru üzerinden",
+                                text = "120 Soru Üzerinden • 4 Yanlış 1 Doğru",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                             )
@@ -2028,11 +2324,11 @@ fun KeepReportEditDialog(
                         Surface(
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(54.dp)
+                            modifier = Modifier.size(56.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Text(
-                                    text = "%${Math.round((roundedTotalNet / 90.0) * 100)}",
+                                    text = "%$successPercent",
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                     color = MaterialTheme.colorScheme.onPrimary
                                 )
@@ -2046,41 +2342,45 @@ fun KeepReportEditDialog(
                 OutlinedTextField(
                     value = examTitle,
                     onValueChange = { examTitle = it },
-                    label = { Text("Deneme Sınavının Adı") },
+                    label = { Text("TYT Deneme Adı") },
+                    placeholder = { Text("Örn: TYT 1. Özdebir, Türkiye Geneli TYT...") },
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
-                Text(
-                    text = "Ders Netleri (3 Yanlış 1 Doğruyu Götürür):",
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "TYT Dersleri (120 Soru):",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Net = D - Y/4",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Spacer(modifier = Modifier.height(8.dp))
 
-                SubjectScoreRow("Türkçe (20 Soru)", turkceD, turkceY, onDChange = { turkceD = it }, onYChange = { turkceY = it }, net = calculateNet(turkceD, turkceY))
-                SubjectScoreRow("Matematik (20 Soru)", matD, matY, onDChange = { matD = it }, onYChange = { matY = it }, net = calculateNet(matD, matY))
-                SubjectScoreRow("Fen Bilimleri (20 Soru)", fenD, fenY, onDChange = { fenD = it }, onYChange = { fenY = it }, net = calculateNet(fenD, fenY))
-                SubjectScoreRow("İnkılap Tarihi (10 Soru)", inkilapD, inkilapY, onDChange = { inkilapD = it }, onYChange = { inkilapY = it }, net = calculateNet(inkilapD, inkilapY))
-                SubjectScoreRow("Din Kültürü (10 Soru)", dinD, dinY, onDChange = { dinD = it }, onYChange = { dinY = it }, net = calculateNet(dinD, dinY))
-                SubjectScoreRow("İngilizce (10 Soru)", ingD, ingY, onDChange = { ingD = it }, onYChange = { ingY = it }, net = calculateNet(ingD, ingY))
+                // TYT 4 Test: Türkçe (40), Matematik (40), Fen (20), Sosyal (20)
+                TytSubjectScoreRow("Türkçe (40 Soru)", turkceD, turkceY, 40, onDChange = { turkceD = it }, onYChange = { turkceY = it }, net = calculateTytNet(turkceD, turkceY))
+                TytSubjectScoreRow("Temel Matematik (40 Soru)", matD, matY, 40, onDChange = { matD = it }, onYChange = { matY = it }, net = calculateTytNet(matD, matY))
+                TytSubjectScoreRow("Fen Bilimleri (20 Soru)", fenD, fenY, 20, onDChange = { fenD = it }, onYChange = { fenY = it }, net = calculateTytNet(fenD, fenY))
+                TytSubjectScoreRow("Sosyal Bilimler (20 Soru)", sosyalD, sosyalY, 20, onDChange = { sosyalD = it }, onYChange = { sosyalY = it }, net = calculateTytNet(sosyalD, sosyalY))
 
                 Spacer(modifier = Modifier.height(12.dp))
 
                 OutlinedTextField(
                     value = evaluationNotes,
                     onValueChange = { evaluationNotes = it },
-                    label = { Text("Sınav Analizi ve Notlar") },
+                    label = { Text("Sınav Analizi ve Hedef Notları") },
+                    placeholder = { Text("Hangi konularda eksik var, süre nasıldı...") },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Text("Kart Rengi:", style = MaterialTheme.typography.labelMedium)
-                KeepColorSwatchesRow(
-                    selectedColorHex = selectedColorHex,
-                    onSelectColor = { selectedColorHex = it }
                 )
             }
         }
@@ -2088,17 +2388,18 @@ fun KeepReportEditDialog(
 }
 
 @Composable
-private fun SubjectScoreRow(
+private fun TytSubjectScoreRow(
     subjectName: String,
     d: String,
     y: String,
+    maxQuestions: Int,
     onDChange: (String) -> Unit,
     onYChange: (String) -> Unit,
     net: Double
 ) {
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
@@ -2109,11 +2410,18 @@ private fun SubjectScoreRow(
                 .padding(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = subjectName,
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                modifier = Modifier.weight(1f)
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = subjectName,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Maks. $maxQuestions soru",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 OutlinedTextField(
@@ -2122,7 +2430,7 @@ private fun SubjectScoreRow(
                     label = { Text("D") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
-                    modifier = Modifier.width(54.dp)
+                    modifier = Modifier.width(52.dp)
                 )
 
                 OutlinedTextField(
@@ -2131,7 +2439,7 @@ private fun SubjectScoreRow(
                     label = { Text("Y") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
-                    modifier = Modifier.width(54.dp)
+                    modifier = Modifier.width(52.dp)
                 )
 
                 Surface(
@@ -2152,50 +2460,70 @@ private fun SubjectScoreRow(
 }
 
 // ================= KEEP COLOR SWATCHES ROW =================
+// 2 satır halinde 12 renk tam olarak ekrana sığar, yarım gözükme veya kesilme olmaz.
 
 @Composable
 fun KeepColorSwatchesRow(
     selectedColorHex: String,
     onSelectColor: (String) -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Column(
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        GoogleKeepColors.forEach { (hex, _) ->
-            val color = remember(hex) {
-                try {
-                    Color(android.graphics.Color.parseColor(hex))
-                } catch (_: Exception) {
-                    Color.White
-                }
-            }
-            val isSelected = selectedColorHex.equals(hex, ignoreCase = true)
-
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(CircleShape)
-                    .background(color)
-                    .border(
-                        width = if (isSelected) 3.dp else 1.dp,
-                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color(0xFFDADCE0),
-                        shape = CircleShape
-                    )
-                    .clickable { onSelectColor(hex) },
-                contentAlignment = Alignment.Center
+        val chunked = GoogleKeepColors.chunked(6)
+        chunked.forEach { rowColors ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                if (isSelected) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        tint = if (hex == "#FFFFFF") Color.Black else Color(0xFF202124),
-                        modifier = Modifier.size(16.dp)
-                    )
+                rowColors.forEach { (hex, name) ->
+                    val color = remember(hex) {
+                        try {
+                            Color(android.graphics.Color.parseColor(hex))
+                        } catch (_: Exception) {
+                            Color.White
+                        }
+                    }
+                    val isSelected = selectedColorHex.equals(hex, ignoreCase = true)
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onSelectColor(hex) }
+                            .padding(2.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .background(color)
+                                .border(
+                                    width = if (isSelected) 3.dp else 1.dp,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color(0xFFDADCE0),
+                                    shape = CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = name,
+                                    tint = if (hex == "#FFFFFF") Color.Black else Color(0xFF202124),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            text = name,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                    }
                 }
             }
         }

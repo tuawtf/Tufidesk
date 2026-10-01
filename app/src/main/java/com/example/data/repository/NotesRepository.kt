@@ -79,17 +79,17 @@ class NotesRepository(
                 )
             )
 
-            // Initial Report / Deneme Neti note
+            // Initial Report / TYT Deneme Neti
             noteDao.insertNote(
                 Note(
-                    title = "1. Genel Deneme Sınavı Net Raporu 🎯",
-                    content = "Tarih: 28 Eylül\nTürkçe: 18 Doğru, 2 Yanlış (17.33 Net)\nMatematik: 16 Doğru, 3 Yanlış (15.00 Net)\nFen Bilimleri: 19 Doğru, 1 Yanlış (18.67 Net)\nİnkılap Tarihi: 10 Doğru, 0 Yanlış (10.00 Net)\nDin Kültürü: 10 Doğru, 0 Yanlış (10.00 Net)\nİngilizce: 9 Doğru, 1 Yanlış (8.67 Net)\n\nToplam Net: 79.67 / 90 🚀",
+                    title = "TYT 1. Genel Deneme Sınavı 🎯",
+                    content = "📊 Sınav: TYT 1. Genel Deneme\nTürkçe (40): 33 D, 4 Y • 32.0 Net\nTemel Matematik (40): 29 D, 3 Y • 28.25 Net\nFen Bilimleri (20): 16 D, 2 Y • 15.5 Net\nSosyal Bilimler (20): 17 D, 2 Y • 16.5 Net\n\n🎯 TOPLAM NET: 92.25 / 120 (%77 Başarı)",
                     folderId = reportFolderId,
-                    colorHex = "#E8F5E9", // Soft Green
+                    colorHex = "#1E293B",
                     isPinned = true,
                     assignedTo = "Tuna",
                     type = NoteType.REPORT,
-                    reportData = "{\"examName\":\"1. Genel Deneme\",\"turkce\":{\"d\":18,\"y\":2},\"matematik\":{\"d\":16,\"y\":3},\"fen\":{\"d\":19,\"y\":1}}"
+                    reportData = "{\"examName\":\"TYT 1. Genel Deneme\",\"turkce\":{\"d\":33,\"y\":4},\"matematik\":{\"d\":29,\"y\":3},\"fen\":{\"d\":16,\"y\":2},\"sosyal\":{\"d\":17,\"y\":2},\"totalNet\":92.25}"
                 )
             )
 

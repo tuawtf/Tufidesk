@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.WindowInsets
@@ -671,7 +672,9 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                             },
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.testTag("add_homework_fab")
+                            modifier = Modifier
+                                .offset(y = 8.dp)
+                                .testTag("add_homework_fab")
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Add,

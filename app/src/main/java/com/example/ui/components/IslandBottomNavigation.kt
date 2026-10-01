@@ -58,7 +58,7 @@ fun IslandBottomNavigation(
         modifier = modifier
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets(0, 0, 0, 0))
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .padding(horizontal = 14.dp, vertical = 2.dp),
         contentAlignment = Alignment.Center
     ) {
         Surface(
