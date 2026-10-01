@@ -178,6 +178,19 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
     val selectedNoteFolderId by viewModel.selectedNoteFolderId.collectAsStateWithLifecycle()
     val noteSearchQuery by viewModel.noteSearchQuery.collectAsStateWithLifecycle()
 
+    val noteLayoutGrid by viewModel.noteLayoutGrid.collectAsStateWithLifecycle()
+    val noteShowWordCount by viewModel.noteShowWordCount.collectAsStateWithLifecycle()
+    val noteConfirmDelete by viewModel.noteConfirmDelete.collectAsStateWithLifecycle()
+    val keepAddNewToBottom by viewModel.keepAddNewToBottom.collectAsStateWithLifecycle()
+    val keepMoveCheckedToBottom by viewModel.keepMoveCheckedToBottom.collectAsStateWithLifecycle()
+    val keepRichLinkPreviews by viewModel.keepRichLinkPreviews.collectAsStateWithLifecycle()
+    val keepMorningTime by viewModel.keepMorningTime.collectAsStateWithLifecycle()
+    val keepAfternoonTime by viewModel.keepAfternoonTime.collectAsStateWithLifecycle()
+    val keepEveningTime by viewModel.keepEveningTime.collectAsStateWithLifecycle()
+    val keepSharingEnabled by viewModel.keepSharingEnabled.collectAsStateWithLifecycle()
+    val noteVaultPassword by viewModel.noteVaultPassword.collectAsStateWithLifecycle()
+    val noteFilterVaultOnly by viewModel.noteFilterVaultOnly.collectAsStateWithLifecycle()
+
     if (currentUser == null) {
         LoginScreen(
             onSelectProfile = { profile ->
@@ -350,7 +363,14 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                         }
                     },
                     canManage = canManage,
-                    currentUserAssigned = currentUser?.name ?: "Tuna"
+                    currentUser = currentUser,
+                    currentUserAssigned = currentUser?.name ?: "Tuna",
+                    isGridLayout = noteLayoutGrid,
+                    onToggleLayoutGrid = { viewModel.setNoteLayoutGrid(it) },
+                    showWordCount = noteShowWordCount,
+                    confirmDelete = noteConfirmDelete,
+                    moveCheckedToBottom = keepMoveCheckedToBottom,
+                    onSwitchProfile = { showSwitchProfileDialog = true }
                 )
 
                 4 -> SettingsScreen(
@@ -397,7 +417,39 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     onSelectProfile = { profile ->
                         viewModel.selectProfile(profile)
                     },
-                    canManage = canManage
+                    canManage = canManage,
+                    isNoteGrid = noteLayoutGrid,
+                    onNoteGridChange = { viewModel.setNoteLayoutGrid(it) },
+                    showWordCount = noteShowWordCount,
+                    onShowWordCountChange = { viewModel.setNoteShowWordCount(it) },
+                    confirmDeleteNote = noteConfirmDelete,
+                    onConfirmDeleteNoteChange = { viewModel.setNoteConfirmDelete(it) },
+                    addNewToBottom = keepAddNewToBottom,
+                    onAddNewToBottomChange = { viewModel.setKeepAddNewToBottom(it) },
+                    moveCheckedToBottom = keepMoveCheckedToBottom,
+                    onMoveCheckedToBottomChange = { viewModel.setKeepMoveCheckedToBottom(it) },
+                    richLinkPreviews = keepRichLinkPreviews,
+                    onRichLinkPreviewsChange = { viewModel.setKeepRichLinkPreviews(it) },
+                    morningTime = keepMorningTime,
+                    onMorningTimeChange = { viewModel.setKeepMorningTime(it) },
+                    afternoonTime = keepAfternoonTime,
+                    onAfternoonTimeChange = { viewModel.setKeepAfternoonTime(it) },
+                    eveningTime = keepEveningTime,
+                    onEveningTimeChange = { viewModel.setKeepEveningTime(it) },
+                    sharingEnabled = keepSharingEnabled,
+                    onSharingEnabledChange = { viewModel.setKeepSharingEnabled(it) },
+                    vaultPassword = noteVaultPassword,
+                    onVaultPasswordChange = {
+                        viewModel.setNoteVaultPassword(it)
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("Kasa PIN kodu güncellendi 🔒")
+                        }
+                    },
+                    onExportNotes = {
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("Tüm notlar ve raporlar JSON formatında yedeklendi 📦")
+                        }
+                    }
                 )
             }
         }

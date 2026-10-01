@@ -101,12 +101,28 @@ class HomeworkViewModel(
     val selectedNoteFolderId = MutableStateFlow<Long?>(null)
     val noteSearchQuery = MutableStateFlow("")
 
+    // Google Notlar (Keep Notes) Preferences & State
+    val noteLayoutGrid = MutableStateFlow(true) // true: 2-column staggered grid, false: 1-column list
+    val noteShowWordCount = MutableStateFlow(true)
+    val noteConfirmDelete = MutableStateFlow(true)
+    val keepAddNewToBottom = MutableStateFlow(false)
+    val keepMoveCheckedToBottom = MutableStateFlow(true)
+    val keepRichLinkPreviews = MutableStateFlow(true)
+    val keepMorningTime = MutableStateFlow("08:00")
+    val keepAfternoonTime = MutableStateFlow("13:00")
+    val keepEveningTime = MutableStateFlow("18:00")
+    val keepSharingEnabled = MutableStateFlow(true)
+    val noteVaultPassword = MutableStateFlow("1234") // Vault PIN
+    val noteVaultUnlocked = MutableStateFlow(false)
+    val noteFilterVaultOnly = MutableStateFlow(false)
+
     val userNotes: StateFlow<List<Note>> = combine(
         allNotes,
         currentUser,
         selectedNoteFolderId,
-        noteSearchQuery
-    ) { notes, user, folderId, query ->
+        noteSearchQuery,
+        noteFilterVaultOnly
+    ) { notes, user, folderId, query, vaultOnly ->
         var list = notes
         if (user != null) {
             when {
@@ -114,6 +130,11 @@ class HomeworkViewModel(
                 user.isElif -> list = list.filter { it.assignedTo.equals("Elif", ignoreCase = true) }
                 else -> { /* teacher sees all */ }
             }
+        }
+        if (vaultOnly) {
+            list = list.filter { it.isLocked }
+        } else {
+            list = list.filter { !it.isLocked }
         }
         if (folderId != null) {
             list = list.filter { it.folderId == folderId }
@@ -130,6 +151,74 @@ class HomeworkViewModel(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
     )
+
+    fun setNoteLayoutGrid(isGrid: Boolean) {
+        noteLayoutGrid.value = isGrid
+    }
+
+    fun setNoteShowWordCount(enabled: Boolean) {
+        noteShowWordCount.value = enabled
+    }
+
+    fun setNoteConfirmDelete(enabled: Boolean) {
+        noteConfirmDelete.value = enabled
+    }
+
+    fun setKeepAddNewToBottom(enabled: Boolean) {
+        keepAddNewToBottom.value = enabled
+    }
+
+    fun setKeepMoveCheckedToBottom(enabled: Boolean) {
+        keepMoveCheckedToBottom.value = enabled
+    }
+
+    fun setKeepRichLinkPreviews(enabled: Boolean) {
+        keepRichLinkPreviews.value = enabled
+    }
+
+    fun setKeepMorningTime(time: String) {
+        keepMorningTime.value = time
+    }
+
+    fun setKeepAfternoonTime(time: String) {
+        keepAfternoonTime.value = time
+    }
+
+    fun setKeepEveningTime(time: String) {
+        keepEveningTime.value = time
+    }
+
+    fun setKeepSharingEnabled(enabled: Boolean) {
+        keepSharingEnabled.value = enabled
+    }
+
+    fun setNoteVaultPassword(pin: String) {
+        noteVaultPassword.value = pin
+    }
+
+    fun unlockVault(pin: String): Boolean {
+        return if (noteVaultPassword.value.isEmpty() || noteVaultPassword.value == pin) {
+            noteVaultUnlocked.value = true
+            true
+        } else {
+            false
+        }
+    }
+
+    fun lockVault() {
+        noteVaultUnlocked.value = false
+        noteFilterVaultOnly.value = false
+    }
+
+    fun setNoteFilterVaultOnly(vaultOnly: Boolean) {
+        noteFilterVaultOnly.value = vaultOnly
+    }
+
+    fun toggleNoteLock(note: Note) {
+        viewModelScope.launch {
+            notesRepository.updateNote(note.copy(isLocked = !note.isLocked))
+        }
+    }
 
     fun setSelectedNoteFolder(folderId: Long?) {
         selectedNoteFolderId.value = folderId

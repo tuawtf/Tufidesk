@@ -14,7 +14,7 @@ import com.example.data.model.NoteFolder
 
 @Database(
     entities = [Course::class, Homework::class, Note::class, NoteFolder::class],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

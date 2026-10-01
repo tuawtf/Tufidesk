@@ -5,6 +5,7 @@ import androidx.room.PrimaryKey
 
 enum class NoteType {
     TEXT,
+    CHECKLIST,
     DRAWING,
     IMAGE,
     REPORT
@@ -22,6 +23,7 @@ data class Note(
     val drawingData: String? = null,
     val reportData: String? = null,
     val isPinned: Boolean = false,
+    val isLocked: Boolean = false,
     val assignedTo: String = "Tuna",
     val createdAtMillis: Long = System.currentTimeMillis(),
     val updatedAtMillis: Long = System.currentTimeMillis(),
