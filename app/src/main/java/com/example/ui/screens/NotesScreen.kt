@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -11,9 +12,11 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -23,12 +26,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -49,9 +56,13 @@ import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.CreateNewFolder
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FormatListBulleted
@@ -64,6 +75,7 @@ import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -90,6 +102,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -108,9 +122,70 @@ import com.example.data.model.NoteFolder
 import com.example.data.model.NoteType
 import com.example.data.model.UserAccount
 import com.example.ui.components.UserFlowerAvatar
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+data class DrawingPoint(val x: Float, val y: Float)
+data class DrawingStroke(val colorHex: String, val width: Float, val points: List<DrawingPoint>)
+
+fun serializeDrawingStrokes(strokes: List<DrawingStroke>): String {
+    return strokes.joinToString(";") { stroke ->
+        val pts = stroke.points.joinToString(" ") { "${it.x.toInt()},${it.y.toInt()}" }
+        "${stroke.colorHex}|${stroke.width}|$pts"
+    }
+}
+
+fun parseDrawingStrokes(data: String): List<DrawingStroke> {
+    if (data.isBlank()) return emptyList()
+    val list = mutableListOf<DrawingStroke>()
+    val strokeTokens = data.split(";")
+    for (token in strokeTokens) {
+        if (token.isBlank()) continue
+        val parts = token.split("|")
+        if (parts.size >= 3) {
+            val colorHex = parts[0]
+            val width = parts[1].toFloatOrNull() ?: 5f
+            val pointsStr = parts[2].trim()
+            val points = mutableListOf<DrawingPoint>()
+            if (pointsStr.isNotBlank()) {
+                val pointTokens = pointsStr.split(" ")
+                for (pt in pointTokens) {
+                    val coords = pt.split(",")
+                    if (coords.size == 2) {
+                        val x = coords[0].toFloatOrNull() ?: continue
+                        val y = coords[1].toFloatOrNull() ?: continue
+                        points.add(DrawingPoint(x, y))
+                    }
+                }
+            }
+            if (points.isNotEmpty()) {
+                list.add(DrawingStroke(colorHex, width, points))
+            }
+        }
+    }
+    return list
+}
+
+fun saveImageToInternalStorage(context: Context, sourceUri: Uri): Uri {
+    return try {
+        val imagesDir = File(context.filesDir, "note_images").apply { mkdirs() }
+        val destFile = File(imagesDir, "img_${System.currentTimeMillis()}.jpg")
+        context.contentResolver.openInputStream(sourceUri)?.use { input ->
+            destFile.outputStream().use { output ->
+                input.copyTo(output)
+            }
+        }
+        Uri.fromFile(destFile)
+    } catch (_: Exception) {
+        sourceUri
+    }
+}
 
 // Google Keep Authentic Material Pastel Colors
 val GoogleKeepColors = listOf(
@@ -155,6 +230,14 @@ fun NotesScreen(
 ) {
     var isFabMenuOpen by remember { mutableStateOf(false) }
 
+    // Multi-selection mode state
+    var selectedNoteIds by remember { mutableStateOf(setOf<Long>()) }
+    val isSelectionMode = selectedNoteIds.isNotEmpty()
+
+    BackHandler(enabled = isSelectionMode) {
+        selectedNoteIds = emptySet()
+    }
+
     // Dialog states
     var showTextNoteDialog by remember { mutableStateOf(false) }
     var showChecklistDialog by remember { mutableStateOf(false) }
@@ -166,19 +249,31 @@ fun NotesScreen(
     var noteToDeleteConfirm by remember { mutableStateOf<Note?>(null) }
 
     // Photo picker for Image Note
+    val context = LocalContext.current
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) {
-            selectedImageUri = uri
+            val savedUri = saveImageToInternalStorage(context, uri)
+            selectedImageUri = savedUri
             showImageNoteDialog = true
         }
     }
 
+    // Filter notes by selected folder if any.
+    // Deneme sınav raporları (NoteType.REPORT) tüm notlar ekranına dahil edilmez, sadece deneme sınavları klasöründe gösterilir.
+    val currentFolderNotes = remember(notes, selectedFolderId) {
+        if (selectedFolderId == null) {
+            notes.filter { it.type != NoteType.REPORT }
+        } else {
+            notes.filter { it.folderId == selectedFolderId }
+        }
+    }
+
     // Partition notes into pinned and others
-    val pinnedNotes = remember(notes) { notes.filter { it.isPinned } }
-    val otherNotes = remember(notes) { notes.filter { !it.isPinned } }
+    val pinnedNotes = remember(currentFolderNotes) { currentFolderNotes.filter { it.isPinned } }
+    val otherNotes = remember(currentFolderNotes) { currentFolderNotes.filter { !it.isPinned } }
 
     Box(
         modifier = modifier
@@ -193,9 +288,67 @@ fun NotesScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalItemSpacing = 8.dp
         ) {
-            // Header Item: Authentic Google Keep Pill Search Bar + Folder/Label Chips
+            // Header Item: Search Bar or Selection Toolbar
             item(span = StaggeredGridItemSpan.FullLine) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (isSelectionMode) {
+                    // Contextual Selection Toolbar
+                    Surface(
+                        shape = RoundedCornerShape(24.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .shadow(3.dp, RoundedCornerShape(24.dp))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(onClick = { selectedNoteIds = emptySet() }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Seçimi Kapat",
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "${selectedNoteIds.size} not seçildi",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(onClick = {
+                                    selectedNoteIds = if (selectedNoteIds.size == currentFolderNotes.size) emptySet() else currentFolderNotes.map { it.id }.toSet()
+                                }) {
+                                    Icon(
+                                        imageVector = if (selectedNoteIds.size == currentFolderNotes.size && currentFolderNotes.isNotEmpty()) Icons.Default.CheckBox else Icons.Default.SelectAll,
+                                        contentDescription = "Tümünü Seç",
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                                IconButton(onClick = {
+                                    selectedNoteIds.forEach { id ->
+                                        currentFolderNotes.find { it.id == id }?.let { onDeleteNote(it) }
+                                    }
+                                    selectedNoteIds = emptySet()
+                                }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Seçilenleri Sil",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else {
                     // Google Keep Style Floating Pill Search Bar
                     Surface(
                         shape = RoundedCornerShape(28.dp),
@@ -259,122 +412,128 @@ fun NotesScreen(
                                     modifier = Modifier.size(22.dp)
                                 )
                             }
-
-                            // Profile Avatar
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .clip(CircleShape)
-                                    .clickable { onSwitchProfile() },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (currentUser != null) {
-                                    UserFlowerAvatar(user = currentUser, size = 32.dp)
-                                } else {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = MaterialTheme.colorScheme.primaryContainer,
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Text(
-                                                text = currentUserAssigned.take(1).uppercase(Locale.getDefault()),
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                                            )
-                                        }
-                                    }
-                                }
-                            }
                         }
                     }
+                }
+            }
 
-                    // Keep Labels / Folders Chips Row
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+            // If a specific folder is currently active, show a Breadcrumb / Return Card
+            if (selectedFolderId != null) {
+                item(span = StaggeredGridItemSpan.FullLine) {
+                    val currentFolder = folders.find { it.id == selectedFolderId }
+                    val fColor = remember(currentFolder?.colorHex) {
+                        try { Color(android.graphics.Color.parseColor(currentFolder?.colorHex ?: "#1B65D4")) } catch (_: Exception) { Color(0xFF1B65D4) }
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = fColor.copy(alpha = 0.12f),
+                        border = BorderStroke(1.2.dp, fColor.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        FilterChip(
-                            selected = selectedFolderId == null,
-                            onClick = { onSelectFolder(null) },
-                            label = { Text("Tümü (${notes.size})") },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        )
-
-                        folders.forEach { folder ->
-                            val count = remember(notes, folder.id) {
-                                notes.count { it.folderId == folder.id }
-                            }
-                            val isSelected = selectedFolderId == folder.id
-                            val folderColor = remember(folder.colorHex) {
-                                try {
-                                    Color(android.graphics.Color.parseColor(folder.colorHex))
-                                } catch (_: Exception) {
-                                    Color(0xFF1B65D4)
-                                }
-                            }
-
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = {
-                                    if (isSelected) onSelectFolder(null) else onSelectFolder(folder.id)
-                                },
-                                label = { Text("${folder.name} ($count)") },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.Folder,
-                                        contentDescription = null,
-                                        tint = folderColor,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = folderColor.copy(alpha = 0.2f),
-                                    selectedLabelColor = folderColor
-                                )
-                            )
-                        }
-
-                        // Add Folder Chip ("+ Klasör")
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        Row(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { showFolderDialog = true }
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { onSelectFolder(null) }
+                                    .padding(vertical = 4.dp, horizontal = 6.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Add,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(15.dp),
-                                    tint = MaterialTheme.colorScheme.primary
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Tüm Notlara Dön",
+                                    tint = fColor,
+                                    modifier = Modifier.size(22.dp)
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "Klasör",
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = MaterialTheme.colorScheme.primary
-                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = currentFolder?.name ?: "Klasör",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "← Tüm notlara dön (${currentFolderNotes.size} not)",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = fColor
+                                    )
+                                }
+                            }
+
+                            if (currentFolder != null) {
+                                IconButton(onClick = { onDeleteFolder(currentFolder) }) {
+                                    Icon(
+                                        imageVector = Icons.Default.DeleteOutline,
+                                        contentDescription = "Klasörü Sil",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
 
+            // Root view: Folders displayed directly in grid as cards (1 or 2 grid layout)
+            if (selectedFolderId == null && searchQuery.isBlank() && folders.isNotEmpty()) {
+                item(span = StaggeredGridItemSpan.FullLine) {
+                    Row(
+                        modifier = Modifier.padding(start = 6.dp, top = 6.dp, bottom = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Folder,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "KLASÖRLER",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        TextButton(
+                            onClick = { showFolderDialog = true },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("+ Yeni Klasör", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+
+                items(
+                    items = folders,
+                    key = { "folder_${it.id}" }
+                ) { folder ->
+                    val count = remember(notes, folder.id) {
+                        notes.count { it.folderId == folder.id }
+                    }
+                    NoteFolderCard(
+                        folder = folder,
+                        noteCount = count,
+                        onClick = { onSelectFolder(folder.id) },
+                        onDelete = { onDeleteFolder(folder) }
+                    )
+                }
+            }
+
             // Empty State
-            if (notes.isEmpty()) {
+            if (currentFolderNotes.isEmpty()) {
                 item(span = StaggeredGridItemSpan.FullLine) {
                     Card(
                         shape = RoundedCornerShape(20.dp),
@@ -446,17 +605,33 @@ fun NotesScreen(
                     key = { it.id },
                     span = { note -> if (note.type == NoteType.REPORT) StaggeredGridItemSpan.FullLine else StaggeredGridItemSpan.SingleLane }
                 ) { note ->
+                    val isSelected = selectedNoteIds.contains(note.id)
+                    val clickAction = {
+                        if (isSelectionMode) {
+                            selectedNoteIds = if (isSelected) selectedNoteIds - note.id else selectedNoteIds + note.id
+                        } else {
+                            noteToEdit = note
+                        }
+                    }
+                    val longClickAction = {
+                        selectedNoteIds = if (isSelected) selectedNoteIds - note.id else selectedNoteIds + note.id
+                    }
+
                     if (note.type == NoteType.REPORT) {
                         TytExamReportCard(
                             note = note,
-                            onClick = { noteToEdit = note },
+                            isSelected = isSelected,
+                            onClick = clickAction,
+                            onLongClick = longClickAction,
                             onTogglePin = { onTogglePin(note) }
                         )
                     } else {
                         GoogleKeepNoteCard(
                             note = note,
                             folder = folders.find { it.id == note.folderId },
-                            onClick = { noteToEdit = note },
+                            isSelected = isSelected,
+                            onClick = clickAction,
+                            onLongClick = longClickAction,
                             onTogglePin = { onTogglePin(note) }
                         )
                     }
@@ -484,17 +659,33 @@ fun NotesScreen(
                 key = { it.id },
                 span = { note -> if (note.type == NoteType.REPORT) StaggeredGridItemSpan.FullLine else StaggeredGridItemSpan.SingleLane }
             ) { note ->
+                val isSelected = selectedNoteIds.contains(note.id)
+                val clickAction = {
+                    if (isSelectionMode) {
+                        selectedNoteIds = if (isSelected) selectedNoteIds - note.id else selectedNoteIds + note.id
+                    } else {
+                        noteToEdit = note
+                    }
+                }
+                val longClickAction = {
+                    selectedNoteIds = if (isSelected) selectedNoteIds - note.id else selectedNoteIds + note.id
+                }
+
                 if (note.type == NoteType.REPORT) {
                     TytExamReportCard(
                         note = note,
-                        onClick = { noteToEdit = note },
+                        isSelected = isSelected,
+                        onClick = clickAction,
+                        onLongClick = longClickAction,
                         onTogglePin = { onTogglePin(note) }
                     )
                 } else {
                     GoogleKeepNoteCard(
                         note = note,
                         folder = folders.find { it.id == note.folderId },
-                        onClick = { noteToEdit = note },
+                        isSelected = isSelected,
+                        onClick = clickAction,
+                        onLongClick = longClickAction,
                         onTogglePin = { onTogglePin(note) }
                     )
                 }
@@ -515,7 +706,6 @@ fun NotesScreen(
         }
 
         // Google Keep Floating Action Button + Speed Dial Menu
-        // Lowered to normal natural FAB level directly above the island bottom bar
         Column(
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -533,7 +723,7 @@ fun NotesScreen(
                     horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // 1. Rapor (TYT Practice Exam Report - Red Scratched in Screenshot)
+                    // 1. Rapor
                     KeepSpeedDialPill(
                         text = "Rapor",
                         icon = Icons.Default.Assessment,
@@ -544,7 +734,7 @@ fun NotesScreen(
                         }
                     )
 
-                    // 2. Klasör (Folder Creation - in place of 'Ses')
+                    // 2. Klasör
                     KeepSpeedDialPill(
                         text = "Klasör",
                         icon = Icons.Default.Folder,
@@ -555,7 +745,7 @@ fun NotesScreen(
                         }
                     )
 
-                    // 3. Resim (Photo / Image Note)
+                    // 3. Resim
                     KeepSpeedDialPill(
                         text = "Resim",
                         icon = Icons.Default.Image,
@@ -568,7 +758,7 @@ fun NotesScreen(
                         }
                     )
 
-                    // 4. Çizim (Drawing / Sketch)
+                    // 4. Çizim
                     KeepSpeedDialPill(
                         text = "Çizim",
                         icon = Icons.Default.Brush,
@@ -579,7 +769,7 @@ fun NotesScreen(
                         }
                     )
 
-                    // 5. Liste (Checklist / To-Do Items)
+                    // 5. Liste
                     KeepSpeedDialPill(
                         text = "Liste",
                         icon = Icons.Default.FormatListBulleted,
@@ -590,7 +780,7 @@ fun NotesScreen(
                         }
                     )
 
-                    // 6. Metin (Standard Text Note)
+                    // 6. Metin
                     KeepSpeedDialPill(
                         text = "Metin",
                         icon = Icons.Default.TextFields,
@@ -603,15 +793,15 @@ fun NotesScreen(
                 }
             }
 
-            // Main FAB: Toggle '+' or '✕'
+            // Main FAB: Toggle '+' or '✕' - Rounded square shape matching Homework FAB
             FloatingActionButton(
                 onClick = { isFabMenuOpen = !isFabMenuOpen },
-                shape = CircleShape,
+                shape = RoundedCornerShape(16.dp),
                 containerColor = if (isFabMenuOpen) Color(0xFFA6D0F2) else MaterialTheme.colorScheme.primary,
                 contentColor = if (isFabMenuOpen) Color(0xFF003355) else MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier
                     .size(56.dp)
-                    .shadow(6.dp, CircleShape)
+                    .shadow(6.dp, RoundedCornerShape(16.dp))
                     .testTag("notes_fab_toggle")
             ) {
                 Icon(
@@ -661,6 +851,7 @@ fun NotesScreen(
     // 3. Drawing / Sketch Dialog
     if (showDrawingDialog) {
         KeepDrawingEditDialog(
+            initialNote = null,
             folders = folders,
             selectedFolderId = selectedFolderId,
             currentUserAssigned = currentUserAssigned,
@@ -675,7 +866,8 @@ fun NotesScreen(
     // 4. Image Note Dialog
     if (showImageNoteDialog && selectedImageUri != null) {
         KeepImageNoteEditDialog(
-            imageUri = selectedImageUri!!,
+            initialNote = null,
+            initialImageUri = selectedImageUri,
             folders = folders,
             selectedFolderId = selectedFolderId,
             currentUserAssigned = currentUserAssigned,
@@ -747,6 +939,33 @@ fun NotesScreen(
                     }
                 )
             }
+            NoteType.DRAWING -> {
+                KeepDrawingEditDialog(
+                    initialNote = noteToEdit,
+                    folders = folders,
+                    selectedFolderId = noteToEdit!!.folderId,
+                    currentUserAssigned = noteToEdit!!.assignedTo,
+                    onDismiss = { noteToEdit = null },
+                    onSave = { updated ->
+                        onUpdateNote(updated)
+                        noteToEdit = null
+                    }
+                )
+            }
+            NoteType.IMAGE -> {
+                KeepImageNoteEditDialog(
+                    initialNote = noteToEdit,
+                    initialImageUri = null,
+                    folders = folders,
+                    selectedFolderId = noteToEdit!!.folderId,
+                    currentUserAssigned = noteToEdit!!.assignedTo,
+                    onDismiss = { noteToEdit = null },
+                    onSave = { updated ->
+                        onUpdateNote(updated)
+                        noteToEdit = null
+                    }
+                )
+            }
             else -> {
                 KeepNoteEditDialog(
                     initialNote = noteToEdit,
@@ -788,29 +1007,169 @@ fun NotesScreen(
     }
 }
 
-// ================= TYT DENEME RAPORU KARTI =================
-// Deneme raporları bir not görünümü olarak değil, özel bir sınav karnesi Card'ı olarak görünür.
+// ================= NOTE FOLDER CARDS (IN-GRID) =================
 
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun NoteFolderCard(
+    folder: NoteFolder,
+    noteCount: Int,
+    onClick: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val folderColor = remember(folder.colorHex) {
+        try {
+            Color(android.graphics.Color.parseColor(folder.colorHex))
+        } catch (_: Exception) {
+            Color(0xFF1B65D4)
+        }
+    }
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = folderColor.copy(alpha = 0.12f)
+        ),
+        border = BorderStroke(1.2.dp, folderColor.copy(alpha = 0.35f)),
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = folderColor.copy(alpha = 0.22f),
+                    modifier = Modifier.size(38.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Folder,
+                            contentDescription = null,
+                            tint = folderColor,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        text = folder.name,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "$noteCount not",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.size(26.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.DeleteOutline,
+                    contentDescription = "Klasörü Sil",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.size(17.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun AddFolderCard(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                modifier = Modifier.size(38.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.CreateNewFolder,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = "Yeni Klasör Ekle",
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+// ================= TYT DENEME RAPORU KARTI =================
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TytExamReportCard(
     note: Note,
+    isSelected: Boolean = false,
     onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
     onTogglePin: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
         ),
-        border = BorderStroke(1.5.dp, Color(0xFF2563EB).copy(alpha = 0.35f)),
+        border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        else BorderStroke(1.5.dp, Color(0xFF2563EB).copy(alpha = 0.35f)),
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            // Header: TYT Badge + Pin
+            // Header: TYT Badge + Pin / Selection
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -839,16 +1198,26 @@ fun TytExamReportCard(
                     }
                 }
 
-                IconButton(
-                    onClick = onTogglePin,
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        imageVector = if (note.isPinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
-                        contentDescription = "Sabitle",
-                        tint = if (note.isPinned) MaterialTheme.colorScheme.primary else Color(0xFF5F6368),
-                        modifier = Modifier.size(18.dp)
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isSelected) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = "Seçildi",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp).padding(end = 4.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = onTogglePin,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (note.isPinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
+                            contentDescription = "Sabitle",
+                            tint = if (note.isPinned) MaterialTheme.colorScheme.primary else Color(0xFF5F6368),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
 
@@ -990,46 +1359,127 @@ private fun MiniSubjectCard(name: String, net: String, totalQ: Int, modifier: Mo
     }
 }
 
+// ================= DRAWING PREVIEW CANVAS =================
+
+@Composable
+fun DrawingPreviewCanvas(strokes: List<DrawingStroke>, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.fillMaxSize().padding(4.dp)) {
+        if (strokes.isEmpty()) return@Canvas
+        var minX = Float.MAX_VALUE
+        var maxX = Float.MIN_VALUE
+        var minY = Float.MAX_VALUE
+        var maxY = Float.MIN_VALUE
+        for (stroke in strokes) {
+            for (p in stroke.points) {
+                if (p.x < minX) minX = p.x
+                if (p.x > maxX) maxX = p.x
+                if (p.y < minY) minY = p.y
+                if (p.y > maxY) maxY = p.y
+            }
+        }
+        val dataWidth = (maxX - minX).coerceAtLeast(1f)
+        val dataHeight = (maxY - minY).coerceAtLeast(1f)
+        val scale = minOf(size.width / dataWidth, size.height / dataHeight).coerceAtMost(1f)
+        val offsetX = (size.width - dataWidth * scale) / 2f - minX * scale
+        val offsetY = (size.height - dataHeight * scale) / 2f - minY * scale
+
+        for (stroke in strokes) {
+            val strokeColor = try {
+                Color(android.graphics.Color.parseColor(stroke.colorHex))
+            } catch (_: Exception) {
+                Color.Black
+            }
+            val scaledWidth = (stroke.width * scale).coerceAtLeast(1.5f)
+            if (stroke.points.size == 1) {
+                val p = stroke.points[0]
+                drawCircle(
+                    color = strokeColor,
+                    radius = scaledWidth / 2f,
+                    center = androidx.compose.ui.geometry.Offset(p.x * scale + offsetX, p.y * scale + offsetY)
+                )
+            } else if (stroke.points.size > 1) {
+                val path = Path()
+                path.moveTo(stroke.points[0].x * scale + offsetX, stroke.points[0].y * scale + offsetY)
+                for (i in 1 until stroke.points.size) {
+                    path.lineTo(stroke.points[i].x * scale + offsetX, stroke.points[i].y * scale + offsetY)
+                }
+                drawPath(
+                    path = path,
+                    color = strokeColor,
+                    style = Stroke(width = scaledWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                )
+            }
+        }
+    }
+}
+
 // ================= NOTE CARD (GOOGLE KEEP STYLE) =================
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun GoogleKeepNoteCard(
     note: Note,
     folder: NoteFolder?,
+    isSelected: Boolean = false,
     onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
     onTogglePin: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val cardColor = remember(note.colorHex) {
-        try {
-            Color(android.graphics.Color.parseColor(note.colorHex))
-        } catch (_: Exception) {
-            Color(0xFFFFFFFF)
+    val isDefaultColor = remember(note.colorHex) {
+        note.colorHex.isBlank() || note.colorHex.equals("#FFFFFF", ignoreCase = true) || note.colorHex.equals("DEFAULT", ignoreCase = true)
+    }
+
+    val defaultSurfaceColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+    val cardColor = remember(note.colorHex, isDefaultColor, defaultSurfaceColor) {
+        if (isDefaultColor) {
+            defaultSurfaceColor
+        } else {
+            try {
+                Color(android.graphics.Color.parseColor(note.colorHex))
+            } catch (_: Exception) {
+                defaultSurfaceColor
+            }
         }
     }
-    val isWhiteOrLight = remember(cardColor) {
-        cardColor == Color.White || (cardColor.red > 0.9f && cardColor.green > 0.9f && cardColor.blue > 0.9f)
+
+    val defaultTextColor = MaterialTheme.colorScheme.onSurface
+    val defaultVariantTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val titleColor = remember(isDefaultColor, cardColor, defaultTextColor) {
+        if (isDefaultColor) defaultTextColor
+        else if (cardColor.luminance() > 0.5f) Color(0xFF202124) else Color.White
+    }
+    val contentTextColor = remember(isDefaultColor, cardColor, defaultVariantTextColor) {
+        if (isDefaultColor) defaultVariantTextColor
+        else if (cardColor.luminance() > 0.5f) Color(0xFF3C4043) else Color(0xFFE0E0E0)
     }
 
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = cardColor),
-        border = BorderStroke(
-            1.dp,
-            if (isWhiteOrLight) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
-            else cardColor.copy(alpha = 0.8f)
-        ),
+        border = if (isSelected) {
+            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        } else {
+            BorderStroke(
+                1.dp,
+                if (isDefaultColor) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                else cardColor.copy(alpha = 0.8f)
+            )
+        },
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(12.dp)
         ) {
-            // Header: Title and Pin Icon
+            // Header: Title, Pin Icon and Selection Indicator
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top,
@@ -1039,7 +1489,7 @@ fun GoogleKeepNoteCard(
                     Text(
                         text = note.title,
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = Color(0xFF202124),
+                        color = titleColor,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
@@ -1048,16 +1498,26 @@ fun GoogleKeepNoteCard(
                     Spacer(modifier = Modifier.weight(1f))
                 }
 
-                IconButton(
-                    onClick = onTogglePin,
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        imageVector = if (note.isPinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
-                        contentDescription = if (note.isPinned) "Sabitlemeyi Kaldır" else "Sabitle",
-                        tint = if (note.isPinned) MaterialTheme.colorScheme.primary else Color(0xFF5F6368),
-                        modifier = Modifier.size(18.dp)
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isSelected) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = "Seçildi",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp).padding(end = 4.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = onTogglePin,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (note.isPinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
+                            contentDescription = if (note.isPinned) "Sabitlemeyi Kaldır" else "Sabitle",
+                            tint = if (note.isPinned) MaterialTheme.colorScheme.primary else contentTextColor.copy(alpha = 0.7f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
 
@@ -1076,7 +1536,7 @@ fun GoogleKeepNoteCard(
                                 Icon(
                                     imageVector = if (isChecked) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank,
                                     contentDescription = null,
-                                    tint = if (isChecked) Color(0xFF5F6368) else Color(0xFF202124),
+                                    tint = if (isChecked) contentTextColor.copy(alpha = 0.6f) else contentTextColor,
                                     modifier = Modifier.size(15.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -1085,7 +1545,7 @@ fun GoogleKeepNoteCard(
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         textDecoration = if (isChecked) TextDecoration.LineThrough else TextDecoration.None
                                     ),
-                                    color = if (isChecked) Color(0xFF80868B) else Color(0xFF202124),
+                                    color = if (isChecked) contentTextColor.copy(alpha = 0.6f) else contentTextColor,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -1094,23 +1554,63 @@ fun GoogleKeepNoteCard(
                     }
                 }
                 NoteType.DRAWING -> {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = Color.White.copy(alpha = 0.8f),
-                        border = BorderStroke(1.dp, Color(0xFFDADCE0)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(70.dp)
-                            .padding(vertical = 4.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.Brush,
-                                contentDescription = null,
-                                tint = Color(0xFF8E24AA),
-                                modifier = Modifier.size(26.dp)
-                            )
+                    val strokes = remember(note.drawingData) { parseDrawingStrokes(note.drawingData ?: "") }
+                    if (strokes.isNotEmpty()) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color.White.copy(alpha = 0.95f),
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(100.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .padding(vertical = 4.dp)
+                        ) {
+                            DrawingPreviewCanvas(strokes = strokes)
                         }
+                    } else {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color.White.copy(alpha = 0.8f),
+                            border = BorderStroke(1.dp, Color(0xFFDADCE0)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(70.dp)
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Brush,
+                                    contentDescription = null,
+                                    tint = Color(0xFF8E24AA),
+                                    modifier = Modifier.size(26.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+                NoteType.IMAGE -> {
+                    if (!note.imageUri.isNullOrBlank()) {
+                        AsyncImage(
+                            model = note.imageUri,
+                            contentDescription = note.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 160.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .padding(vertical = 4.dp)
+                        )
+                    }
+                    if (note.content.isNotBlank()) {
+                        Text(
+                            text = note.content,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = contentTextColor,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
                     }
                 }
                 else -> {
@@ -1118,7 +1618,7 @@ fun GoogleKeepNoteCard(
                         Text(
                             text = note.content,
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF3C4043),
+                            color = contentTextColor,
                             maxLines = 7,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(vertical = 4.dp)
@@ -1176,7 +1676,7 @@ fun GoogleKeepNoteCard(
                 Text(
                     text = dateStr,
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                    color = Color(0xFF5F6368)
+                    color = contentTextColor.copy(alpha = 0.8f)
                 )
             }
         }
@@ -1257,12 +1757,45 @@ fun KeepNoteEditDialog(
     var isPinned by remember { mutableStateOf(initialPinned) }
     var showColorPaletteSheet by remember { mutableStateOf(false) }
 
-    val bgColor = remember(selectedColorHex) {
-        try {
-            Color(android.graphics.Color.parseColor(selectedColorHex))
-        } catch (_: Exception) {
-            Color.White
+    val isDefaultColor = remember(selectedColorHex) {
+        selectedColorHex.isBlank() || selectedColorHex.equals("#FFFFFF", ignoreCase = true) || selectedColorHex.equals("DEFAULT", ignoreCase = true)
+    }
+    val defaultSurfaceColor = MaterialTheme.colorScheme.surface
+    val defaultOnSurface = MaterialTheme.colorScheme.onSurface
+    val defaultOnSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+
+    val bgColor = remember(selectedColorHex, isDefaultColor, defaultSurfaceColor) {
+        if (isDefaultColor) defaultSurfaceColor
+        else {
+            try {
+                Color(android.graphics.Color.parseColor(selectedColorHex))
+            } catch (_: Exception) {
+                defaultSurfaceColor
+            }
         }
+    }
+    val isLightBg = remember(isDefaultColor, bgColor) {
+        if (isDefaultColor) null else bgColor.luminance() > 0.45f
+    }
+    val titleTextColor = remember(isDefaultColor, isLightBg, defaultOnSurface) {
+        if (isDefaultColor) defaultOnSurface
+        else if (isLightBg == true) Color(0xFF1F1F1F) else Color(0xFFFFFFFF)
+    }
+    val bodyTextColor = remember(isDefaultColor, isLightBg, defaultOnSurface) {
+        if (isDefaultColor) defaultOnSurface
+        else if (isLightBg == true) Color(0xFF202124) else Color(0xFFF1F5F9)
+    }
+    val placeholderColor = remember(isDefaultColor, isLightBg, defaultOnSurfaceVariant) {
+        if (isDefaultColor) defaultOnSurfaceVariant.copy(alpha = 0.65f)
+        else if (isLightBg == true) Color(0xFF5F6368) else Color(0xFF94A3B8)
+    }
+    val iconColor = remember(isDefaultColor, isLightBg, defaultOnSurface) {
+        if (isDefaultColor) defaultOnSurface
+        else if (isLightBg == true) Color(0xFF3C4043) else Color(0xFFF8FAFC)
+    }
+    val secondaryIconColor = remember(isDefaultColor, isLightBg, defaultOnSurfaceVariant) {
+        if (isDefaultColor) defaultOnSurfaceVariant
+        else if (isLightBg == true) Color(0xFF5F6368) else Color(0xFFCBD5E1)
     }
 
     val isDirty = remember(title, content, selectedFolder, selectedColorHex, isPinned) {
@@ -1307,21 +1840,25 @@ fun KeepNoteEditDialog(
 
     Dialog(
         onDismissRequest = { handleCloseOrSave() },
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
         Surface(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .imePadding(),
             color = bgColor
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                    modifier = Modifier.fillMaxSize()
                 ) {
                     // Top Action Bar
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -1329,7 +1866,7 @@ fun KeepNoteEditDialog(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Geri ve Kaydet",
-                                tint = Color(0xFF202124)
+                                tint = iconColor
                             )
                         }
 
@@ -1338,7 +1875,7 @@ fun KeepNoteEditDialog(
                                 Icon(
                                     imageVector = if (isPinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
                                     contentDescription = "Sabitle",
-                                    tint = if (isPinned) MaterialTheme.colorScheme.primary else Color(0xFF5F6368)
+                                    tint = if (isPinned) MaterialTheme.colorScheme.primary else secondaryIconColor
                                 )
                             }
                             // Color palette button: Toggles sliding bottom palette
@@ -1346,7 +1883,7 @@ fun KeepNoteEditDialog(
                                 Icon(
                                     imageVector = Icons.Default.Palette,
                                     contentDescription = "Renk Seçici",
-                                    tint = if (showColorPaletteSheet) MaterialTheme.colorScheme.primary else Color(0xFF5F6368)
+                                    tint = if (showColorPaletteSheet) MaterialTheme.colorScheme.primary else secondaryIconColor
                                 )
                             }
                             IconButton(onClick = { handleCloseOrSave() }) {
@@ -1359,83 +1896,100 @@ fun KeepNoteEditDialog(
                         }
                     }
 
-                    // Folder selector chips
-                    Row(
+                    // Scrollable Note Body - Keyboard will never hide the text
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
                     ) {
-                        FilterChip(
-                            selected = selectedFolder == null,
-                            onClick = { selectedFolder = null },
-                            label = { Text("Klasörsüz") },
-                            shape = RoundedCornerShape(10.dp)
-                        )
-                        folders.forEach { f ->
+                        // Folder selector chips
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
                             FilterChip(
-                                selected = selectedFolder == f.id,
-                                onClick = { selectedFolder = if (selectedFolder == f.id) null else f.id },
-                                label = { Text(f.name) },
+                                selected = selectedFolder == null,
+                                onClick = { selectedFolder = null },
+                                label = { Text("Klasörsüz") },
                                 shape = RoundedCornerShape(10.dp)
                             )
+                            folders.forEach { f ->
+                                FilterChip(
+                                    selected = selectedFolder == f.id,
+                                    onClick = { selectedFolder = if (selectedFolder == f.id) null else f.id },
+                                    label = { Text(f.name) },
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                            }
                         }
-                    }
 
-                    // Title Input
-                    OutlinedTextField(
-                        value = title,
-                        onValueChange = { title = it },
-                        placeholder = {
-                            Text(
-                                "Başlık",
-                                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                                color = Color(0xFF5F6368)
+                        // Title Input
+                        OutlinedTextField(
+                            value = title,
+                            onValueChange = { title = it },
+                            placeholder = {
+                                Text(
+                                    "Başlık",
+                                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = placeholderColor
+                                )
+                            },
+                            textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, color = titleTextColor),
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent,
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                cursorColor = titleTextColor
                             )
-                        },
-                        textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, color = Color(0xFF202124)),
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent
                         )
-                    )
 
-                    // Content Input
-                    OutlinedTextField(
-                        value = content,
-                        onValueChange = { content = it },
-                        placeholder = {
-                            Text(
-                                "Not...",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = Color(0xFF5F6368)
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // Content Input (expands naturally and scrolls)
+                        OutlinedTextField(
+                            value = content,
+                            onValueChange = { content = it },
+                            placeholder = {
+                                Text(
+                                    "Not...",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = placeholderColor
+                                )
+                            },
+                            textStyle = MaterialTheme.typography.bodyLarge.copy(color = bodyTextColor),
+                            modifier = Modifier
+                                .fillMaxWidth(),
+                            minLines = 8,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent,
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                cursorColor = bodyTextColor
                             )
-                        },
-                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color(0xFF202124)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent
                         )
-                    )
 
-                    // Word count
-                    if (showWordCount) {
-                        val words = remember(content) { if (content.isBlank()) 0 else content.trim().split("\\s+".toRegex()).size }
-                        Text(
-                            text = "$words kelime • ${content.length} karakter",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF5F6368),
-                            modifier = Modifier.padding(bottom = 6.dp)
-                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Word count
+                        if (showWordCount) {
+                            val words = remember(content) { if (content.isBlank()) 0 else content.trim().split("\\s+".toRegex()).size }
+                            Text(
+                                text = "$words kelime • ${content.length} karakter",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = placeholderColor,
+                                modifier = Modifier.padding(bottom = 6.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(140.dp))
                     }
                 }
 
@@ -1557,12 +2111,45 @@ fun KeepChecklistEditDialog(
         }
     }
 
-    val bgColor = remember(selectedColorHex) {
-        try {
-            Color(android.graphics.Color.parseColor(selectedColorHex))
-        } catch (_: Exception) {
-            Color.White
+    val isDefaultColor = remember(selectedColorHex) {
+        selectedColorHex.isBlank() || selectedColorHex.equals("#FFFFFF", ignoreCase = true) || selectedColorHex.equals("DEFAULT", ignoreCase = true)
+    }
+    val defaultSurfaceColor = MaterialTheme.colorScheme.surface
+    val defaultOnSurface = MaterialTheme.colorScheme.onSurface
+    val defaultOnSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+
+    val bgColor = remember(selectedColorHex, isDefaultColor, defaultSurfaceColor) {
+        if (isDefaultColor) defaultSurfaceColor
+        else {
+            try {
+                Color(android.graphics.Color.parseColor(selectedColorHex))
+            } catch (_: Exception) {
+                defaultSurfaceColor
+            }
         }
+    }
+    val isLightBg = remember(isDefaultColor, bgColor) {
+        if (isDefaultColor) null else bgColor.luminance() > 0.45f
+    }
+    val titleTextColor = remember(isDefaultColor, isLightBg, defaultOnSurface) {
+        if (isDefaultColor) defaultOnSurface
+        else if (isLightBg == true) Color(0xFF1F1F1F) else Color(0xFFFFFFFF)
+    }
+    val bodyTextColor = remember(isDefaultColor, isLightBg, defaultOnSurface) {
+        if (isDefaultColor) defaultOnSurface
+        else if (isLightBg == true) Color(0xFF202124) else Color(0xFFF1F5F9)
+    }
+    val placeholderColor = remember(isDefaultColor, isLightBg, defaultOnSurfaceVariant) {
+        if (isDefaultColor) defaultOnSurfaceVariant.copy(alpha = 0.65f)
+        else if (isLightBg == true) Color(0xFF5F6368) else Color(0xFF94A3B8)
+    }
+    val iconColor = remember(isDefaultColor, isLightBg, defaultOnSurface) {
+        if (isDefaultColor) defaultOnSurface
+        else if (isLightBg == true) Color(0xFF3C4043) else Color(0xFFF8FAFC)
+    }
+    val secondaryIconColor = remember(isDefaultColor, isLightBg, defaultOnSurfaceVariant) {
+        if (isDefaultColor) defaultOnSurfaceVariant
+        else if (isLightBg == true) Color(0xFF5F6368) else Color(0xFFCBD5E1)
     }
 
     fun buildContentString(): String {
@@ -1618,10 +2205,14 @@ fun KeepChecklistEditDialog(
 
     Dialog(
         onDismissRequest = { handleCloseOrSave() },
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
         Surface(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .imePadding(),
             color = bgColor
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
@@ -1640,7 +2231,7 @@ fun KeepChecklistEditDialog(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Geri ve Kaydet",
-                                tint = Color(0xFF202124)
+                                tint = iconColor
                             )
                         }
 
@@ -1649,14 +2240,14 @@ fun KeepChecklistEditDialog(
                                 Icon(
                                     imageVector = if (isPinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
                                     contentDescription = "Sabitle",
-                                    tint = if (isPinned) MaterialTheme.colorScheme.primary else Color(0xFF5F6368)
+                                    tint = if (isPinned) MaterialTheme.colorScheme.primary else secondaryIconColor
                                 )
                             }
                             IconButton(onClick = { showColorPaletteSheet = !showColorPaletteSheet }) {
                                 Icon(
                                     imageVector = Icons.Default.Palette,
                                     contentDescription = "Renk Seçici",
-                                    tint = if (showColorPaletteSheet) MaterialTheme.colorScheme.primary else Color(0xFF5F6368)
+                                    tint = if (showColorPaletteSheet) MaterialTheme.colorScheme.primary else secondaryIconColor
                                 )
                             }
                             IconButton(onClick = { handleCloseOrSave() }) {
@@ -1677,16 +2268,17 @@ fun KeepChecklistEditDialog(
                             Text(
                                 "Başlık",
                                 style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                                color = Color(0xFF5F6368)
+                                color = placeholderColor
                             )
                         },
-                        textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, color = Color(0xFF202124)),
+                        textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, color = titleTextColor),
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color.Transparent,
                             unfocusedBorderColor = Color.Transparent,
                             focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent
+                            unfocusedContainerColor = Color.Transparent,
+                            cursorColor = titleTextColor
                         )
                     )
 
@@ -1713,10 +2305,10 @@ fun KeepChecklistEditDialog(
                                     onValueChange = { text ->
                                         itemsList[index] = item.first to text
                                     },
-                                    placeholder = { Text("Liste öğesi...") },
+                                    placeholder = { Text("Liste öğesi...", color = placeholderColor) },
                                     textStyle = MaterialTheme.typography.bodyMedium.copy(
                                         textDecoration = if (item.first) TextDecoration.LineThrough else TextDecoration.None,
-                                        color = if (item.first) Color(0xFF80868B) else Color(0xFF202124)
+                                        color = if (item.first) placeholderColor else bodyTextColor
                                     ),
                                     modifier = Modifier.weight(1f),
                                     singleLine = true,
@@ -1724,14 +2316,15 @@ fun KeepChecklistEditDialog(
                                         focusedBorderColor = Color.Transparent,
                                         unfocusedBorderColor = Color.Transparent,
                                         focusedContainerColor = Color.Transparent,
-                                        unfocusedContainerColor = Color.Transparent
+                                        unfocusedContainerColor = Color.Transparent,
+                                        cursorColor = bodyTextColor
                                     )
                                 )
                                 IconButton(onClick = { itemsList.removeAt(index) }) {
                                     Icon(
                                         imageVector = Icons.Default.Close,
                                         contentDescription = "Öğeyi Sil",
-                                        tint = Color(0xFF80868B),
+                                        tint = secondaryIconColor,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
@@ -1761,6 +2354,10 @@ fun KeepChecklistEditDialog(
                                     color = MaterialTheme.colorScheme.primary
                                 )
                             }
+                        }
+
+                        item {
+                            Spacer(modifier = Modifier.height(140.dp))
                         }
                     }
                 }
@@ -1845,24 +2442,66 @@ fun KeepChecklistEditDialog(
 
 @Composable
 fun KeepDrawingEditDialog(
+    initialNote: Note? = null,
     folders: List<NoteFolder>,
     selectedFolderId: Long?,
     currentUserAssigned: String,
     onDismiss: () -> Unit,
     onSave: (Note) -> Unit
 ) {
-    var title by remember { mutableStateOf("") }
+    val initialTitle = remember(initialNote) { initialNote?.title ?: "" }
+    var title by remember { mutableStateOf(initialTitle) }
     var strokeColor by remember { mutableStateOf(Color.Black) }
-    var strokeWidth by remember { mutableStateOf(5f) }
+    var strokeColorHex by remember { mutableStateOf("#000000") }
+    var strokeWidth by remember { mutableStateOf(6f) }
 
-    val paths = remember { mutableStateListOf<Pair<Path, Pair<Color, Float>>>() }
-    var currentPath by remember { mutableStateOf<Path?>(null) }
+    val strokes = remember {
+        mutableStateListOf<DrawingStroke>().apply {
+            if (initialNote != null && !initialNote.drawingData.isNullOrBlank()) {
+                addAll(parseDrawingStrokes(initialNote.drawingData))
+            }
+        }
+    }
+    var currentPoints by remember { mutableStateOf<List<DrawingPoint>>(emptyList()) }
+
+    fun handleCloseOrSave() {
+        if (strokes.isNotEmpty() || title.isNotBlank()) {
+            val now = System.currentTimeMillis()
+            val serialized = serializeDrawingStrokes(strokes)
+            val note = initialNote?.copy(
+                title = title.trim().ifBlank { "Çizim Notu" },
+                drawingData = serialized,
+                content = if (strokes.isNotEmpty()) "Çizim (${strokes.size} çizgi)" else "Boş çizim",
+                updatedAtMillis = now
+            ) ?: Note(
+                title = title.trim().ifBlank { "Çizim Notu" },
+                content = if (strokes.isNotEmpty()) "Çizim (${strokes.size} çizgi)" else "Boş çizim",
+                colorHex = "#FFFFFF",
+                folderId = selectedFolderId,
+                assignedTo = currentUserAssigned,
+                type = NoteType.DRAWING,
+                drawingData = serialized,
+                createdAtMillis = now,
+                updatedAtMillis = now
+            )
+            onSave(note)
+        } else {
+            onDismiss()
+        }
+    }
 
     Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        onDismissRequest = { handleCloseOrSave() },
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
-        Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .imePadding(),
+            color = MaterialTheme.colorScheme.surface
+        ) {
             Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
                 // Top Bar
                 Row(
@@ -1870,41 +2509,36 @@ fun KeepDrawingEditDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
+                    IconButton(onClick = { handleCloseOrSave() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri ve Kaydet")
                     }
                     OutlinedTextField(
                         value = title,
                         onValueChange = { title = it },
                         placeholder = { Text("Çizim Başlığı...") },
-                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                        modifier = Modifier.weight(1f).padding(horizontal = 6.dp),
                         singleLine = true
                     )
-                    IconButton(onClick = {
-                        if (paths.isNotEmpty()) paths.removeAt(paths.lastIndex)
-                    }) {
+                    IconButton(
+                        onClick = {
+                            if (strokes.isNotEmpty()) strokes.removeAt(strokes.lastIndex)
+                        },
+                        enabled = strokes.isNotEmpty()
+                    ) {
                         Icon(Icons.Default.Undo, contentDescription = "Geri Al")
                     }
-                    IconButton(onClick = { paths.clear() }) {
+                    IconButton(
+                        onClick = { strokes.clear() },
+                        enabled = strokes.isNotEmpty()
+                    ) {
                         Icon(Icons.Default.Clear, contentDescription = "Temizle")
                     }
-                    IconButton(onClick = {
-                        val now = System.currentTimeMillis()
-                        val note = Note(
-                            title = title.ifBlank { "Çizim Notu" },
-                            content = "Serbest El Çizimi",
-                            colorHex = "#FFFFFF",
-                            assignedTo = currentUserAssigned,
-                            type = NoteType.DRAWING,
-                            drawingData = "drawing_${paths.size}_strokes",
-                            createdAtMillis = now,
-                            updatedAtMillis = now
-                        )
-                        onSave(note)
-                    }) {
+                    IconButton(onClick = { handleCloseOrSave() }) {
                         Icon(Icons.Default.Check, contentDescription = "Kaydet", tint = MaterialTheme.colorScheme.primary)
                     }
                 }
+
+                Spacer(modifier = Modifier.height(6.dp))
 
                 // Drawing Canvas
                 Box(
@@ -1912,60 +2546,133 @@ fun KeepDrawingEditDialog(
                         .fillMaxWidth()
                         .weight(1f)
                         .clip(RoundedCornerShape(12.dp))
-                        .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(12.dp))
-                        .pointerInput(Unit) {
+                        .border(1.5.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                        .background(Color(0xFFFAFAFA))
+                        .pointerInput(strokeColorHex, strokeWidth) {
                             detectDragGestures(
                                 onDragStart = { offset ->
-                                    val path = Path().apply { moveTo(offset.x, offset.y) }
-                                    currentPath = path
-                                    paths.add(path to (strokeColor to strokeWidth))
+                                    currentPoints = listOf(DrawingPoint(offset.x, offset.y))
                                 },
                                 onDrag = { change, _ ->
-                                    currentPath?.lineTo(change.position.x, change.position.y)
-                                    val last = paths.lastOrNull()
-                                    if (last != null) {
-                                        paths[paths.lastIndex] = last.first to (strokeColor to strokeWidth)
-                                    }
+                                    currentPoints = currentPoints + DrawingPoint(change.position.x, change.position.y)
                                 },
                                 onDragEnd = {
-                                    currentPath = null
+                                    if (currentPoints.isNotEmpty()) {
+                                        strokes.add(DrawingStroke(strokeColorHex, strokeWidth, currentPoints))
+                                        currentPoints = emptyList()
+                                    }
                                 }
                             )
                         }
                 ) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
-                        paths.forEach { (path, style) ->
+                        // Draw completed strokes
+                        strokes.forEach { stroke ->
+                            val color = try {
+                                Color(android.graphics.Color.parseColor(stroke.colorHex))
+                            } catch (_: Exception) {
+                                Color.Black
+                            }
+                            if (stroke.points.size == 1) {
+                                val pt = stroke.points[0]
+                                drawCircle(
+                                    color = color,
+                                    radius = stroke.width / 2f,
+                                    center = androidx.compose.ui.geometry.Offset(pt.x, pt.y)
+                                )
+                            } else if (stroke.points.size > 1) {
+                                val path = Path().apply {
+                                    moveTo(stroke.points[0].x, stroke.points[0].y)
+                                    for (i in 1 until stroke.points.size) {
+                                        lineTo(stroke.points[i].x, stroke.points[i].y)
+                                    }
+                                }
+                                drawPath(
+                                    path = path,
+                                    color = color,
+                                    style = Stroke(width = stroke.width, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                                )
+                            }
+                        }
+
+                        // Draw active stroke live
+                        if (currentPoints.size == 1) {
+                            val pt = currentPoints[0]
+                            drawCircle(
+                                color = strokeColor,
+                                radius = strokeWidth / 2f,
+                                center = androidx.compose.ui.geometry.Offset(pt.x, pt.y)
+                            )
+                        } else if (currentPoints.size > 1) {
+                            val path = Path().apply {
+                                moveTo(currentPoints[0].x, currentPoints[0].y)
+                                for (i in 1 until currentPoints.size) {
+                                    lineTo(currentPoints[i].x, currentPoints[i].y)
+                                }
+                            }
                             drawPath(
                                 path = path,
-                                color = style.first,
-                                style = Stroke(width = style.second)
+                                color = strokeColor,
+                                style = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                // Brush Colors Row
-                val penColors = listOf(Color.Black, Color(0xFF1E88E5), Color(0xFFE53935), Color(0xFF43A047), Color(0xFF8E24AA), Color(0xFFFB8C00))
+                // Brush thickness selector & Color Palette
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceAround,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    penColors.forEach { color ->
-                        Box(
-                            modifier = Modifier
-                                .size(34.dp)
-                                .clip(CircleShape)
-                                .background(color)
-                                .border(
-                                    width = if (strokeColor == color) 3.dp else 1.dp,
-                                    color = if (strokeColor == color) MaterialTheme.colorScheme.primary else Color.LightGray,
-                                    shape = CircleShape
-                                )
-                                .clickable { strokeColor = color }
-                        )
+                    // Thickness options
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        listOf(3f to "İnce", 7f to "Orta", 14f to "Kalın").forEach { (width, label) ->
+                            FilterChip(
+                                selected = strokeWidth == width,
+                                onClick = { strokeWidth = width },
+                                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                        }
+                    }
+
+                    // Pen Colors
+                    val penColors = listOf(
+                        "#000000" to Color.Black,
+                        "#1E88E5" to Color(0xFF1E88E5),
+                        "#E53935" to Color(0xFFE53935),
+                        "#43A047" to Color(0xFF43A047),
+                        "#8E24AA" to Color(0xFF8E24AA),
+                        "#FB8C00" to Color(0xFFFB8C00)
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        penColors.forEach { (hex, color) ->
+                            val isSelected = strokeColorHex.equals(hex, ignoreCase = true)
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                                    .border(
+                                        width = if (isSelected) 3.dp else 1.dp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.LightGray,
+                                        shape = CircleShape
+                                    )
+                                    .clickable {
+                                        strokeColor = color
+                                        strokeColorHex = hex
+                                    }
+                            )
+                        }
                     }
                 }
             }
@@ -1977,89 +2684,230 @@ fun KeepDrawingEditDialog(
 
 @Composable
 fun KeepImageNoteEditDialog(
-    imageUri: Uri,
+    initialNote: Note? = null,
+    initialImageUri: Uri? = null,
     folders: List<NoteFolder>,
     selectedFolderId: Long?,
     currentUserAssigned: String,
     onDismiss: () -> Unit,
     onSave: (Note) -> Unit
 ) {
-    var title by remember { mutableStateOf("") }
-    var content by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val initialTitle = remember(initialNote) { initialNote?.title ?: "" }
+    val initialContent = remember(initialNote) { initialNote?.content ?: "" }
+    val initialUri = remember(initialNote, initialImageUri) {
+        initialNote?.imageUri ?: initialImageUri?.toString() ?: ""
+    }
+    val initialFolder = remember(initialNote) { initialNote?.folderId ?: selectedFolderId }
+
+    var title by remember { mutableStateOf(initialTitle) }
+    var content by remember { mutableStateOf(initialContent) }
+    var currentImageUri by remember { mutableStateOf(initialUri) }
+    var selectedFolder by remember { mutableStateOf(initialFolder) }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            val savedUri = saveImageToInternalStorage(context, uri)
+            currentImageUri = savedUri.toString()
+        }
+    }
+
+    fun handleCloseOrSave() {
+        if (currentImageUri.isNotBlank() || title.isNotBlank() || content.isNotBlank()) {
+            val now = System.currentTimeMillis()
+            val note = initialNote?.copy(
+                title = title.trim().ifBlank { "Görsel Notu" },
+                content = content.trim(),
+                imageUri = currentImageUri,
+                folderId = selectedFolder,
+                updatedAtMillis = now
+            ) ?: Note(
+                title = title.trim().ifBlank { "Görsel Notu" },
+                content = content.trim(),
+                imageUri = currentImageUri,
+                colorHex = "#FFFFFF",
+                folderId = selectedFolder,
+                assignedTo = currentUserAssigned,
+                type = NoteType.IMAGE,
+                createdAtMillis = now,
+                updatedAtMillis = now
+            )
+            onSave(note)
+        } else {
+            onDismiss()
+        }
+    }
 
     Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        onDismissRequest = { handleCloseOrSave() },
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
-        Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
-            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .imePadding(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
+            ) {
+                // Top Bar
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
+                    IconButton(onClick = { handleCloseOrSave() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri ve Kaydet")
                     }
-                    Text("Görsel Notu", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
-                    IconButton(onClick = {
-                        val now = System.currentTimeMillis()
-                        val note = Note(
-                            title = title.ifBlank { "Görsel Notu" },
-                            content = content,
-                            imageUri = imageUri.toString(),
-                            colorHex = "#FFFFFF",
-                            folderId = selectedFolderId,
-                            assignedTo = currentUserAssigned,
-                            type = NoteType.IMAGE,
-                            createdAtMillis = now,
-                            updatedAtMillis = now
-                        )
-                        onSave(note)
-                    }) {
+                    Text(
+                        "Görsel Notu 📷",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                    IconButton(onClick = { handleCloseOrSave() }) {
                         Icon(Icons.Default.Check, contentDescription = "Kaydet", tint = MaterialTheme.colorScheme.primary)
-                    }
-                }
-
-                // Image Preview Placeholder
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Default.Image,
-                                contentDescription = null,
-                                modifier = Modifier.size(48.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text("Seçilen Fotoğraf Hazır", style = MaterialTheme.typography.bodyMedium)
-                        }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
+                // Image Display & Change Button
+                if (currentImageUri.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 180.dp, max = 280.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                    ) {
+                        AsyncImage(
+                            model = currentImageUri,
+                            contentDescription = "Not Fotoğrafı",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color.Black.copy(alpha = 0.65f),
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(10.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
+                                    photoPickerLauncher.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                    )
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Image,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Değiştir",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp)
+                            .clickable {
+                                photoPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Default.Image,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(48.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Fotoğraf Seçmek İçin Dokunun",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Folder selector chips
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    FilterChip(
+                        selected = selectedFolder == null,
+                        onClick = { selectedFolder = null },
+                        label = { Text("Klasörsüz") },
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    folders.forEach { f ->
+                        FilterChip(
+                            selected = selectedFolder == f.id,
+                            onClick = { selectedFolder = if (selectedFolder == f.id) null else f.id },
+                            label = { Text(f.name) },
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Title Input
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
                     label = { Text("Başlık") },
-                    modifier = Modifier.fillMaxWidth()
+                    textStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
                 )
 
                 Spacer(modifier = Modifier.height(10.dp))
 
+                // Content Input
                 OutlinedTextField(
                     value = content,
                     onValueChange = { content = it },
                     label = { Text("Açıklama / Not") },
-                    modifier = Modifier.fillMaxWidth().weight(1f)
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = 120.dp),
+                    shape = RoundedCornerShape(12.dp)
                 )
+
+                Spacer(modifier = Modifier.height(140.dp))
             }
         }
     }
@@ -2238,15 +3086,18 @@ fun KeepReportEditDialog(
                 }
             }
             val now = System.currentTimeMillis()
+            val denemeFolderId = folders.find { it.name.contains("Deneme", ignoreCase = true) }?.id
+            val targetFolderId = selectedFolderId ?: denemeFolderId ?: folders.firstOrNull()?.id
             val note = existingNote?.copy(
                 title = examTitle.trim(),
                 content = summaryText.trim(),
+                folderId = existingNote.folderId ?: targetFolderId,
                 updatedAtMillis = now
             ) ?: Note(
                 title = examTitle.trim(),
                 content = summaryText.trim(),
                 colorHex = "#1E293B",
-                folderId = selectedFolderId,
+                folderId = targetFolderId,
                 assignedTo = currentUserAssigned,
                 type = NoteType.REPORT,
                 createdAtMillis = now,
@@ -2260,9 +3111,16 @@ fun KeepReportEditDialog(
 
     Dialog(
         onDismissRequest = { handleCloseOrSave() },
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .imePadding(),
+            color = MaterialTheme.colorScheme.background
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -2382,6 +3240,8 @@ fun KeepReportEditDialog(
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3
                 )
+
+                Spacer(modifier = Modifier.height(140.dp))
             }
         }
     }

@@ -66,11 +66,12 @@ class FirebaseSyncManager(
 
     private fun checkInitialNetwork(): Boolean {
         return try {
-            val activeNetwork = connectivityManager.activeNetwork ?: return true
-            val caps = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return true
-            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            val activeNetwork = connectivityManager.activeNetwork ?: return false
+            val caps = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return false
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) || !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED))
         } catch (_: Exception) {
-            true
+            false
         }
     }
 
@@ -462,9 +463,8 @@ class FirebaseSyncManager(
         if (firestore == null) {
             initFirebaseIfAvailable()
             if (firestore == null) {
-                _syncState.value = SyncState.SYNCED
-                _lastSyncTime.value = System.currentTimeMillis()
-                return true
+                if (!silent) _syncState.value = SyncState.ERROR
+                return false
             }
         }
 

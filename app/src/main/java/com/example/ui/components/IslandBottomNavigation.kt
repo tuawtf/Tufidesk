@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -57,8 +58,8 @@ fun IslandBottomNavigation(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .windowInsetsPadding(WindowInsets(0, 0, 0, 0))
-            .padding(horizontal = 14.dp, vertical = 2.dp),
+            .navigationBarsPadding()
+            .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 20.dp),
         contentAlignment = Alignment.Center
     ) {
         Surface(

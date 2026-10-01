@@ -116,35 +116,12 @@ fun SettingsScreen(
     canManage: Boolean = true,
     isNoteGrid: Boolean = true,
     onNoteGridChange: (Boolean) -> Unit = {},
-    showWordCount: Boolean = true,
-    onShowWordCountChange: (Boolean) -> Unit = {},
-    confirmDeleteNote: Boolean = true,
-    onConfirmDeleteNoteChange: (Boolean) -> Unit = {},
-    addNewToBottom: Boolean = false,
-    onAddNewToBottomChange: (Boolean) -> Unit = {},
     moveCheckedToBottom: Boolean = true,
     onMoveCheckedToBottomChange: (Boolean) -> Unit = {},
-    richLinkPreviews: Boolean = true,
-    onRichLinkPreviewsChange: (Boolean) -> Unit = {},
-    morningTime: String = "08:00",
-    onMorningTimeChange: (String) -> Unit = {},
-    afternoonTime: String = "13:00",
-    onAfternoonTimeChange: (String) -> Unit = {},
-    eveningTime: String = "18:00",
-    onEveningTimeChange: (String) -> Unit = {},
-    sharingEnabled: Boolean = true,
-    onSharingEnabledChange: (Boolean) -> Unit = {},
-    vaultPassword: String = "1234",
-    onVaultPasswordChange: (String) -> Unit = {},
-    onExportNotes: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showThemeDialog by remember { mutableStateOf(false) }
     var showPaletteDialog by remember { mutableStateOf(false) }
-    var showChangePinDialog by remember { mutableStateOf(false) }
-    var editingTimeLabel by remember { mutableStateOf<String?>(null) }
-    var editingTimeValue by remember { mutableStateOf("") }
-    var onEditingTimeSave by remember { mutableStateOf<(String) -> Unit>({}) }
 
     val paletteOptions = listOf(
         MaterialPaletteOption(
@@ -198,6 +175,21 @@ fun SettingsScreen(
             secondaryColor = Color(0xFF705B40)
         )
     )
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val appVersion = remember(context) {
+        try {
+            val pInfo = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0)
+            }
+            pInfo.versionName ?: "1.0.0"
+        } catch (_: Exception) {
+            "1.0.0"
+        }
+    }
 
     LazyColumn(
         modifier = modifier
@@ -298,24 +290,16 @@ fun SettingsScreen(
             }
         }
 
-        // Section 2.2: Google Keep Notlar & Rapor Ayarları
+        // Section 2.2: Not Tercihleri
         item {
-            SettingsCategoryCard(title = "Google Notlar Ayarları") {
+            SettingsCategoryCard(title = "Not Tercihleri") {
                 Column {
-                    // Display & Layout
                     SettingsSwitchItem(
                         icon = Icons.Default.GridView,
                         title = "2 Sütunlu Kılavuz (Grid)",
-                        subtitle = "Notlar Google Keep çift sütunlu düzen veya liste olarak gösterilsin",
+                        subtitle = "Notlar çift sütunlu düzen veya tek sütun liste olarak gösterilsin",
                         checked = isNoteGrid,
                         onCheckedChange = onNoteGridChange
-                    )
-                    SettingsSwitchItem(
-                        icon = Icons.Default.FormatListBulleted,
-                        title = "Yeni Öğeleri En Alta Ekle",
-                        subtitle = "Listelerde yeni eklenen maddeler otomatik listenin altına eklensin",
-                        checked = addNewToBottom,
-                        onCheckedChange = onAddNewToBottomChange
                     )
                     SettingsSwitchItem(
                         icon = Icons.Default.Check,
@@ -323,80 +307,6 @@ fun SettingsScreen(
                         subtitle = "Tamamlanan kontrol listesi maddeleri otomatik alta taşınsın",
                         checked = moveCheckedToBottom,
                         onCheckedChange = onMoveCheckedToBottomChange
-                    )
-                    SettingsSwitchItem(
-                        icon = Icons.Default.Link,
-                        title = "Zengin Bağlantı Önizlemeleri",
-                        subtitle = "Notlardaki web ve kaynak bağlantılarını kart olarak göster",
-                        checked = richLinkPreviews,
-                        onCheckedChange = onRichLinkPreviewsChange
-                    )
-                    SettingsSwitchItem(
-                        icon = Icons.Default.TextFields,
-                        title = "Kelime & Karakter Sayacı",
-                        subtitle = "Not düzenleme ekranının altında canlı sayaç göster",
-                        checked = showWordCount,
-                        onCheckedChange = onShowWordCountChange
-                    )
-                    SettingsSwitchItem(
-                        icon = Icons.Default.DeleteForever,
-                        title = "Not Silme Onayı",
-                        subtitle = "Bir not veya liste silinirken onay penceresi göster",
-                        checked = confirmDeleteNote,
-                        onCheckedChange = onConfirmDeleteNoteChange
-                    )
-
-                    // Reminder Times
-                    SettingsClickableItem(
-                        icon = Icons.Default.WbSunny,
-                        title = "Sabah Hatırlatıcı Saati",
-                        subtitle = "Varsayılan: $morningTime",
-                        onClick = {
-                            editingTimeLabel = "Sabah Hatırlatıcı Saati"
-                            editingTimeValue = morningTime
-                            onEditingTimeSave = onMorningTimeChange
-                        }
-                    )
-                    SettingsClickableItem(
-                        icon = Icons.Default.Schedule,
-                        title = "Öğleden Sonra Hatırlatıcı Saati",
-                        subtitle = "Varsayılan: $afternoonTime",
-                        onClick = {
-                            editingTimeLabel = "Öğleden Sonra Hatırlatıcı Saati"
-                            editingTimeValue = afternoonTime
-                            onEditingTimeSave = onAfternoonTimeChange
-                        }
-                    )
-                    SettingsClickableItem(
-                        icon = Icons.Default.DarkMode,
-                        title = "Akşam Hatırlatıcı Saati",
-                        subtitle = "Varsayılan: $eveningTime",
-                        onClick = {
-                            editingTimeLabel = "Akşam Hatırlatıcı Saati"
-                            editingTimeValue = eveningTime
-                            onEditingTimeSave = onEveningTimeChange
-                        }
-                    )
-
-                    // Sharing & Security
-                    SettingsSwitchItem(
-                        icon = Icons.Default.Share,
-                        title = "Not Paylaşımını Etkinleştir",
-                        subtitle = "Ders notlarını ve deneme raporlarını aile ve öğretmenle paylaş",
-                        checked = sharingEnabled,
-                        onCheckedChange = onSharingEnabledChange
-                    )
-                    SettingsClickableItem(
-                        icon = Icons.Default.Key,
-                        title = "Gizli Kasa PIN Şifresi",
-                        subtitle = "Kilitli notlara erişim şifresini belirleyin (Mevcut: ••••)",
-                        onClick = { showChangePinDialog = true }
-                    )
-                    SettingsClickableItem(
-                        icon = Icons.Default.FileDownload,
-                        title = "Notları Yedekle / Dışa Aktar",
-                        subtitle = "Tüm not, liste ve raporlarınızı JSON yedeği olarak dışa aktarın",
-                        onClick = onExportNotes
                     )
                 }
             }
@@ -528,7 +438,7 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Sürüm 1.2.0 • Material You / Material Design 3",
+                            text = "Sürüm $appVersion • Material Design 3",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -681,171 +591,6 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(onClick = { showPaletteDialog = false }) {
                     Text("Kapat")
-                }
-            }
-        )
-    }
-
-    // Change Vault PIN Dialog
-    if (showChangePinDialog) {
-        var newPin by remember { mutableStateOf("") }
-        var confirmPin by remember { mutableStateOf("") }
-        var pinError by remember { mutableStateOf<String?>(null) }
-
-        AlertDialog(
-            onDismissRequest = { showChangePinDialog = false },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Key,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Kasa PIN Kodunu Değiştir")
-                }
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Gizli notlarınızı kilitlemek için 4 haneli yeni bir PIN belirleyin.")
-                    OutlinedTextField(
-                        value = newPin,
-                        onValueChange = {
-                            if (it.length <= 6) newPin = it
-                            pinError = null
-                        },
-                        label = { Text("Yeni PIN Kodu") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                        visualTransformation = PasswordVisualTransformation(),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = confirmPin,
-                        onValueChange = {
-                            if (it.length <= 6) confirmPin = it
-                            pinError = null
-                        },
-                        label = { Text("Yeni PIN Kodu (Tekrar)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                        visualTransformation = PasswordVisualTransformation(),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    if (pinError != null) {
-                        Text(
-                            text = pinError!!,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                OutlinedButton(
-                    onClick = {
-                        if (newPin.length < 4) {
-                            pinError = "PIN kodu en az 4 haneli olmalıdır."
-                        } else if (newPin != confirmPin) {
-                            pinError = "PIN kodları birbiriyle eşleşmiyor!"
-                        } else {
-                            onVaultPasswordChange(newPin)
-                            showChangePinDialog = false
-                        }
-                    }
-                ) {
-                    Text("Kaydet")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showChangePinDialog = false }) {
-                    Text("İptal")
-                }
-            }
-        )
-    }
-
-    // Edit Reminder Time Dialog (Google Keep style)
-    if (editingTimeLabel != null) {
-        var tempTime by remember(editingTimeLabel) { mutableStateOf(editingTimeValue) }
-        val presetTimes = listOf("07:00", "08:00", "09:00", "12:00", "13:00", "15:00", "18:00", "20:00")
-
-        AlertDialog(
-            onDismissRequest = { editingTimeLabel = null },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.AccessTime,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(editingTimeLabel ?: "Saat Belirle")
-                }
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        "Not hatırlatıcı bildirimleri için varsayılan zamanı seçin veya yazın:",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-
-                    OutlinedTextField(
-                        value = tempTime,
-                        onValueChange = { if (it.length <= 5) tempTime = it },
-                        label = { Text("Saat (SS:DD)") },
-                        placeholder = { Text("08:00") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Text(
-                        "Hızlı Seçenekler:",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
-                    )
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        presetTimes.forEach { preset ->
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = if (tempTime == preset) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable { tempTime = preset }
-                            ) {
-                                Text(
-                                    text = preset,
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontWeight = if (tempTime == preset) FontWeight.Bold else FontWeight.Normal
-                                    ),
-                                    color = if (tempTime == preset) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                OutlinedButton(
-                    onClick = {
-                        if (tempTime.isNotBlank()) {
-                            onEditingTimeSave(tempTime.trim())
-                        }
-                        editingTimeLabel = null
-                    }
-                ) {
-                    Text("Tamam")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { editingTimeLabel = null }) {
-                    Text("İptal")
                 }
             }
         )

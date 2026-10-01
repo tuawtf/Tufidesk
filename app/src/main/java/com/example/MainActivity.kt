@@ -421,36 +421,8 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     canManage = canManage,
                     isNoteGrid = noteLayoutGrid,
                     onNoteGridChange = { viewModel.setNoteLayoutGrid(it) },
-                    showWordCount = noteShowWordCount,
-                    onShowWordCountChange = { viewModel.setNoteShowWordCount(it) },
-                    confirmDeleteNote = noteConfirmDelete,
-                    onConfirmDeleteNoteChange = { viewModel.setNoteConfirmDelete(it) },
-                    addNewToBottom = keepAddNewToBottom,
-                    onAddNewToBottomChange = { viewModel.setKeepAddNewToBottom(it) },
                     moveCheckedToBottom = keepMoveCheckedToBottom,
-                    onMoveCheckedToBottomChange = { viewModel.setKeepMoveCheckedToBottom(it) },
-                    richLinkPreviews = keepRichLinkPreviews,
-                    onRichLinkPreviewsChange = { viewModel.setKeepRichLinkPreviews(it) },
-                    morningTime = keepMorningTime,
-                    onMorningTimeChange = { viewModel.setKeepMorningTime(it) },
-                    afternoonTime = keepAfternoonTime,
-                    onAfternoonTimeChange = { viewModel.setKeepAfternoonTime(it) },
-                    eveningTime = keepEveningTime,
-                    onEveningTimeChange = { viewModel.setKeepEveningTime(it) },
-                    sharingEnabled = keepSharingEnabled,
-                    onSharingEnabledChange = { viewModel.setKeepSharingEnabled(it) },
-                    vaultPassword = noteVaultPassword,
-                    onVaultPasswordChange = {
-                        viewModel.setNoteVaultPassword(it)
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Kasa PIN kodu güncellendi 🔒")
-                        }
-                    },
-                    onExportNotes = {
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Tüm notlar ve raporlar JSON formatında yedeklendi 📦")
-                        }
-                    }
+                    onMoveCheckedToBottomChange = { viewModel.setKeepMoveCheckedToBottom(it) }
                 )
             }
         }
@@ -591,64 +563,36 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                             // Cloud Sync status icon button
                             IconButton(onClick = {
                                 coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("Bulut senkronizasyonu başlatıldı...")
-                                }
-                                viewModel.syncCloudNow { success ->
-                                    coroutineScope.launch {
-                                        if (!isOnline) {
-                                            snackbarHostState.showSnackbar("Çevrimdışı mod: İnternet bağlantısı bekleniyor. Yerel verileriniz güncel.")
-                                        } else if (success) {
-                                            snackbarHostState.showSnackbar("Bulut senkronizasyonu başarıyla tamamlandı ✅")
-                                        } else {
-                                            val msg = syncErrorMessage ?: "Yerel veritabanı aktif ve güncel."
-                                            snackbarHostState.showSnackbar("Durum: $msg")
+                                    if (!isOnline) {
+                                        snackbarHostState.showSnackbar("İnternet bağlantısı yok! Eşitleme başarısız ❌")
+                                    } else {
+                                        snackbarHostState.showSnackbar("Bulut senkronizasyonu başlatıldı...")
+                                        viewModel.syncCloudNow { success ->
+                                            coroutineScope.launch {
+                                                if (success) {
+                                                    snackbarHostState.showSnackbar("Bulut senkronizasyonu başarıyla tamamlandı ✅")
+                                                } else {
+                                                    snackbarHostState.showSnackbar("Bulut senkronizasyonu başarısız ❌")
+                                                }
+                                            }
                                         }
                                     }
                                 }
                             }) {
                                 val syncIcon = when {
-                                    !isOnline -> Icons.Default.CloudOff
+                                    !isOnline || syncState == SyncState.OFFLINE -> Icons.Default.CloudOff
+                                    syncState == SyncState.ERROR -> Icons.Default.CloudOff
                                     syncState == SyncState.SYNCED -> Icons.Default.CloudDone
                                     syncState == SyncState.SYNCING -> Icons.Default.Sync
-                                    else -> Icons.Default.CloudDone
+                                    else -> Icons.Default.CloudOff
                                 }
                                 val syncColor = when {
-                                    !isOnline -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    !isOnline || syncState == SyncState.OFFLINE || syncState == SyncState.ERROR -> MaterialTheme.colorScheme.error
                                     syncState == SyncState.SYNCED -> MaterialTheme.colorScheme.primary
                                     syncState == SyncState.SYNCING -> MaterialTheme.colorScheme.tertiary
-                                    else -> MaterialTheme.colorScheme.primary
+                                    else -> MaterialTheme.colorScheme.error
                                 }
                                 Icon(imageVector = syncIcon, contentDescription = "Eşitle", tint = syncColor)
-                            }
-
-                            // Profile Badge (Interactive Switch)
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .clickable { showSwitchProfileDialog = true }
-                                    .padding(end = 4.dp)
-                                    .testTag("topbar_profile_badge")
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    UserFlowerAvatar(
-                                        user = currentUser,
-                                        size = 28.dp,
-                                        shape = CircleShape,
-                                        showBorder = true
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = currentUser?.name ?: "",
-                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                }
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
@@ -673,7 +617,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier
-                                .offset(y = 8.dp)
+                                .offset(y = (-2).dp)
                                 .testTag("add_homework_fab")
                         ) {
                             Icon(
