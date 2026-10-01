@@ -77,8 +77,29 @@ class FirebaseSyncManager(
     private fun initFirebaseIfAvailable() {
         try {
             if (FirebaseApp.getApps(context).isEmpty()) {
-                FirebaseApp.initializeApp(context)
+                try {
+                    FirebaseApp.initializeApp(context)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Standard FirebaseApp.initializeApp failed, trying fallback options: ${e.message}")
+                }
             }
+
+            // If still empty (e.g. google-services.json missing from Gradle build artifacts on GitHub Actions), initialize programmatically!
+            if (FirebaseApp.getApps(context).isEmpty()) {
+                try {
+                    val options = com.google.firebase.FirebaseOptions.Builder()
+                        .setApplicationId("1:604652700316:android:a702a1ee43bb33455b6359")
+                        .setApiKey("AIzaSyC5mIBDPChrJMHnuEWl1QTlL1fFNBL_uwA")
+                        .setProjectId("tufidesk")
+                        .setStorageBucket("tufidesk.firebasestorage.app")
+                        .build()
+                    FirebaseApp.initializeApp(context, options)
+                    Log.i(TAG, "FirebaseApp initialized with programmatic FirebaseOptions fallback")
+                } catch (optionsErr: Exception) {
+                    Log.e(TAG, "Programmatic FirebaseOptions initialization failed: ${optionsErr.message}", optionsErr)
+                }
+            }
+
             if (FirebaseApp.getApps(context).isNotEmpty()) {
                 val db = FirebaseFirestore.getInstance()
                 try {
@@ -92,11 +113,11 @@ class FirebaseSyncManager(
                 firestore = db
                 Log.d(TAG, "Firebase Firestore successfully initialized")
             } else {
-                Log.w(TAG, "FirebaseApp is not initialized (google-services.json not yet placed)")
+                Log.w(TAG, "FirebaseApp is not initialized")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error initializing Firebase Firestore: ${e.message}", e)
-            _lastErrorMessage.value = "Firebase Başlatma Bilgisi: Yerel veritabanı aktif."
+            _lastErrorMessage.value = "Firebase Başlatma Hatası: ${e.localizedMessage ?: e.message}"
         }
     }
 
