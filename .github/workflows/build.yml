@@ -1,21 +1,67 @@
-name: Generate Permanent Keystore
+name: Build Android Stable Release
 
 on:
-  workflow_dispatch:
   push:
     branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
-  create-key:
+  build:
     runs-on: ubuntu-latest
-    steps:
-      - name: Sabit Anahtar Uret ve Metne Cevir
-        run: |
-          keytool -genkeypair -v -keystore release.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Tufidesk, O=Tufi, C=TR"
-          base64 -w 0 release.keystore > keystore_base64.txt
 
-      - name: Anahtar Metnini Yukle
-        uses: actions/upload-artifact@v4
+    steps:
+      - name: Kodu Cek
+        uses: actions/checkout@v4
+
+      - name: Java 21 Kur
+        uses: actions/setup-java@v4
         with:
-          name: keystore-secret-file
-          path: keystore_base64.txt
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Gradle Kurulumu
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Surum Numarasini Belirle
+        run: |
+          VERSION_NAME="1.2.${{ github.run_number }}"
+          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
+
+          sed -i 's/versionCode = .*/versionCode = '${{ github.run_number }}'/' app/build.gradle.kts
+          sed -i 's/versionName = .*/versionName = "'"$VERSION_NAME"'"/' app/build.gradle.kts
+
+      - name: Kasadan Kalici Anahtari Cikar
+        run: |
+          if [ -f ".env.example" ] && [ ! -f ".env" ]; then
+            cp .env.example .env
+          fi
+
+          # Kasadaki sabit anahtari cozer
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > debug.keystore
+
+          gradle wrapper --gradle-version 9.3.1
+          chmod +x gradlew
+
+      - name: APK Derle
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: APK Dosyasini Hazirla
+        run: |
+          mkdir -p release-output
+          cp app/build/outputs/apk/debug/*.apk "release-output/Tufidesk-v${{ env.VERSION_NAME }}-stable.apk"
+
+      - name: Otomatik Release Olustur ve Paylas
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ env.VERSION_NAME }}"
+          name: "Tufidesk v${{ env.VERSION_NAME }} (Stable)"
+          draft: false
+          prerelease: false
+          files: release-output/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
