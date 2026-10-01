@@ -29,49 +29,48 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
-      - name: Surum Numarasini Belirle ve Uygula
+      - name: Surum Numarasini Belirle
         run: |
-          # 1.2.X formatinda surum numarasi olustur
           VERSION_NAME="1.2.${{ github.run_number }}"
           echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
 
-          # build.gradle.kts icindeki versionCode ve versionName degerlerini guncelle
           sed -i 's/versionCode = .*/versionCode = '${{ github.run_number }}'/' app/build.gradle.kts
           sed -i 's/versionName = .*/versionName = "'"$VERSION_NAME"'"/' app/build.gradle.kts
 
-      - name: Kalici Keystore Kontrolu
+      - name: Kalici Release Keystore Olustur ve Sabitle
         run: |
           if [ -f ".env.example" ] && [ ! -f ".env" ]; then
             cp .env.example .env
           fi
 
-          # Depoda anahtar yoksa bir kez uret ve depoya kalici olarak yukle
-          if [ ! -f "debug.keystore" ]; then
-            echo "Keystore olusturuluyor..."
-            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Tufidesk,O=Tufidesk,C=TR"
+          # Eger gercek release.jks yoksa, 25 yil gecerli profesyonel anahtar uret
+          if [ ! -f "release.jks" ]; then
+            echo "Kalici Release Keystore uretiliyor..."
+            keytool -genkeypair -v -keystore release.jks -alias tufidesk -keyalg RSA -keysize 2048 -validity 10000 -storepass "TufideskKey2026" -keypass "TufideskKey2026" -dname "CN=Tufidesk, O=Tufi, C=TR"
             
             git config --global user.name "github-actions[bot]"
             git config --global user.email "github-actions[bot]@users.noreply.github.com"
-            git add debug.keystore
-            git commit -m "ci: kalici keystore eklendi [skip ci]"
+            git add -f release.jks
+            git commit -m "ci: kalici resmi release keystore eklendi [skip ci]"
             git push
           else
-            echo "Mevcut keystore kullaniliyor."
+            echo "Mevcut sabit release.jks kullaniliyor."
           fi
 
+          # debug.keystore gereksinimi varsa onu da ayni anahtardan bagla
+          cp release.jks debug.keystore
           gradle wrapper --gradle-version 9.3.1
           chmod +x gradlew
 
       - name: APK Derle
         run: ./gradlew assembleDebug --stacktrace
 
-      - name: APK Dosyasini Hazirla (Stable Olarak Yeniden Adlandir)
+      - name: APK Dosyasini Hazirla
         run: |
           mkdir -p release-output
-          # app-debug.apk adini Tufidesk-v1.2.X-stable.apk seklinde degistir
           cp app/build/outputs/apk/debug/*.apk "release-output/Tufidesk-v${{ env.VERSION_NAME }}-stable.apk"
 
-      - name: Otomatik Release Olustur ve Stable APK Paylas
+      - name: Otomatik Release Olustur ve Paylas
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "v${{ env.VERSION_NAME }}"
