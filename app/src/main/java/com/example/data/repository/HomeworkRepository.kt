@@ -93,8 +93,9 @@ class HomeworkRepository(
                 }
             }
 
-            // Clean up any remaining legacy "pazar teslim" phrasing from descriptions
+            // Clean up any remaining legacy "pazar teslim" phrasing and migrate "Herkes" to "Tuna"
             for (hw in homeworkDao.getAllHomeworksList()) {
+                var updatedHw = hw
                 if (hw.description.contains("pazar teslim", ignoreCase = true) || hw.description.contains("Pazar teslim", ignoreCase = true)) {
                     val sanitizedDesc = hw.description
                         .replace("pazar teslimi ödevi.", "ödevi.", ignoreCase = true)
@@ -102,7 +103,13 @@ class HomeworkRepository(
                         .replace("pazar teslim raporu.", "raporu.", ignoreCase = true)
                         .replace("pazar teslim raporu", "raporu", ignoreCase = true)
                         .replace("Pazar teslimi", "Haftalık teslim", ignoreCase = true)
-                    homeworkDao.updateHomework(hw.copy(description = sanitizedDesc))
+                    updatedHw = updatedHw.copy(description = sanitizedDesc)
+                }
+                if (updatedHw.assignedTo.equals("Herkes", ignoreCase = true)) {
+                    updatedHw = updatedHw.copy(assignedTo = "Tuna")
+                }
+                if (updatedHw != hw) {
+                    homeworkDao.updateHomework(updatedHw)
                 }
             }
         } catch (e: Exception) {
@@ -165,7 +172,58 @@ class HomeworkRepository(
         }
         val thisWeekSunday = upcomingSundayCal.timeInMillis
 
-        // 1. Hafta: %80 (5 ödevden 4'ü tamamlandı)
+        val startOfToday = (now.clone() as Calendar).apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val todayDue = startOfToday + 20 * 3600000L + 30 * 60000L // 20:30 today
+
+        // ================= TUNA'NIN ÖDEVLERİ =================
+        // Tuna Bugünün Ödevleri
+        homeworkDao.insertHomework(
+            Homework(
+                courseId = mathId,
+                title = "Matematik: Kareköklü İfadeler Soru Çözümü",
+                description = "Sayfa 55-60 arası test 4 ve test 5 bitirilecek.",
+                dueDateMillis = todayDue,
+                dueTimeText = "20:30",
+                priority = "HIGH",
+                estimatedMinutes = 45,
+                isCompleted = false,
+                assignedTo = "Tuna"
+            )
+        )
+        homeworkDao.insertHomework(
+            Homework(
+                courseId = scienceId,
+                title = "Fen Bilimleri: Basınç Ünitesi Çalışma Notları",
+                description = "Katı ve sıvı basıncı formülleri tekrar edilecek.",
+                dueDateMillis = todayDue,
+                dueTimeText = "21:30",
+                priority = "MEDIUM",
+                estimatedMinutes = 30,
+                isCompleted = false,
+                assignedTo = "Tuna"
+            )
+        )
+        homeworkDao.insertHomework(
+            Homework(
+                courseId = turkishId,
+                title = "Türkçe: Paragrafta Ana Düşünce Alıştırması",
+                description = "20 soru çözüldü ve kontrol edildi.",
+                dueDateMillis = todayDue,
+                dueTimeText = "19:00",
+                priority = "LOW",
+                estimatedMinutes = 25,
+                isCompleted = true,
+                completedAtMillis = System.currentTimeMillis() - 3600000L,
+                assignedTo = "Tuna"
+            )
+        )
+
+        // Tuna 1. Hafta: %80 (5 ödevden 4'ü tamamlandı)
         homeworkDao.insertHomework(
             Homework(
                 courseId = mathId,
@@ -176,7 +234,7 @@ class HomeworkRepository(
                 priority = "HIGH",
                 isCompleted = true,
                 completedAtMillis = week1Sunday - 7200000L,
-                assignedTo = "Herkes"
+                assignedTo = "Tuna"
             )
         )
         homeworkDao.insertHomework(
@@ -189,7 +247,7 @@ class HomeworkRepository(
                 priority = "MEDIUM",
                 isCompleted = true,
                 completedAtMillis = week1Sunday - 5400000L,
-                assignedTo = "Herkes"
+                assignedTo = "Tuna"
             )
         )
         homeworkDao.insertHomework(
@@ -202,7 +260,7 @@ class HomeworkRepository(
                 priority = "HIGH",
                 isCompleted = true,
                 completedAtMillis = week1Sunday - 3600000L,
-                assignedTo = "Herkes"
+                assignedTo = "Tuna"
             )
         )
         homeworkDao.insertHomework(
@@ -215,7 +273,7 @@ class HomeworkRepository(
                 priority = "LOW",
                 isCompleted = true,
                 completedAtMillis = week1Sunday - 1800000L,
-                assignedTo = "Herkes"
+                assignedTo = "Tuna"
             )
         )
         homeworkDao.insertHomework(
@@ -227,11 +285,11 @@ class HomeworkRepository(
                 dueTimeText = "21:00",
                 priority = "MEDIUM",
                 isCompleted = false,
-                assignedTo = "Herkes"
+                assignedTo = "Tuna"
             )
         )
 
-        // 2. Hafta: %50 (4 ödevden 2'si tamamlandı)
+        // Tuna 2. Hafta: %50 (4 ödevden 2'si tamamlandı)
         homeworkDao.insertHomework(
             Homework(
                 courseId = mathId,
@@ -242,7 +300,7 @@ class HomeworkRepository(
                 priority = "HIGH",
                 isCompleted = true,
                 completedAtMillis = week2Sunday - 7200000L,
-                assignedTo = "Herkes"
+                assignedTo = "Tuna"
             )
         )
         homeworkDao.insertHomework(
@@ -255,7 +313,7 @@ class HomeworkRepository(
                 priority = "MEDIUM",
                 isCompleted = true,
                 completedAtMillis = week2Sunday - 3600000L,
-                assignedTo = "Herkes"
+                assignedTo = "Tuna"
             )
         )
         homeworkDao.insertHomework(
@@ -267,7 +325,7 @@ class HomeworkRepository(
                 dueTimeText = "21:00",
                 priority = "HIGH",
                 isCompleted = false,
-                assignedTo = "Herkes"
+                assignedTo = "Tuna"
             )
         )
         homeworkDao.insertHomework(
@@ -279,11 +337,11 @@ class HomeworkRepository(
                 dueTimeText = "21:00",
                 priority = "LOW",
                 isCompleted = false,
-                assignedTo = "Herkes"
+                assignedTo = "Tuna"
             )
         )
 
-        // Bu Hafta (Aktif ödevler)
+        // Tuna 3. Hafta (Bu Hafta)
         homeworkDao.insertHomework(
             Homework(
                 courseId = mathId,
@@ -293,7 +351,7 @@ class HomeworkRepository(
                 dueTimeText = "21:00",
                 priority = "HIGH",
                 isCompleted = false,
-                assignedTo = "Herkes"
+                assignedTo = "Tuna"
             )
         )
         homeworkDao.insertHomework(
@@ -305,20 +363,182 @@ class HomeworkRepository(
                 dueTimeText = "21:00",
                 priority = "MEDIUM",
                 isCompleted = false,
-                assignedTo = "Herkes"
+                assignedTo = "Tuna"
+            )
+        )
+
+        // ================= ELİF'İN ÖDEVLERİ =================
+        // Elif Bugünün Ödevleri
+        homeworkDao.insertHomework(
+            Homework(
+                courseId = turkishId,
+                title = "Türkçe: Noktalama İşaretleri ve Yazım Kuralları",
+                description = "Defterdeki 3. bölüm yazım kuralları tamamlanacak.",
+                dueDateMillis = todayDue,
+                dueTimeText = "20:00",
+                priority = "HIGH",
+                estimatedMinutes = 35,
+                isCompleted = false,
+                assignedTo = "Elif"
             )
         )
         homeworkDao.insertHomework(
             Homework(
+                courseId = socialId,
+                title = "Sosyal Bilgiler: Kültür ve Miras Özeti",
+                description = "Konu özeti çıkarılıp soruları cevaplanacak.",
+                dueDateMillis = todayDue,
+                dueTimeText = "21:00",
+                priority = "MEDIUM",
+                estimatedMinutes = 30,
+                isCompleted = false,
+                assignedTo = "Elif"
+            )
+        )
+        homeworkDao.insertHomework(
+            Homework(
+                courseId = mathId,
+                title = "Matematik: Kesirler ve Sayı Doğrusu Çizimi",
+                description = "Örnek problemler çözüldü.",
+                dueDateMillis = todayDue,
+                dueTimeText = "18:30",
+                priority = "LOW",
+                estimatedMinutes = 20,
+                isCompleted = true,
+                completedAtMillis = System.currentTimeMillis() - 7200000L,
+                assignedTo = "Elif"
+            )
+        )
+
+        // Elif 1. Hafta (%75 - 4 ödevden 3'ü tamamlandı)
+        homeworkDao.insertHomework(
+            Homework(
                 courseId = turkishId,
-                title = "3. Hafta Türkçe: Noktalama İşaretleri ve Yazım Kuralları",
-                description = "Hafta sonuna kadar tamamlanacak.",
-                dueDateMillis = thisWeekSunday,
+                title = "1. Hafta Türkçe: Sözcükte Anlam ve Deyimler",
+                description = "Deyimler ve atasözleri çalışma föyü.",
+                dueDateMillis = week1Sunday,
+                dueTimeText = "21:00",
+                priority = "MEDIUM",
+                isCompleted = true,
+                completedAtMillis = week1Sunday - 7200000L,
+                assignedTo = "Elif"
+            )
+        )
+        homeworkDao.insertHomework(
+            Homework(
+                courseId = mathId,
+                title = "1. Hafta Matematik: Doğal Sayılarla İşlemler",
+                description = "Dört işlem alıştırmaları.",
+                dueDateMillis = week1Sunday,
+                dueTimeText = "21:00",
+                priority = "HIGH",
+                isCompleted = true,
+                completedAtMillis = week1Sunday - 5400000L,
+                assignedTo = "Elif"
+            )
+        )
+        homeworkDao.insertHomework(
+            Homework(
+                courseId = scienceId,
+                title = "1. Hafta Fen: Güneş Sistemi ve Gezegenler",
+                description = "Gezegen modelleri çizelgesi.",
+                dueDateMillis = week1Sunday,
+                dueTimeText = "21:00",
+                priority = "HIGH",
+                isCompleted = true,
+                completedAtMillis = week1Sunday - 3600000L,
+                assignedTo = "Elif"
+            )
+        )
+        homeworkDao.insertHomework(
+            Homework(
+                courseId = englishId,
+                title = "1. Hafta İngilizce: Hello Unit Vocabulary",
+                description = "Kelime ezber kartları.",
+                dueDateMillis = week1Sunday,
                 dueTimeText = "21:00",
                 priority = "LOW",
+                isCompleted = false,
+                assignedTo = "Elif"
+            )
+        )
+
+        // Elif 2. Hafta (%66 - 3 ödevden 2'si tamamlandı)
+        homeworkDao.insertHomework(
+            Homework(
+                courseId = turkishId,
+                title = "2. Hafta Türkçe: Metin Türleri ve Şiir İncelemesi",
+                description = "Şiir tahlili çalışma kağıdı.",
+                dueDateMillis = week2Sunday,
+                dueTimeText = "21:00",
+                priority = "MEDIUM",
+                isCompleted = true,
+                completedAtMillis = week2Sunday - 7200000L,
+                assignedTo = "Elif"
+            )
+        )
+        homeworkDao.insertHomework(
+            Homework(
+                courseId = scienceId,
+                title = "2. Hafta Fen Bilimleri: Ayın Evreleri Deneyi",
+                description = "Gözlem günlüğü hazırlandı.",
+                dueDateMillis = week2Sunday,
+                dueTimeText = "21:00",
+                priority = "HIGH",
+                isCompleted = true,
+                completedAtMillis = week2Sunday - 3600000L,
+                assignedTo = "Elif"
+            )
+        )
+        homeworkDao.insertHomework(
+            Homework(
+                courseId = socialId,
+                title = "2. Hafta Sosyal Bilgiler: Haklar ve Sorumluluklar",
+                description = "Haklarımız konusundaki örnek olaylar.",
+                dueDateMillis = week2Sunday,
+                dueTimeText = "21:00",
+                priority = "MEDIUM",
+                isCompleted = false,
+                assignedTo = "Elif"
+            )
+        )
+
+        // Elif 3. Hafta (Bu Hafta)
+        homeworkDao.insertHomework(
+            Homework(
+                courseId = turkishId,
+                title = "3. Hafta Türkçe: Hikaye Haritası ve Kompozisyon",
+                description = "Serbest hikaye yazma ödevi.",
+                dueDateMillis = thisWeekSunday,
+                dueTimeText = "21:00",
+                priority = "HIGH",
+                isCompleted = false,
+                assignedTo = "Elif"
+            )
+        )
+        homeworkDao.insertHomework(
+            Homework(
+                courseId = socialId,
+                title = "3. Hafta Sosyal: Tarihe Yolculuk ve İlk Medeniyetler",
+                description = "İlk yerleşim yerleri harita çalışması.",
+                dueDateMillis = thisWeekSunday,
+                dueTimeText = "21:00",
+                priority = "MEDIUM",
+                isCompleted = false,
+                assignedTo = "Elif"
+            )
+        )
+        homeworkDao.insertHomework(
+            Homework(
+                courseId = mathId,
+                title = "3. Hafta Matematik: Ondalık Gösterim Testi",
+                description = "Sayfa 32-35 arası testler.",
+                dueDateMillis = thisWeekSunday,
+                dueTimeText = "21:00",
+                priority = "HIGH",
                 isCompleted = true,
                 completedAtMillis = System.currentTimeMillis(),
-                assignedTo = "Herkes"
+                assignedTo = "Elif"
             )
         )
     }

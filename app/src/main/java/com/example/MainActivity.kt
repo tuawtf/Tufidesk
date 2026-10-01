@@ -147,6 +147,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
 
     val filteredHomeworks by viewModel.filteredHomeworks.collectAsStateWithLifecycle()
     val allHomeworks by viewModel.allHomeworks.collectAsStateWithLifecycle()
+    val userHomeworks by viewModel.userHomeworks.collectAsStateWithLifecycle()
     val courses by viewModel.allCourses.collectAsStateWithLifecycle()
     val stats by viewModel.stats.collectAsStateWithLifecycle()
 
@@ -257,7 +258,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                 )
 
                 1 -> CalendarScreen(
-                    allHomeworks = allHomeworks,
+                    homeworks = userHomeworks,
                     selectedDateMillis = selectedCalendarDate,
                     onSelectDate = { viewModel.setSelectedCalendarDate(it) },
                     onToggleComplete = { hw ->
@@ -312,7 +313,14 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                 3 -> StatsScreen(
                     stats = stats,
                     courses = courses,
-                    allHomeworks = allHomeworks
+                    homeworks = userHomeworks,
+                    onToggleComplete = { hw ->
+                        viewModel.toggleCompletion(hw)
+                        coroutineScope.launch {
+                            val msg = if (!hw.isCompleted) "Tebrikler! Ödev tamamlandı 🎉" else "Ödev bekleyenlere alındı"
+                            snackbarHostState.showSnackbar(msg)
+                        }
+                    }
                 )
 
                 4 -> SettingsScreen(

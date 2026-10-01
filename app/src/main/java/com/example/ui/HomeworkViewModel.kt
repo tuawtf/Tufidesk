@@ -27,9 +27,9 @@ enum class StatusFilter(val title: String) {
 }
 
 enum class TimeFilter(val title: String) {
-    ALL("Tüm Zamanlar"),
     TODAY("Bugün"),
     THIS_WEEK("Bu Hafta"),
+    ALL("Tüm Zamanlar"),
     OVERDUE("Gecikenler")
 }
 
@@ -122,13 +122,38 @@ class HomeworkViewModel(
     // Filters and Search
     val searchQuery = MutableStateFlow("")
     val statusFilter = MutableStateFlow(StatusFilter.ALL)
-    val timeFilter = MutableStateFlow(TimeFilter.ALL)
+    val timeFilter = MutableStateFlow(TimeFilter.TODAY)
     val selectedCourseFilter = MutableStateFlow<Long?>(null)
     val selectedPriorityFilter = MutableStateFlow<String?>(null)
     val sortOrder = MutableStateFlow(SortOrder.DUE_DATE_ASC)
 
     // Calendar selected date (start of day millis)
     val selectedCalendarDate = MutableStateFlow(getStartOfDay(System.currentTimeMillis()))
+
+    // User-scoped homeworks (Personalized: Tuna only gets Tuna, Elif only gets Elif)
+    val userHomeworks: StateFlow<List<HomeworkWithCourse>> = combine(
+        allHomeworks,
+        currentUser,
+        adminAssignedFilter
+    ) { homeworks, user, adminFilter ->
+        if (user == null) return@combine homeworks
+        when {
+            user.isTuna -> homeworks.filter { it.homework.assignedTo.equals("Tuna", ignoreCase = true) }
+            user.isElif -> homeworks.filter { it.homework.assignedTo.equals("Elif", ignoreCase = true) }
+            user.isTeacher -> {
+                when (adminFilter) {
+                    "Tuna" -> homeworks.filter { it.homework.assignedTo.equals("Tuna", ignoreCase = true) }
+                    "Elif" -> homeworks.filter { it.homework.assignedTo.equals("Elif", ignoreCase = true) }
+                    else -> homeworks
+                }
+            }
+            else -> homeworks
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
 
     private data class FilterBase(
         val query: String,
@@ -180,15 +205,19 @@ class HomeworkViewModel(
             when {
                 user.isTuna -> {
                     list = list.filter {
-                        it.homework.assignedTo.equals("Tuna", ignoreCase = true) ||
-                                it.homework.assignedTo.equals("Herkes", ignoreCase = true) ||
-                                it.homework.assignedTo.isBlank()
+                        it.homework.assignedTo.equals("Tuna", ignoreCase = true)
                     }
                 }
                 user.isElif -> {
                     list = list.filter {
-                        it.homework.assignedTo.equals("Elif", ignoreCase = true) ||
-                                it.homework.assignedTo.equals("Herkes", ignoreCase = true)
+                        it.homework.assignedTo.equals("Elif", ignoreCase = true)
+                    }
+                }
+                user.isTeacher -> {
+                    when (adminFilter) {
+                        "Tuna" -> list = list.filter { it.homework.assignedTo.equals("Tuna", ignoreCase = true) }
+                        "Elif" -> list = list.filter { it.homework.assignedTo.equals("Elif", ignoreCase = true) }
+                        else -> { /* show all */ }
                     }
                 }
             }
@@ -289,15 +318,19 @@ class HomeworkViewModel(
             when {
                 user.isTuna -> {
                     scopedList = scopedList.filter {
-                        it.homework.assignedTo.equals("Tuna", ignoreCase = true) ||
-                                it.homework.assignedTo.equals("Herkes", ignoreCase = true) ||
-                                it.homework.assignedTo.isBlank()
+                        it.homework.assignedTo.equals("Tuna", ignoreCase = true)
                     }
                 }
                 user.isElif -> {
                     scopedList = scopedList.filter {
-                        it.homework.assignedTo.equals("Elif", ignoreCase = true) ||
-                                it.homework.assignedTo.equals("Herkes", ignoreCase = true)
+                        it.homework.assignedTo.equals("Elif", ignoreCase = true)
+                    }
+                }
+                user.isTeacher -> {
+                    when (adminFilter) {
+                        "Tuna" -> scopedList = scopedList.filter { it.homework.assignedTo.equals("Tuna", ignoreCase = true) }
+                        "Elif" -> scopedList = scopedList.filter { it.homework.assignedTo.equals("Elif", ignoreCase = true) }
+                        else -> { /* show all */ }
                     }
                 }
             }
