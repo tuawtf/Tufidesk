@@ -13,25 +13,23 @@ jobs:
       - name: Kodu Cek
         uses: actions/checkout@v4
 
-      - name: Java 17 Kur
+      - name: Java 21 Kur
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: Gradle Kurulumu
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.7'
+          gradle-version: '9.3.1'
 
       - name: Hazirlik ve Yetkilendirme
         run: |
           if [ -f ".env.example" ] && [ ! -f ".env" ]; then
             cp .env.example .env
           fi
-          if [ ! -f "gradlew" ]; then
-            gradle wrapper
-          fi
+          gradle wrapper --gradle-version 9.3.1
           chmod +x gradlew
 
       - name: APK Derle
@@ -42,4 +40,3 @@ jobs:
         with:
           name: app-debug
           path: app/build/outputs/apk/debug/*.apk
-          
