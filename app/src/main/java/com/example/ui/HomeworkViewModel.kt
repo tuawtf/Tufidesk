@@ -122,6 +122,41 @@ class HomeworkViewModel(
         floatingBottomBar.value = enabled
     }
 
+    // Araçlar Bölümü & Alt Bar Sabitleme / Sıralama
+    val pinnedBottomTools = MutableStateFlow<List<String>>(listOf()) // örn: "exams", "timer", "notes"
+    val toolsOrder = MutableStateFlow<List<String>>(listOf("notes", "exams", "timer", "schedule"))
+
+    fun togglePinToolToBottom(toolKey: String) {
+        val current = pinnedBottomTools.value.toMutableList()
+        if (current.contains(toolKey)) {
+            current.remove(toolKey)
+        } else {
+            current.add(toolKey)
+        }
+        pinnedBottomTools.value = current
+    }
+
+    fun isToolPinnedToBottom(toolKey: String): Boolean {
+        return pinnedBottomTools.value.contains(toolKey)
+    }
+
+    fun setToolsOrder(newOrder: List<String>) {
+        toolsOrder.value = newOrder
+    }
+
+    fun moveTool(toolKey: String, moveUp: Boolean) {
+        val list = toolsOrder.value.toMutableList()
+        val index = list.indexOf(toolKey)
+        if (index != -1) {
+            val targetIndex = if (moveUp) index - 1 else index + 1
+            if (targetIndex in 0 until list.size) {
+                val item = list.removeAt(index)
+                list.add(targetIndex, item)
+                toolsOrder.value = list
+            }
+        }
+    }
+
     val userNotes: StateFlow<List<Note>> = combine(
         allNotes,
         currentUser,

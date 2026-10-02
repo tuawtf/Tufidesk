@@ -39,12 +39,14 @@ import com.example.ui.components.SwitchProfileDialog
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.CloudDone
@@ -131,8 +133,10 @@ sealed class Screen(
     data object Home : Screen("home", "Ödevler", Icons.Filled.Assignment, Icons.Outlined.Assignment)
     data object Calendar : Screen("calendar", "Takvim", Icons.Filled.CalendarMonth, Icons.Outlined.CalendarMonth)
     data object Stats : Screen("stats", "İstatistik", Icons.Filled.BarChart, Icons.Outlined.BarChart)
-    data object Tools : Screen("tools", "Araçlar", Icons.Filled.GridView, Icons.Outlined.GridView)
     data object Notes : Screen("notes", "Notlar", Icons.Filled.Description, Icons.Outlined.Description)
+    data object Exams : Screen("exams", "Denemeler", Icons.Filled.Assessment, Icons.Filled.Assessment)
+    data object Timer : Screen("timer", "Sayaç", Icons.Filled.HourglassTop, Icons.Filled.HourglassTop)
+    data object Tools : Screen("tools", "Araçlar", Icons.Filled.GridView, Icons.Outlined.GridView)
     data object Settings : Screen("settings", "Ayarlar", Icons.Filled.Settings, Icons.Outlined.Settings)
 }
 
@@ -260,7 +264,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
 
     val canManage = currentUser?.canManage ?: false
 
-    var currentTab by remember { mutableIntStateOf(0) }
+    var currentRoute by rememberSaveable { mutableStateOf(Screen.Home.route) }
 
     // Dialog states
     var showAddEditHomeworkDialog by remember { mutableStateOf(false) }
@@ -314,12 +318,31 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
         onDispose {}
     }
 
-    val navItems = listOf(
-        Screen.Home,
-        Screen.Calendar,
-        Screen.Stats,
-        Screen.Tools
-    )
+    val pinnedBottomTools by viewModel.pinnedBottomTools.collectAsStateWithLifecycle()
+    val toolsOrder by viewModel.toolsOrder.collectAsStateWithLifecycle()
+
+    val navItems = remember(pinnedBottomTools) {
+        buildList {
+            add(Screen.Home)
+            add(Screen.Calendar)
+            add(Screen.Stats)
+            if (pinnedBottomTools.contains("notes")) add(Screen.Notes)
+            if (pinnedBottomTools.contains("exams")) add(Screen.Exams)
+            if (pinnedBottomTools.contains("timer")) add(Screen.Timer)
+            add(Screen.Tools)
+        }
+    }
+
+    val currentTab = remember(currentRoute, navItems) {
+        val index = navItems.indexOfFirst { it.route == currentRoute }
+        if (index != -1) index else 0
+    }
+
+    val selectedScreen = remember(currentRoute, navItems) {
+        navItems.find { it.route == currentRoute } ?: Screen.Home
+    }
+
+    val isTimerActive = (selectedScreen == Screen.Timer) || (selectedScreen == Screen.Tools && activeTool == "timer")
 
     // Handle back button on sub-tabs
     BackHandler(enabled = isSettingsOpen) {
@@ -328,13 +351,13 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
     BackHandler(enabled = !isSettingsOpen && activeTool != null) {
         activeTool = null
     }
-    BackHandler(enabled = !isSettingsOpen && activeTool == null && currentTab != 0) {
-        currentTab = 0
+    BackHandler(enabled = !isSettingsOpen && activeTool == null && currentRoute != Screen.Home.route) {
+        currentRoute = Screen.Home.route
     }
 
     val screenTitle = when {
         isSettingsOpen -> "Ayarlar"
-        currentTab == 0 -> {
+        selectedScreen == Screen.Home -> {
             if (selectedCourseFilter != null) {
                 val courseName = courses.find { it.id == selectedCourseFilter }?.name ?: "Filtrelenmiş"
                 "Ödevler • $courseName"
@@ -342,9 +365,12 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                 "TufiDESK"
             }
         }
-        currentTab == 1 -> "Ödev Takvimi"
-        currentTab == 2 -> "İstatistikler"
-        currentTab == 3 -> when (activeTool) {
+        selectedScreen == Screen.Calendar -> "Ödev Takvimi"
+        selectedScreen == Screen.Stats -> "İstatistikler"
+        selectedScreen == Screen.Notes -> "Notlar"
+        selectedScreen == Screen.Exams -> "Deneme Sınavları"
+        selectedScreen == Screen.Timer -> "Sayaç & Odak"
+        selectedScreen == Screen.Tools -> when (activeTool) {
             "notes" -> "Notlar"
             "exams" -> "Deneme Sınavları"
             "timer" -> "Sayaç & Odak"
@@ -421,8 +447,9 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
             renderSettings()
         } else {
             Crossfade(targetState = currentTab, label = "tab_crossfade") { tab ->
-                when (tab) {
-                    0 -> HomeScreen(
+                val targetScreen = navItems.getOrNull(tab) ?: Screen.Home
+                when (targetScreen) {
+                    Screen.Home -> HomeScreen(
                         homeworks = filteredHomeworks,
                         stats = stats,
                         statusFilter = statusFilter,
@@ -452,7 +479,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                         onAdminAssignedFilterChange = { viewModel.setAdminAssignedFilter(it) }
                     )
 
-                    1 -> CalendarScreen(
+                    Screen.Calendar -> CalendarScreen(
                         homeworks = userHomeworks,
                         selectedDateMillis = selectedCalendarDate,
                         onSelectDate = { viewModel.setSelectedCalendarDate(it) },
@@ -479,7 +506,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                         canManage = canManage
                     )
 
-                    2 -> StatsScreen(
+                    Screen.Stats -> StatsScreen(
                         stats = stats,
                         courses = courses,
                         homeworks = userHomeworks,
@@ -491,7 +518,89 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                         }
                     )
 
-                    3 -> {
+                    Screen.Notes -> {
+                        NotesScreen(
+                            notes = userNotes,
+                            folders = noteFolders,
+                            selectedFolderId = selectedNoteFolderId,
+                            searchQuery = noteSearchQuery,
+                            onSelectFolder = { viewModel.setSelectedNoteFolder(it) },
+                            onSearchQueryChange = { viewModel.setNoteSearchQuery(it) },
+                            onInsertNote = { note ->
+                                viewModel.insertNote(note)
+                                showNotification("Not kaydedildi 📝", IslandNotificationType.SUCCESS, "Google Notlar")
+                            },
+                            onUpdateNote = { note ->
+                                viewModel.updateNote(note)
+                                showNotification("Not güncellendi", IslandNotificationType.SUCCESS, "Google Notlar")
+                            },
+                            onDeleteNote = { note ->
+                                viewModel.deleteNote(note)
+                                showNotification("Not silindi", IslandNotificationType.WARNING, "Google Notlar")
+                            },
+                            onTogglePin = { note ->
+                                viewModel.toggleNotePin(note)
+                            },
+                            onCreateFolder = { name, colorHex ->
+                                viewModel.insertFolder(name, colorHex)
+                                showNotification("'$name' klasörü oluşturuldu 📁", IslandNotificationType.SUCCESS, "Klasör")
+                            },
+                            onUpdateFolder = { folder ->
+                                viewModel.updateFolder(folder)
+                                showNotification("Klasör güncellendi 📁", IslandNotificationType.SUCCESS, "Klasör")
+                            },
+                            onDeleteFolder = { folder ->
+                                viewModel.deleteFolder(folder)
+                                showNotification("Klasör silindi", IslandNotificationType.WARNING, "Klasör")
+                            },
+                            canManage = canManage,
+                            currentUser = currentUser,
+                            currentUserAssigned = currentUser?.name ?: "Tuna",
+                            isGridLayout = noteLayoutGrid,
+                            onToggleLayoutGrid = { viewModel.setNoteLayoutGrid(it) },
+                            showWordCount = noteShowWordCount,
+                            confirmDelete = noteConfirmDelete,
+                            moveCheckedToBottom = keepMoveCheckedToBottom,
+                            onSwitchProfile = { showSwitchProfileDialog = true },
+                            onSelectionModeChange = { isSelectionActive = it }
+                        )
+                    }
+
+                    Screen.Exams -> {
+                        DenemeExamScreen(
+                            notes = userNotes,
+                            currentUserAssigned = currentUser?.name ?: "Tuna",
+                            onInsertExam = { note ->
+                                viewModel.insertNote(note)
+                                showNotification("Deneme sınavı kaydedildi 🎯", IslandNotificationType.SUCCESS, "Denemeler")
+                            },
+                            onUpdateExam = { note ->
+                                viewModel.updateNote(note)
+                                showNotification("Deneme güncellendi 🎯", IslandNotificationType.SUCCESS, "Denemeler")
+                            },
+                            onDeleteExam = { note ->
+                                viewModel.deleteNote(note)
+                                showNotification("Deneme silindi", IslandNotificationType.WARNING, "Denemeler")
+                            },
+                            onNotify = { msg ->
+                                showNotification(msg, IslandNotificationType.INFO, "Denemeler")
+                            }
+                        )
+                    }
+
+                    Screen.Timer -> {
+                        FocusTimerScreen(
+                            onBackToTools = {
+                                currentRoute = Screen.Tools.route
+                                activeTool = null
+                            },
+                            onNotify = { msg ->
+                                showNotification(msg, IslandNotificationType.SUCCESS, "Sayaç & Odak")
+                            }
+                        )
+                    }
+
+                    Screen.Tools -> {
                         when (activeTool) {
                             "notes" -> {
                                 NotesScreen(
@@ -563,6 +672,9 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                             }
                             "timer" -> {
                                 FocusTimerScreen(
+                                    onBackToTools = {
+                                        activeTool = null
+                                    },
                                     onNotify = { msg ->
                                         showNotification(msg, IslandNotificationType.SUCCESS, "Sayaç & Odak")
                                     }
@@ -572,13 +684,50 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                                 ToolsScreen(
                                     noteCount = userNotes.count { it.type != NoteType.REPORT },
                                     examCount = userNotes.count { it.type == NoteType.REPORT },
+                                    pinnedBottomTools = pinnedBottomTools,
+                                    toolsOrder = toolsOrder,
+                                    onTogglePinToBottom = { viewModel.togglePinToolToBottom(it) },
+                                    onMoveTool = { key, up -> viewModel.moveTool(key, up) },
+                                    onResetOrder = { viewModel.setToolsOrder(listOf("notes", "exams", "timer", "schedule")) },
                                     onOpenNotes = { activeTool = "notes" },
                                     onOpenExams = { activeTool = "exams" },
-                                    onOpenTimer = { activeTool = "timer" }
+                                    onOpenTimer = { activeTool = "timer" },
+                                    onSelectionActiveChange = { isSelectionActive = it },
+                                    onNotify = { msg -> showNotification(msg, IslandNotificationType.INFO, "Araçlar") }
                                 )
                             }
                         }
                     }
+
+                    else -> HomeScreen(
+                        homeworks = filteredHomeworks,
+                        stats = stats,
+                        statusFilter = statusFilter,
+                        onStatusChange = { viewModel.setStatus(it) },
+                        timeFilter = timeFilter,
+                        onTimeChange = { viewModel.setTime(it) },
+                        sortOrder = sortOrder,
+                        onSortChange = { viewModel.setSort(it) },
+                        onToggleComplete = { hw ->
+                            viewModel.toggleCompletion(hw)
+                            val msg = if (!hw.isCompleted) "Tebrikler! Ödev tamamlandı 🎉" else "Ödev bekleyenlere alındı"
+                            val type = if (!hw.isCompleted) IslandNotificationType.SUCCESS else IslandNotificationType.INFO
+                            showNotification(msg, type, "Ödev")
+                        },
+                        onEditHomework = { hw ->
+                            homeworkToEdit = hw
+                            showAddEditHomeworkDialog = true
+                        },
+                        onDeleteHomework = { hw ->
+                            viewModel.deleteHomework(hw)
+                            showNotification("Ödev silindi", IslandNotificationType.WARNING, "Silindi")
+                        },
+                        canManage = canManage,
+                        hideCompletedInSettings = hideCompleted,
+                        currentUser = currentUser,
+                        adminAssignedFilter = adminAssignedFilter,
+                        onAdminAssignedFilterChange = { viewModel.setAdminAssignedFilter(it) }
+                    )
                 }
             }
         }
@@ -597,7 +746,9 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     // Left Island Menu
                     TabletIslandNavigation(
                         currentTab = currentTab,
-                        onTabSelected = { currentTab = it },
+                        onTabSelected = { index ->
+                            navItems.getOrNull(index)?.let { currentRoute = it.route }
+                        },
                         onAddHomeworkClick = {
                             homeworkToEdit = null
                             showAddEditHomeworkDialog = true
@@ -807,10 +958,12 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     )
                 },
                 bottomBar = {
-                    if (!floatingBottomBar && !isSettingsOpen && !isSelectionActive) {
+                    if (!floatingBottomBar && !isSettingsOpen && !isSelectionActive && !isTimerActive) {
                         IslandBottomNavigation(
                             currentTab = currentTab,
-                            onTabSelected = { currentTab = it },
+                            onTabSelected = { index ->
+                                navItems.getOrNull(index)?.let { currentRoute = it.route }
+                            },
                             navItems = navItems
                         )
                     }
@@ -848,10 +1001,12 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     screenContent()
 
                     // Tamamen havada yüzen ada menüsü (Arkada hiçbir siyahlık veya şerit yok)
-                    if (floatingBottomBar && !isSettingsOpen && !isSelectionActive) {
+                    if (floatingBottomBar && !isSettingsOpen && !isSelectionActive && !isTimerActive) {
                         IslandBottomNavigation(
                             currentTab = currentTab,
-                            onTabSelected = { currentTab = it },
+                            onTabSelected = { index ->
+                                navItems.getOrNull(index)?.let { currentRoute = it.route }
+                            },
                             navItems = navItems,
                             modifier = Modifier.align(Alignment.BottomCenter)
                         )

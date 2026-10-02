@@ -6,6 +6,7 @@ import android.os.SystemClock
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -28,9 +29,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -44,6 +47,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Pause
@@ -106,6 +110,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.IslandBottomNavItem
 import kotlinx.coroutines.delay
 import java.util.Locale
 
@@ -128,72 +133,169 @@ data class LapRecord(
 )
 
 /**
- * Google Saat (Google Clock) tarzı, dokunsal titreşim (Haptic) ve yay animasyonlu Sayaç & Odak Ekranı.
+ * Google Saat (Google Clock) tarzı, alt adalı (Bottom Navigation Island) ve dokunsal titreşimli Sayaç & Odak Ekranı.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FocusTimerScreen(
+    onBackToTools: () -> Unit = {},
     onNotify: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-    val tabs = TimerTab.values()
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
             .testTag("focus_timer_screen")
     ) {
-        // Google Clock Material 3 Primary Tab Row
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            tonalElevation = 2.dp,
-            modifier = Modifier.fillMaxWidth()
+        // Seçilen moda göre içerik alanı (Alt bar için padding bırakılmıştır)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 76.dp)
         ) {
-            PrimaryTabRow(
-                selectedTabIndex = selectedTab,
-                containerColor = Color.Transparent,
-                contentColor = MaterialTheme.colorScheme.primary,
-                indicator = {
-                    TabRowDefaults.PrimaryIndicator(
-                        Modifier.tabIndicatorOffset(selectedTab),
-                        color = MaterialTheme.colorScheme.primary,
-                        height = 3.dp
-                    )
-                }
-            ) {
-                tabs.forEachIndexed { index, tab ->
-                    val isSelected = selectedTab == index
-                    Tab(
-                        selected = isSelected,
-                        onClick = { selectedTab = index },
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = tab.icon,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = tab.title,
-                                    style = MaterialTheme.typography.labelLarge.copy(
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                    )
-                                )
-                            }
-                        },
-                        modifier = Modifier.testTag("timer_tab_${tab.name.lowercase()}")
-                    )
-                }
+            when (selectedTab) {
+                0 -> GoogleStopwatchContent()
+                1 -> GoogleTimerContent(onNotify = onNotify)
+                2 -> GooglePomodoroContent(onNotify = onNotify)
             }
         }
 
-        // Seçilen moda göre içerik
-        when (selectedTab) {
-            0 -> GoogleStopwatchContent()
-            1 -> GoogleTimerContent(onNotify = onNotify)
-            2 -> GooglePomodoroContent(onNotify = onNotify)
+        // ================= SAYAÇ EKRANI İÇİN ÖZEL YÜZEN ADA ALT GEZİNME BARI =================
+        TimerBottomIslandNavigation(
+            currentTab = selectedTab,
+            onTabSelected = { selectedTab = it },
+            onBackToTools = onBackToTools,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
+    }
+}
+
+/**
+ * Sayaç ve Odak ekranında gösterilen, en solda Araçlar butonu ve sağında Kronometre, Zamanlayıcı, Pomodoro sekmelerini barındıran ada barı.
+ */
+@Composable
+private fun TimerBottomIslandNavigation(
+    currentTab: Int,
+    onTabSelected: (Int) -> Unit,
+    onBackToTools: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptic = LocalHapticFeedback.current
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+            shadowElevation = 10.dp,
+            border = BorderStroke(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+            ),
+            modifier = Modifier
+                .wrapContentWidth()
+                .animateContentSize(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioLowBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+                )
+                .testTag("timer_bottom_nav_bar")
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // EN SOLDA ÖZEL FARKLI TASARIMLI ARAÇLAR BUTONU
+                Surface(
+                    shape = RoundedCornerShape(22.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.85f),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(22.dp))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = ripple(bounded = true),
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onBackToTools()
+                            }
+                        )
+                        .testTag("timer_back_to_tools_button")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.GridView,
+                            contentDescription = "Araçlar Menüsü",
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Araçlar",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
+
+                // İnce Dikey Ayırıcı
+                Box(
+                    modifier = Modifier
+                        .height(24.dp)
+                        .width(1.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                )
+
+                // 1. KRONOMETRE
+                IslandBottomNavItem(
+                    icon = Icons.Default.Timer,
+                    label = "Kronometre",
+                    isSelected = currentTab == 0,
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onTabSelected(0)
+                    },
+                    testTag = "timer_tab_stopwatch"
+                )
+
+                // 2. ZAMANLAYICI
+                IslandBottomNavItem(
+                    icon = Icons.Default.HourglassTop,
+                    label = "Zamanlayıcı",
+                    isSelected = currentTab == 1,
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onTabSelected(1)
+                    },
+                    testTag = "timer_tab_countdown"
+                )
+
+                // 3. POMODORO
+                IslandBottomNavItem(
+                    icon = Icons.Default.SelfImprovement,
+                    label = "Pomodoro",
+                    isSelected = currentTab == 2,
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onTabSelected(2)
+                    },
+                    testTag = "timer_tab_pomodoro"
+                )
+            }
         }
     }
 }
