@@ -87,91 +87,81 @@ fun StatsScreen(
     onToggleComplete: (Homework) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    // Kişiye özel haftalık ilerleme verileri (En sondan başa doğru: 3. Hafta, 2. Hafta, 1. Hafta)
+    // Kişiye özel haftalık ilerleme verileri (Ödevlerin tarihlerine göre DİNAMİK belirlenir)
     val weeklyReports by remember(homeworks) {
         derivedStateOf {
-            val now = Calendar.getInstance()
-            val currentDayOfWeek = now.get(Calendar.DAY_OF_WEEK)
-            val daysSinceSunday = if (currentDayOfWeek == Calendar.SUNDAY) 0 else (currentDayOfWeek - Calendar.SUNDAY)
-
-            val lastSundayCal = (now.clone() as Calendar).apply {
-                add(Calendar.DAY_OF_MONTH, -daysSinceSunday)
-                set(Calendar.HOUR_OF_DAY, 23)
-                set(Calendar.MINUTE, 59)
-                set(Calendar.SECOND, 59)
-                set(Calendar.MILLISECOND, 999)
-            }
-            val twoSundaysAgoCal = (lastSundayCal.clone() as Calendar).apply {
-                add(Calendar.WEEK_OF_YEAR, -1)
-            }
-            val upcomingSundayCal = (now.clone() as Calendar).apply {
-                val daysUntilSunday = if (currentDayOfWeek == Calendar.SUNDAY) 0 else ((Calendar.SUNDAY + 7 - currentDayOfWeek) % 7)
-                add(Calendar.DAY_OF_MONTH, if (daysUntilSunday == 0) 7 else daysUntilSunday)
-                set(Calendar.HOUR_OF_DAY, 23)
-                set(Calendar.MINUTE, 59)
-                set(Calendar.SECOND, 59)
-                set(Calendar.MILLISECOND, 999)
-            }
-
             val dateFmt = SimpleDateFormat("d MMMM", Locale("tr"))
 
-            // 1. Hafta
-            val w1Start = twoSundaysAgoCal.timeInMillis - 7L * 86400000L
-            val w1End = twoSundaysAgoCal.timeInMillis
-            val w1Hws = homeworks.filter { it.homework.dueDateMillis in (w1Start + 1)..w1End }
-            val w1Total = w1Hws.size
-            val w1Comp = w1Hws.count { it.homework.isCompleted }
-            val w1Pct = if (w1Total > 0) (w1Comp * 100) / w1Total else 0
+            // Herhangi bir zaman damgası için haftanın Pazartesi (00:00) ve Pazar (23:59:59) aralığını hesapla
+            fun getWeekBounds(timestampMillis: Long): Pair<Long, Long> {
+                val cal = Calendar.getInstance().apply {
+                    timeInMillis = timestampMillis
+                    firstDayOfWeek = Calendar.MONDAY
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                    val dow = get(Calendar.DAY_OF_WEEK)
+                    val daysFromMonday = if (dow == Calendar.SUNDAY) 6 else (dow - Calendar.MONDAY)
+                    add(Calendar.DAY_OF_MONTH, -daysFromMonday)
+                }
+                val start = cal.timeInMillis
+                val endCal = (cal.clone() as Calendar).apply {
+                    add(Calendar.DAY_OF_MONTH, 6)
+                    set(Calendar.HOUR_OF_DAY, 23)
+                    set(Calendar.MINUTE, 59)
+                    set(Calendar.SECOND, 59)
+                    set(Calendar.MILLISECOND, 999)
+                }
+                val end = endCal.timeInMillis
+                return Pair(start, end)
+            }
 
-            // 2. Hafta
-            val w2Start = lastSundayCal.timeInMillis - 7L * 86400000L
-            val w2End = lastSundayCal.timeInMillis
-            val w2Hws = homeworks.filter { it.homework.dueDateMillis in (w2Start + 1)..w2End }
-            val w2Total = w2Hws.size
-            val w2Comp = w2Hws.count { it.homework.isCompleted }
-            val w2Pct = if (w2Total > 0) (w2Comp * 100) / w2Total else 0
+            val now = System.currentTimeMillis()
+            val currentWeekBounds = getWeekBounds(now)
 
-            // 3. Hafta (Bu Hafta)
-            val w3Start = upcomingSundayCal.timeInMillis - 7L * 86400000L
-            val w3End = upcomingSundayCal.timeInMillis
-            val w3Hws = homeworks.filter { it.homework.dueDateMillis in (w3Start + 1)..w3End }
-            val w3Total = w3Hws.size
-            val w3Comp = w3Hws.count { it.homework.isCompleted }
-            val w3Pct = if (w3Total > 0) (w3Comp * 100) / w3Total else 0
+            // Mevcut tüm ödevlerin haftalarını dinamik tespit et
+            val weekBoundsSet = mutableSetOf<Pair<Long, Long>>()
+            // Bu haftayı her zaman dahil et
+            weekBoundsSet.add(currentWeekBounds)
 
-            val w3 = WeeklyReportData(
-                weekNumber = 3,
-                weekTitle = "3. Hafta",
-                dateRangeText = dateFmt.format(Date(upcomingSundayCal.timeInMillis)),
-                homeworks = w3Hws,
-                totalCount = w3Total,
-                completedCount = w3Comp,
-                percentage = w3Pct,
-                isCurrent = true
-            )
-            val w2 = WeeklyReportData(
-                weekNumber = 2,
-                weekTitle = "2. Hafta",
-                dateRangeText = dateFmt.format(Date(lastSundayCal.timeInMillis)),
-                homeworks = w2Hws,
-                totalCount = w2Total,
-                completedCount = w2Comp,
-                percentage = w2Pct,
-                isCurrent = false
-            )
-            val w1 = WeeklyReportData(
-                weekNumber = 1,
-                weekTitle = "1. Hafta",
-                dateRangeText = dateFmt.format(Date(twoSundaysAgoCal.timeInMillis)),
-                homeworks = w1Hws,
-                totalCount = w1Total,
-                completedCount = w1Comp,
-                percentage = w1Pct,
-                isCurrent = false
-            )
+            for (hw in homeworks) {
+                val due = hw.homework.dueDateMillis
+                if (due > 0L) {
+                    weekBoundsSet.add(getWeekBounds(due))
+                }
+            }
 
-            // Sıralama: En son haftadan ilk haftaya doğru (3. Hafta / Bu hafta en üstte)
-            listOf(w3, w2, w1)
+            // Haftaları en eskiden en yeniye doğru kronolojik olarak sırala
+            val sortedWeeks = weekBoundsSet.sortedBy { it.first }
+
+            // Her haftaya kronolojik olarak 1, 2, 3... hafta numarası ata
+            val reports = sortedWeeks.mapIndexed { index, bounds ->
+                val weekNum = index + 1
+                val (wStart, wEnd) = bounds
+                val isCurrent = (now in wStart..wEnd)
+
+                val wHws = homeworks.filter { it.homework.dueDateMillis in wStart..wEnd }
+                val total = wHws.size
+                val comp = wHws.count { it.homework.isCompleted }
+                val pct = if (total > 0) (comp * 100) / total else 0
+
+                val rangeText = "${dateFmt.format(Date(wStart))} - ${dateFmt.format(Date(wEnd))}"
+
+                WeeklyReportData(
+                    weekNumber = weekNum,
+                    weekTitle = "$weekNum. Hafta",
+                    dateRangeText = rangeText,
+                    homeworks = wHws,
+                    totalCount = total,
+                    completedCount = comp,
+                    percentage = pct,
+                    isCurrent = isCurrent
+                )
+            }
+
+            // En yeni haftadan eskiye doğru sırala (Yeni haftalar en üstte)
+            reports.reversed()
         }
     }
 

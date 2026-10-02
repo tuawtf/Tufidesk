@@ -433,6 +433,9 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     onNoteGridChange = { viewModel.setNoteLayoutGrid(it) },
                     moveCheckedToBottom = keepMoveCheckedToBottom,
                     onMoveCheckedToBottomChange = { viewModel.setKeepMoveCheckedToBottom(it) },
+                    onClearAllFirebaseData = { onResult ->
+                        viewModel.clearAllFirebaseData(onResult)
+                    },
                     onResetFirebaseData = { onResult ->
                         viewModel.resetFirebaseWithDemoData(onResult)
                     },

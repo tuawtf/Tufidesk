@@ -619,6 +619,17 @@ class HomeworkViewModel(
         }
     }
 
+    fun clearAllFirebaseData(onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val msg = syncManager.clearAllFirebaseData()
+                onResult(true, msg)
+            } catch (e: Exception) {
+                onResult(false, e.localizedMessage ?: "Silme başarısız: ${e.message}")
+            }
+        }
+    }
+
     fun resetFirebaseWithDemoData(onResult: (Boolean, String) -> Unit) {
         viewModelScope.launch {
             try {

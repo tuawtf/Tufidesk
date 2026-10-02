@@ -143,6 +143,7 @@ fun SettingsScreen(
     moveCheckedToBottom: Boolean = true,
     onMoveCheckedToBottomChange: (Boolean) -> Unit = {},
     onResetFirebaseData: ((Boolean, String) -> Unit) -> Unit = {},
+    onClearAllFirebaseData: ((Boolean, String) -> Unit) -> Unit = {},
     onExportFirebaseJson: ((Boolean, String) -> Unit) -> Unit = {},
     onImportFirebaseJson: (String, (Boolean, String) -> Unit) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
@@ -156,6 +157,9 @@ fun SettingsScreen(
 
     var showResetFirebaseConfirmDialog by remember { mutableStateOf(false) }
     var isResettingFirebase by remember { mutableStateOf(false) }
+
+    var showClearFirebaseAllConfirmDialog by remember { mutableStateOf(false) }
+    var isClearingFirebase by remember { mutableStateOf(false) }
 
     var showExportJsonDialog by remember { mutableStateOf(false) }
     var exportedJsonText by remember { mutableStateOf("") }
@@ -240,6 +244,7 @@ fun SettingsScreen(
             isOnline = isOnline,
             syncState = syncState,
             syncErrorMessage = syncErrorMessage,
+            onClearAllFirebaseClick = { showClearFirebaseAllConfirmDialog = true },
             onResetFirebaseClick = { showResetFirebaseConfirmDialog = true },
             onExportJsonClick = {
                 isExportingJson = true
@@ -970,6 +975,73 @@ fun SettingsScreen(
         )
     }
 
+    // 0. Clear All Firebase Confirmation Dialog (Tamamen Sil ve Boşalt)
+    if (showClearFirebaseAllConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!isClearingFirebase) showClearFirebaseAllConfirmDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.DeleteForever,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Firebase'deki Tüm Veriler Kalıcı Olarak Silinsin mi?",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Bu işlem buluttaki (Firestore) ve yerel cihazdaki TÜM ödevleri, dersleri, notları ve klasörleri kalıcı olarak silecek ve veritabanını tamamen boş bırakacaktır.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Demo veri YÜKLENMEZ. Tüm veritabanı sıfırlanır ve tertemiz boş bırakılır.",
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    if (isClearingFirebase) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Firebase'deki tüm veriler siliniyor...", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        isClearingFirebase = true
+                        onClearAllFirebaseData { success, message ->
+                            isClearingFirebase = false
+                            showClearFirebaseAllConfirmDialog = false
+                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                        }
+                    },
+                    enabled = !isClearingFirebase,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Evet, Hepsini Sil (Boşalt)", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showClearFirebaseAllConfirmDialog = false },
+                    enabled = !isClearingFirebase
+                ) {
+                    Text("İptal")
+                }
+            }
+        )
+    }
+
     // 1. Reset Firebase Confirmation Dialog
     if (showResetFirebaseConfirmDialog) {
         AlertDialog(
@@ -1355,6 +1427,7 @@ fun DeveloperSettingsContent(
     isOnline: Boolean,
     syncState: SyncState,
     syncErrorMessage: String?,
+    onClearAllFirebaseClick: () -> Unit,
     onResetFirebaseClick: () -> Unit,
     onExportJsonClick: () -> Unit,
     isExportingJson: Boolean,
@@ -1445,24 +1518,38 @@ fun DeveloperSettingsContent(
 
             // 1. Firebase Reset & Demo Seed
             item {
-                SettingsCategoryCard(title = "🔥 Firebase Veritabanı Sıfırlama") {
+                SettingsCategoryCard(title = "🔥 Firebase Veritabanı Sıfırlama & Temizleme") {
                     Column(
                         modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            text = "Firebasedeki Tüm Her Şeyi Sil ve Demo Verileri Yükle",
+                            text = "Firebase Bulut Veritabanı İşlemleri",
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.error
                         )
                         Text(
-                            text = "Firebase Firestore veritabanındaki TÜM koleksiyonları (ödevler, dersler, notlar, klasörler) temizler. Ardından şu anki uygulama için gerekli değerleri olan (haftalık Pazar teslimli ödevler, dersler, notlar) temiz ve eksiksiz demo verileri yükler.",
+                            text = "Firebase Firestore bulut veritabanındaki koleksiyonları (ödevler, dersler, notlar, klasörler) yönetebilir veya tamamen silebilirsiniz.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+
+                        // 1. TAMAMEN SİL VE BOŞALT BUTONU
+                        Button(
+                            onClick = onClearAllFirebaseClick,
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(imageVector = Icons.Default.DeleteForever, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Firebase'deki Tüm Verileri Sil (Boşalt)", fontWeight = FontWeight.Bold)
+                        }
+
+                        // 2. SIFIRLA VE DEMO VERİLERİ YÜKLE
                         Button(
                             onClick = onResetFirebaseClick,
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer),
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {

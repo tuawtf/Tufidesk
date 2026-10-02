@@ -631,6 +631,48 @@ class FirebaseSyncManager(
     }
 
     /**
+     * Firebase'deki tüm koleksiyonları (homeworks, courses, notes, note_folders, settings, users)
+     * ve yerel veritabanını TAMAMEN siler ve boş bırakır.
+     */
+    suspend fun clearAllFirebaseData(): String = withContext(Dispatchers.IO) {
+        initFirebaseIfAvailable()
+        val db = firestore
+
+        _syncState.value = SyncState.SYNCING
+
+        try {
+            if (db != null) {
+                val collections = listOf("courses", "homeworks", "notes", "note_folders", "settings", "users")
+                for (colName in collections) {
+                    try {
+                        val snapshot = db.collection(colName).get().await()
+                        for (doc in snapshot.documents) {
+                            try {
+                                doc.reference.delete().await()
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Error deleting doc ${doc.id} in $colName: ${e.message}")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Error getting collection $colName for deletion: ${e.message}")
+                    }
+                }
+            }
+
+            // Yerel verileri de temizle
+            repository.clearAllData()
+            notesRepository?.clearAll()
+
+            _syncState.value = SyncState.IDLE
+            return@withContext "Firebase ve yerel veritabanındaki tüm veriler başarıyla silindi! Veritabanı tamamen boşaltıldı."
+        } catch (e: Exception) {
+            _syncState.value = SyncState.ERROR
+            _lastErrorMessage.value = e.message
+            return@withContext "Hata oluştu: ${e.message}"
+        }
+    }
+
+    /**
      * Firebase'deki tüm koleksiyonları (homeworks, courses, notes, note_folders, settings) temizler
      * ve geçerli haftalık Pazar teslimatlı demo verilerini hem Firebase'e hem yerel Room DB'ye yükler.
      */
