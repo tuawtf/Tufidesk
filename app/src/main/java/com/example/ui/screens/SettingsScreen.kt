@@ -32,9 +32,12 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FormatListBulleted
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Lock
@@ -127,6 +130,10 @@ fun SettingsScreen(
     onColorPaletteChange: (String) -> Unit,
     hideCompleted: Boolean,
     onHideCompletedChange: (Boolean) -> Unit,
+    isFullScreen: Boolean = false,
+    onFullScreenChange: (Boolean) -> Unit = {},
+    floatingBottomBar: Boolean = true,
+    onFloatingBottomBarChange: (Boolean) -> Unit = {},
     onResetDemoData: () -> Unit = {},
     onClearAllData: () -> Unit = {},
     currentUser: UserAccount? = null,
@@ -349,6 +356,26 @@ fun SettingsScreen(
                     title = "Materyal Renk Paleti",
                     subtitle = currentOption.name,
                     onClick = { showPaletteDialog = true }
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                SettingsSwitchItem(
+                    icon = if (isFullScreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                    title = "Tam Ekran Yap",
+                    subtitle = "Durum ve gezinme çubuklarını gizleyerek odaklanmış tam ekran deneyimi sağlar",
+                    checked = isFullScreen,
+                    onCheckedChange = onFullScreenChange
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                SettingsSwitchItem(
+                    icon = Icons.Default.Layers,
+                    title = "Tam Yüzen Alt Menü (Siyahlığı Kaldır)",
+                    subtitle = "Alt menünün arkasındaki siyah çubuğu kaldırarak tamamen havada yüzen ada görünümü sağlar",
+                    checked = floatingBottomBar,
+                    onCheckedChange = onFloatingBottomBarChange
                 )
             }
         }

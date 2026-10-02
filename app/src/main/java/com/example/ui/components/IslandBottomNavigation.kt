@@ -1,27 +1,29 @@
 package com.example.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ripple
 import androidx.compose.material3.Icon
@@ -39,14 +41,15 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.Screen
 
 /**
  * Modern Yüzen Ada (Floating Island Dock) Alt Gezinme Çubuğu.
- * Telefon modunda ekranın altında havada duran, yuvarlatılmış ve animasyonlu ada menüsü.
+ * - Butonlar birbirine yakın durur (spacedBy 6dp).
+ * - Bir butona basıldığında yalnızca o buton yana doğru genişler ve ismi yanında yazar.
+ * - Yanındakiler birbirine yakın kalmaya devam eder, kapsül ada boyutu animasyonla genişler.
  */
 @Composable
 fun IslandBottomNavigation(
@@ -59,11 +62,11 @@ fun IslandBottomNavigation(
         modifier = modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 20.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
         Surface(
-            shape = RoundedCornerShape(26.dp),
+            shape = RoundedCornerShape(28.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp,
             shadowElevation = 10.dp,
@@ -72,14 +75,19 @@ fun IslandBottomNavigation(
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
             ),
             modifier = Modifier
-                .fillMaxWidth()
+                .wrapContentWidth()
+                .animateContentSize(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioLowBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+                )
                 .testTag("bottom_nav_bar")
         ) {
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
                     .padding(horizontal = 6.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 navItems.forEachIndexed { index, screen ->
@@ -89,7 +97,6 @@ fun IslandBottomNavigation(
                         label = screen.title,
                         isSelected = isSelected,
                         onClick = { onTabSelected(index) },
-                        modifier = Modifier.weight(1f),
                         testTag = "nav_tab_${screen.route}"
                     )
                 }
@@ -98,6 +105,9 @@ fun IslandBottomNavigation(
     }
 }
 
+/**
+ * Dinamik olarak genişleyen ve daralan ada menü butonu.
+ */
 @Composable
 fun IslandBottomNavItem(
     icon: ImageVector,
@@ -121,57 +131,81 @@ fun IslandBottomNavItem(
         targetValue = if (isSelected) {
             MaterialTheme.colorScheme.onPrimaryContainer
         } else {
-            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
+            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.80f)
         },
         animationSpec = tween(durationMillis = 200),
         label = "island_item_content"
     )
 
     val iconScale by animateFloatAsState(
-        targetValue = if (isSelected) 1.15f else 1.0f,
+        targetValue = if (isSelected) 1.08f else 1.0f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
         label = "island_icon_scale"
     )
 
     Surface(
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(22.dp),
         color = bgColor,
         modifier = modifier
-            .padding(horizontal = 2.dp)
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(22.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(bounded = true),
                 onClick = onClick
             )
+            .animateContentSize(
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioLowBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            )
             .testTag(testTag)
     ) {
-        Column(
+        Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp, horizontal = 4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .padding(
+                    horizontal = if (isSelected) 14.dp else 11.dp,
+                    vertical = 10.dp
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
                 tint = contentColor,
                 modifier = Modifier
-                    .size(22.dp)
+                    .size(23.dp)
                     .graphicsLayer(scaleX = iconScale, scaleY = iconScale)
             )
-            Spacer(modifier = Modifier.height(3.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 11.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+
+            // Seçildiğinde yana doğru pürüzsüzce genişleyip metni gösterir
+            AnimatedVisibility(
+                visible = isSelected,
+                enter = fadeIn(animationSpec = tween(180)) + expandHorizontally(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioLowBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
                 ),
-                color = contentColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+                exit = fadeOut(animationSpec = tween(80)) + shrinkHorizontally(
+                    animationSpec = tween(120)
+                )
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = contentColor,
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                }
+            }
         }
     }
 }

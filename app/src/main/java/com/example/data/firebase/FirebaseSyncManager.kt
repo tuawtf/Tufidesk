@@ -97,7 +97,7 @@ class FirebaseSyncManager(
             if (FirebaseApp.getApps(context).isEmpty()) {
                 try {
                     val options = com.google.firebase.FirebaseOptions.Builder()
-                        .setApplicationId("1:604652700316:android:a702a1ee43bb33455b6359")
+                        .setApplicationId("1:604652700316:android:56eaee97a63cdf305b6359")
                         .setApiKey("AIzaSyC5mIBDPChrJMHnuEWl1QTlL1fFNBL_uwA")
                         .setProjectId("tufidesk")
                         .setStorageBucket("tufidesk.firebasestorage.app")

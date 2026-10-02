@@ -116,6 +116,12 @@ class HomeworkViewModel(
     val noteVaultUnlocked = MutableStateFlow(false)
     val noteFilterVaultOnly = MutableStateFlow(false)
 
+    // Alt barın arkasındaki siyah çubuğu kaldırarak tamamen havada yüzen ada modunu sağlar
+    val floatingBottomBar = MutableStateFlow(true)
+    fun setFloatingBottomBar(enabled: Boolean) {
+        floatingBottomBar.value = enabled
+    }
+
     val userNotes: StateFlow<List<Note>> = combine(
         allNotes,
         currentUser,
