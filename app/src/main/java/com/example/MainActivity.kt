@@ -126,21 +126,28 @@ class MainActivity : ComponentActivity() {
         val syncManager = FirebaseSyncManager(
             applicationContext,
             repository,
-            CoroutineScope(Dispatchers.IO + SupervisorJob())
+            CoroutineScope(Dispatchers.IO + SupervisorJob()),
+            notesRepository
         )
         HomeworkViewModelFactory(repository, authManager, syncManager, notesRepository)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        try {
+            enableEdgeToEdge()
 
-        setContent {
-            val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
-            val colorPalette by viewModel.colorPalette.collectAsStateWithLifecycle()
-            MyApplicationTheme(themeMode = themeMode, colorPalette = colorPalette) {
-                HomeworkApp(viewModel = viewModel)
+            setContent {
+                val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+                val colorPalette by viewModel.colorPalette.collectAsStateWithLifecycle()
+                MyApplicationTheme(themeMode = themeMode, colorPalette = colorPalette) {
+                    HomeworkApp(viewModel = viewModel)
+                }
             }
+        } catch (t: Throwable) {
+            android.util.Log.e("MainActivity", "Fatal error in onCreate: ${t.message}", t)
+            CrashActivity.start(this, t)
+            finish()
         }
     }
 }
@@ -210,6 +217,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
     // Dialog states
     var showAddEditHomeworkDialog by remember { mutableStateOf(false) }
     var homeworkToEdit by remember { mutableStateOf<Homework?>(null) }
+    var newHomeworkInitialDate by remember { mutableStateOf<Long?>(null) }
 
     var showAddEditCourseDialog by remember { mutableStateOf(false) }
     var courseToEdit by remember { mutableStateOf<Course?>(null) }
@@ -304,6 +312,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     },
                     onAddNewHomeworkForDate = { dateMillis ->
                         homeworkToEdit = null
+                        newHomeworkInitialDate = dateMillis
                         viewModel.setSelectedCalendarDate(dateMillis)
                         showAddEditHomeworkDialog = true
                     },
@@ -428,7 +437,16 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     isNoteGrid = noteLayoutGrid,
                     onNoteGridChange = { viewModel.setNoteLayoutGrid(it) },
                     moveCheckedToBottom = keepMoveCheckedToBottom,
-                    onMoveCheckedToBottomChange = { viewModel.setKeepMoveCheckedToBottom(it) }
+                    onMoveCheckedToBottomChange = { viewModel.setKeepMoveCheckedToBottom(it) },
+                    onResetFirebaseData = { onResult ->
+                        viewModel.resetFirebaseWithDemoData(onResult)
+                    },
+                    onExportFirebaseJson = { onResult ->
+                        viewModel.exportFirebaseDataToJson(onResult)
+                    },
+                    onImportFirebaseJson = { jsonStr, onResult ->
+                        viewModel.importFirebaseDataFromJson(jsonStr, onResult)
+                    }
                 )
             }
         }
@@ -649,11 +667,13 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
     if (showAddEditHomeworkDialog) {
         AddEditHomeworkDialog(
             initialHomework = homeworkToEdit,
+            initialDateMillis = newHomeworkInitialDate,
             courses = courses,
             activeUser = currentUser,
             onDismiss = {
                 showAddEditHomeworkDialog = false
                 homeworkToEdit = null
+                newHomeworkInitialDate = null
             },
             onSave = { id, courseId, title, description, dueDateMillis, dueTimeText, priority, estimatedMinutes, assignedTo ->
                 viewModel.saveHomework(
@@ -669,6 +689,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                 )
                 showAddEditHomeworkDialog = false
                 homeworkToEdit = null
+                newHomeworkInitialDate = null
                 coroutineScope.launch {
                     snackbarHostState.showSnackbar(
                         if (id == 0L) "Ödev başarıyla eklendi" else "Ödev güncellendi"

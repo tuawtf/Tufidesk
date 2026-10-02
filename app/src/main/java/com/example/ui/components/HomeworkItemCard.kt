@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.model.HomeworkWithCourse
+import com.example.ui.HomeworkViewModel
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -318,10 +319,15 @@ fun DueDateChip(
             calNow.get(Calendar.DAY_OF_YEAR) == calDue.get(Calendar.DAY_OF_YEAR)
     calNow.add(Calendar.DAY_OF_YEAR, -1) // restore
 
-    val isOverdue = !isCompleted && dueDateMillis < now && !isSameDay
+    // Teslim tarihi her zaman o haftanın Pazar günüdür.
+    val sundayDeadlineMillis = HomeworkViewModel.getSundayOfWeek(dueDateMillis)
+    val isOverdue = HomeworkViewModel.isOverdue(dueDateMillis, isCompleted, now)
 
-    val dateFormat = SimpleDateFormat("d MMMM", Locale("tr"))
-    val dateStr = dateFormat.format(Date(dueDateMillis))
+    val dayFormat = SimpleDateFormat("EEEE", Locale("tr"))
+    val sundayDateFormat = SimpleDateFormat("d MMMM EEEE", Locale("tr"))
+
+    val targetDayName = dayFormat.format(Date(dueDateMillis))
+    val sundayDeadlineStr = sundayDateFormat.format(Date(sundayDeadlineMillis))
 
     val (chipText, chipBg, chipColor, chipIcon) = when {
         isCompleted -> Quadruple(
@@ -331,25 +337,31 @@ fun DueDateChip(
             Icons.Default.Check
         )
         isOverdue -> Quadruple(
-            "Gecikti! ($dateStr)",
+            "Gecikti! (Son Teslim: $sundayDeadlineStr)",
             MaterialTheme.colorScheme.errorContainer,
             MaterialTheme.colorScheme.onErrorContainer,
             Icons.Default.Warning
         )
         isSameDay -> Quadruple(
-            "Bugün $dueTimeText",
+            "Bugün Yapılacak • Teslim: Pazar $dueTimeText",
             MaterialTheme.colorScheme.tertiaryContainer,
             MaterialTheme.colorScheme.onTertiaryContainer,
             Icons.Default.AccessTime
         )
         isTomorrow -> Quadruple(
-            "Yarın $dueTimeText",
+            "Yarın Yapılacak • Teslim: Pazar $dueTimeText",
             MaterialTheme.colorScheme.primaryContainer,
             MaterialTheme.colorScheme.onPrimaryContainer,
             Icons.Default.AccessTime
         )
+        dueDateMillis < now && !isSameDay -> Quadruple(
+            "Hedef: $targetDayName • Teslim: Pazar $dueTimeText",
+            MaterialTheme.colorScheme.surfaceVariant,
+            MaterialTheme.colorScheme.onSurfaceVariant,
+            Icons.Default.AccessTime
+        )
         else -> Quadruple(
-            "$dateStr $dueTimeText",
+            "Planlanan: $targetDayName • Teslim: Pazar $dueTimeText",
             MaterialTheme.colorScheme.surfaceVariant,
             MaterialTheme.colorScheme.onSurfaceVariant,
             Icons.Default.AccessTime

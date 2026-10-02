@@ -89,10 +89,17 @@ import com.google.firebase.FirebaseApp
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.DeveloperMode
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.text.font.FontFamily
+import android.content.Intent
 import com.example.data.firebase.SyncState
 import com.example.data.model.UserAccount
 import com.example.ui.components.UserFlowerAvatar
@@ -131,13 +138,27 @@ fun SettingsScreen(
     onNoteGridChange: (Boolean) -> Unit = {},
     moveCheckedToBottom: Boolean = true,
     onMoveCheckedToBottomChange: (Boolean) -> Unit = {},
+    onResetFirebaseData: ((Boolean, String) -> Unit) -> Unit = {},
+    onExportFirebaseJson: ((Boolean, String) -> Unit) -> Unit = {},
+    onImportFirebaseJson: (String, (Boolean, String) -> Unit) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     var showThemeDialog by remember { mutableStateOf(false) }
     var showPaletteDialog by remember { mutableStateOf(false) }
     var versionTapCount by remember { mutableStateOf(0) }
-    var isDeveloperModeActive by rememberSaveable { mutableStateOf(false) }
+    var isDeveloperModeActive by rememberSaveable { mutableStateOf(true) }
     var showDevOptionsDialog by remember { mutableStateOf(false) }
+
+    var showResetFirebaseConfirmDialog by remember { mutableStateOf(false) }
+    var isResettingFirebase by remember { mutableStateOf(false) }
+
+    var showExportJsonDialog by remember { mutableStateOf(false) }
+    var exportedJsonText by remember { mutableStateOf("") }
+    var isExportingJson by remember { mutableStateOf(false) }
+
+    var showImportJsonDialog by remember { mutableStateOf(false) }
+    var importJsonInput by remember { mutableStateOf("") }
+    var isImportingJson by remember { mutableStateOf(false) }
 
     val paletteOptions = listOf(
         MaterialPaletteOption(
@@ -492,11 +513,13 @@ fun SettingsScreen(
             }
         }
 
-        // Section 4: Developer Options & Diagnostics (Active after 5 taps on version)
-        if (isDeveloperModeActive) {
-            item {
-                SettingsCategoryCard(title = "🛠️ Geliştirici Seçenekleri & Teşhis") {
-                    Column(modifier = Modifier.padding(14.dp)) {
+        // Section 4: Developer Options & Firebase Management
+        item {
+            SettingsCategoryCard(title = "🛠️ Geliştirici Seçenekleri & Firebase Yönetimi") {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
@@ -505,46 +528,164 @@ fun SettingsScreen(
                                 imageVector = Icons.Default.DeveloperMode,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier.size(24.dp)
                             )
                             Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = "Senkronizasyon ve Hata Teşhisi",
-                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Firebase & Geliştirici Araçları",
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Veritabanı sıfırlama, JSON dışa/içe aktarma ve bulut teşhisi",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "Bulut senkronizasyonunun neden başarısız olduğunu, Firebase bağlantısını ve hata loglarını canlı olarak inceleyin.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        // 1. Reset Firebase & Seed Demo Data
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showResetFirebaseConfirmDialog = true }
                         ) {
-                            Button(
-                                onClick = { showDevOptionsDialog = true },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.BugReport,
+                                    imageVector = Icons.Default.DeleteForever,
                                     contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(26.dp)
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Hata ve Teşhis Paneli")
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Firebase'i Sıfırla & Demo Verileri Yükle",
+                                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "Firebase'deki her şeyi siler; geçerli Pazar teslimli ödevler, dersler ve notlar demo verisini yükler.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
+                        }
+
+                        // 2. Export Firebase Data to JSON
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    isExportingJson = true
+                                    onExportFirebaseJson { success, result ->
+                                        isExportingJson = false
+                                        if (success) {
+                                            exportedJsonText = result
+                                            showExportJsonDialog = true
+                                        } else {
+                                            Toast.makeText(context, result, Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudDownload,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Firebase Verilerini Dışa Aktar (JSON)",
+                                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "Tüm ders, ödev ve not verilerini JSON formatında dışa aktarın ve paylaşın.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                if (isExportingJson) {
+                                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                }
+                            }
+                        }
+
+                        // 3. Import Firebase Data from JSON
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.25f)),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.35f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    importJsonInput = ""
+                                    showImportJsonDialog = true
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudUpload,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Firebase Verilerini İçe Aktar (JSON)",
+                                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.secondary
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "JSON yedeğini yapıştırarak Firebase'e ve uygulamaya geri yükleyin.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+
+                        // 4. Diagnostics Dialog Button
+                        OutlinedButton(
+                            onClick = { showDevOptionsDialog = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.BugReport, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Bağlantı & Senkronizasyon Teşhis Paneli", style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
             }
         }
-    }
 
     // Theme Mode Dialog
     if (showThemeDialog) {
@@ -913,6 +1054,278 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(onClick = { showDevOptionsDialog = false }) {
                     Text("Kapat")
+                }
+            }
+        )
+    }
+
+    // 1. Reset Firebase Confirmation Dialog
+    if (showResetFirebaseConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!isResettingFirebase) showResetFirebaseConfirmDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Firebase'deki Tüm Veriler Silinsin mi?",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Bu işlem buluttaki (Firestore) TÜM ödevleri, dersleri, notları ve klasörleri kalıcı olarak temizleyecektir.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Ardından uygulama için gerekli ve geçerli kurallara (haftalık Pazar teslimatlı ödevler, dersler, notlar) sahip temiz demo veriler Firebase'e yüklenecektir.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (isResettingFirebase) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Firebase temizleniyor ve demo veriler yükleniyor...", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        isResettingFirebase = true
+                        onResetFirebaseData { success, message ->
+                            isResettingFirebase = false
+                            showResetFirebaseConfirmDialog = false
+                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                        }
+                    },
+                    enabled = !isResettingFirebase,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Evet, Sıfırla ve Yükle", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showResetFirebaseConfirmDialog = false },
+                    enabled = !isResettingFirebase
+                ) {
+                    Text("İptal")
+                }
+            }
+        )
+    }
+
+    // 2. Export JSON Dialog
+    if (showExportJsonDialog) {
+        AlertDialog(
+            onDismissRequest = { showExportJsonDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.CloudDownload,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Firebase JSON Dışa Aktarma",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Firebase ve yerel veritabanındaki veriler JSON formatında hazırlandı:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color(0xFF1E1E1E),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                    ) {
+                        SelectionContainer {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(10.dp)
+                                    .verticalScroll(rememberScrollState())
+                                    .horizontalScroll(rememberScrollState())
+                            ) {
+                                Text(
+                                    text = exportedJsonText,
+                                    color = Color(0xFFF1F1F1),
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                val clip = ClipData.newPlainText("TufiDESK JSON Export", exportedJsonText)
+                                clipboard.setPrimaryClip(clip)
+                                Toast.makeText(context, "JSON panoya kopyalandı!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Kopyala", style = MaterialTheme.typography.labelSmall)
+                        }
+
+                        Button(
+                            onClick = {
+                                try {
+                                    val sendIntent = Intent().apply {
+                                        action = Intent.ACTION_SEND
+                                        putExtra(Intent.EXTRA_TEXT, exportedJsonText)
+                                        type = "application/json"
+                                    }
+                                    context.startActivity(Intent.createChooser(sendIntent, "JSON Paylaş"))
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Paylaşım başlatılamadı: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Paylaş", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showExportJsonDialog = false }) {
+                    Text("Kapat")
+                }
+            }
+        )
+    }
+
+    // 3. Import JSON Dialog
+    if (showImportJsonDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!isImportingJson) showImportJsonDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.CloudUpload,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Firebase JSON İçe Aktar",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Daha önce dışa aktarılmış veya geçerli JSON metnini aşağıya yapıştırın. Veriler Firebase Firestore'a ve yerel veritabanınıza yazılacaktır:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    OutlinedButton(
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val clipText = clipboard.primaryClip?.getItemAt(0)?.text?.toString()
+                            if (!clipText.isNullOrBlank()) {
+                                importJsonInput = clipText
+                                Toast.makeText(context, "Panodan yapıştırıldı", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Pano boş!", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.ContentPaste, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Panodan Yapıştır", style = MaterialTheme.typography.labelMedium)
+                    }
+
+                    OutlinedTextField(
+                        value = importJsonInput,
+                        onValueChange = { importJsonInput = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp),
+                        placeholder = { Text("{\"courses\": [...], \"homeworks\": [...]}") },
+                        shape = RoundedCornerShape(10.dp),
+                        textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+                    )
+
+                    if (isImportingJson) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("JSON ayrıştırılıyor ve Firebase'e yazılıyor...", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (importJsonInput.isBlank()) {
+                            Toast.makeText(context, "Lütfen geçerli bir JSON metni yapıştırın", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        isImportingJson = true
+                        onImportFirebaseJson(importJsonInput) { success, message ->
+                            isImportingJson = false
+                            if (success) {
+                                showImportJsonDialog = false
+                            }
+                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                        }
+                    },
+                    enabled = !isImportingJson && importJsonInput.isNotBlank(),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("İçe Aktar", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showImportJsonDialog = false },
+                    enabled = !isImportingJson
+                ) {
+                    Text("İptal")
                 }
             }
         )

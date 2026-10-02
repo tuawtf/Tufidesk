@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -58,6 +59,7 @@ import com.example.data.model.Course
 import com.example.data.model.Homework
 import java.text.SimpleDateFormat
 import com.example.data.model.UserAccount
+import com.example.ui.HomeworkViewModel
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -66,6 +68,7 @@ import java.util.Locale
 @Composable
 fun AddEditHomeworkDialog(
     initialHomework: Homework? = null,
+    initialDateMillis: Long? = null,
     courses: List<Course>,
     activeUser: UserAccount? = null,
     onDismiss: () -> Unit,
@@ -98,14 +101,9 @@ fun AddEditHomeworkDialog(
     }
 
     var dueDateMillis by remember {
-        mutableLongStateOf(initialHomework?.dueDateMillis ?: run {
-            val cal = Calendar.getInstance().apply {
-                add(Calendar.DAY_OF_YEAR, 1)
-                set(Calendar.HOUR_OF_DAY, 23)
-                set(Calendar.MINUTE, 59)
-            }
-            cal.timeInMillis
-        })
+        mutableLongStateOf(
+            initialHomework?.dueDateMillis ?: initialDateMillis ?: System.currentTimeMillis()
+        )
     }
 
     var dueTimeText by remember { mutableStateOf(initialHomework?.dueTimeText ?: "23:59") }
@@ -307,8 +305,13 @@ fun AddEditHomeworkDialog(
 
                 // Due Date Selector
                 Text(
-                    text = "Teslim Tarihi",
+                    text = "Ödevin Yapılacağı / Planlanan Gün *",
                     style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
+                )
+                Text(
+                    text = "Ödev takvimde ve günlük planda bu gün altında gösterilir.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(6.dp))
 
@@ -344,6 +347,53 @@ fun AddEditHomeworkDialog(
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.primary
                         )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Sunday Weekly Deadline Info Card
+                val sundayDeadlineMillis = remember(dueDateMillis) {
+                    HomeworkViewModel.getSundayOfWeek(dueDateMillis)
+                }
+                val sundayFormat = remember { SimpleDateFormat("d MMMM yyyy, EEEE", Locale("tr")) }
+                val targetDayNameFormat = remember { SimpleDateFormat("EEEE", Locale("tr")) }
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CalendarMonth,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Otomatik Hafta Sonu Teslimi (Pazar)",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Son Teslim: ${sundayFormat.format(Date(sundayDeadlineMillis))} ($dueTimeText)",
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "${targetDayNameFormat.format(Date(dueDateMillis))} günü tamamlansa bile ödev Pazar gününe kadar gecikmiş sayılmaz.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
 

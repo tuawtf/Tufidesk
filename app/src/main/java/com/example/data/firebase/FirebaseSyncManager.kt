@@ -8,7 +8,11 @@ import android.net.NetworkRequest
 import android.util.Log
 import com.example.data.model.Course
 import com.example.data.model.Homework
+import com.example.data.model.Note
+import com.example.data.model.NoteFolder
+import com.example.data.model.NoteType
 import com.example.data.repository.HomeworkRepository
+import com.example.data.repository.NotesRepository
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FirebaseFirestore
@@ -22,6 +26,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 enum class SyncState {
     IDLE,
@@ -34,7 +42,8 @@ enum class SyncState {
 class FirebaseSyncManager(
     private val context: Context,
     private val repository: HomeworkRepository,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val notesRepository: NotesRepository? = null
 ) {
     private val TAG = "FirebaseSyncManager"
 
@@ -619,5 +628,528 @@ class FirebaseSyncManager(
             _syncState.value = SyncState.ERROR
             false
         }
+    }
+
+    /**
+     * Firebase'deki tüm koleksiyonları (homeworks, courses, notes, note_folders, settings) temizler
+     * ve geçerli haftalık Pazar teslimatlı demo verilerini hem Firebase'e hem yerel Room DB'ye yükler.
+     */
+    suspend fun resetFirebaseWithDemoData(): String = withContext(Dispatchers.IO) {
+        initFirebaseIfAvailable()
+        val db = firestore
+
+        _syncState.value = SyncState.SYNCING
+
+        try {
+            if (db == null) {
+                // Firebase henüz bağlanmamış veya offline ise yerel DB'yi sıfırlayıp demo verileri yükle
+                repository.clearAllData()
+                notesRepository?.clearAll()
+                repository.seedInitialDataIfNeeded(force = true)
+                notesRepository?.seedInitialNotesIfNeeded(force = true)
+
+                val localCourses = repository.getAllCoursesList()
+                val localHomeworks = repository.getAllHomeworksList()
+                val localNotes = notesRepository?.getAllNotesList().orEmpty()
+
+                _syncState.value = SyncState.IDLE
+                return@withContext "Yerel veritabanı temizlendi ve güncel demo veriler yüklendi! (${localCourses.size} ders, ${localHomeworks.size} ödev, ${localNotes.size} not). Firebase bağlantısı aktifleştiğinde buluta aktarılacaktır."
+            }
+
+            // 1. Delete all remote documents in collections
+            val collections = listOf("courses", "homeworks", "notes", "note_folders", "settings")
+            for (colName in collections) {
+                try {
+                    val snapshot = db.collection(colName).get().await()
+                    for (doc in snapshot.documents) {
+                        try {
+                            doc.reference.delete().await()
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Error deleting doc ${doc.id} in $colName: ${e.message}")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error getting collection $colName for deletion: ${e.message}")
+                }
+            }
+
+            // 2. Clear local data and reseed demo data
+            repository.clearAllData()
+            notesRepository?.clearAll()
+
+            repository.seedInitialDataIfNeeded(force = true)
+            notesRepository?.seedInitialNotesIfNeeded(force = true)
+
+            // 3. Upload newly seeded courses to Firestore
+            val localCourses = repository.getAllCoursesList()
+            for (course in localCourses) {
+                db.collection("courses").document(course.id.toString()).set(
+                    mapOf(
+                        "id" to course.id,
+                        "name" to course.name,
+                        "teacher" to course.teacher,
+                        "colorHex" to course.colorHex,
+                        "iconName" to course.iconName,
+                        "updatedAtMillis" to System.currentTimeMillis()
+                    )
+                ).await()
+            }
+
+            // 4. Upload newly seeded homeworks to Firestore (with Sunday weekly due date)
+            val localHomeworks = repository.getAllHomeworksList()
+            for (hw in localHomeworks) {
+                db.collection("homeworks").document(hw.id.toString()).set(
+                    mapOf(
+                        "id" to hw.id,
+                        "courseId" to hw.courseId,
+                        "title" to hw.title,
+                        "description" to hw.description,
+                        "dueDateMillis" to hw.dueDateMillis,
+                        "dueTimeText" to hw.dueTimeText,
+                        "priority" to hw.priority,
+                        "isCompleted" to hw.isCompleted,
+                        "estimatedMinutes" to hw.estimatedMinutes,
+                        "createdAtMillis" to hw.createdAtMillis,
+                        "completedAtMillis" to (hw.completedAtMillis ?: 0L),
+                        "assignedTo" to hw.assignedTo,
+                        "updatedAtMillis" to hw.updatedAtMillis
+                    )
+                ).await()
+            }
+
+            // 5. Upload folders and notes
+            val localFolders = notesRepository?.getAllFoldersList().orEmpty()
+            for (f in localFolders) {
+                db.collection("note_folders").document(f.id.toString()).set(
+                    mapOf(
+                        "id" to f.id,
+                        "name" to f.name,
+                        "colorHex" to f.colorHex,
+                        "iconName" to f.iconName
+                    )
+                ).await()
+            }
+
+            val localNotes = notesRepository?.getAllNotesList().orEmpty()
+            for (n in localNotes) {
+                db.collection("notes").document(n.id.toString()).set(
+                    mapOf(
+                        "id" to n.id,
+                        "title" to n.title,
+                        "content" to n.content,
+                        "folderId" to (n.folderId ?: 0L),
+                        "colorHex" to n.colorHex,
+                        "isPinned" to n.isPinned,
+                        "isLocked" to n.isLocked,
+                        "noteType" to n.type.name,
+                        "createdAtMillis" to n.createdAtMillis,
+                        "updatedAtMillis" to n.updatedAtMillis,
+                        "assignedTo" to n.assignedTo,
+                        "drawingData" to (n.drawingData ?: ""),
+                        "reportData" to (n.reportData ?: ""),
+                        "imageUri" to (n.imageUri ?: "")
+                    )
+                ).await()
+            }
+
+            _syncState.value = SyncState.SYNCED
+            _lastSyncTime.value = System.currentTimeMillis()
+            _lastErrorMessage.value = null
+
+            "Firebase tamamen temizlendi ve güncel demo veriler başarıyla yüklendi! (${localCourses.size} ders, ${localHomeworks.size} ödev, ${localNotes.size} not)"
+        } catch (e: Exception) {
+            _syncState.value = SyncState.ERROR
+            _lastErrorMessage.value = e.localizedMessage ?: e.message
+            throw e
+        }
+    }
+
+    /**
+     * Firebase ve yerel veritabanındaki tüm dersleri, ödevleri ve notları JSON formatında dışa aktarır.
+     */
+    suspend fun exportAllDataToJson(): String = withContext(Dispatchers.IO) {
+        val rootJson = org.json.JSONObject()
+        rootJson.put("exportDate", SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()))
+        rootJson.put("appName", "TufiDESK")
+        rootJson.put("version", 1)
+
+        val db = firestore
+        val coursesArray = org.json.JSONArray()
+        val homeworksArray = org.json.JSONArray()
+        val foldersArray = org.json.JSONArray()
+        val notesArray = org.json.JSONArray()
+
+        if (db != null) {
+            try {
+                val coursesDocs = db.collection("courses").get().await().documents
+                for (doc in coursesDocs) {
+                    val obj = org.json.JSONObject()
+                    doc.data?.forEach { (k, v) -> obj.put(k, v) }
+                    if (!obj.has("id")) obj.put("id", doc.id.toLongOrNull() ?: 0L)
+                    coursesArray.put(obj)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Export: remote courses fetch failed, fallback to local: ${e.message}")
+            }
+
+            try {
+                val hwDocs = db.collection("homeworks").get().await().documents
+                for (doc in hwDocs) {
+                    val obj = org.json.JSONObject()
+                    doc.data?.forEach { (k, v) -> obj.put(k, v) }
+                    if (!obj.has("id")) obj.put("id", doc.id.toLongOrNull() ?: 0L)
+                    homeworksArray.put(obj)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Export: remote homeworks fetch failed, fallback to local: ${e.message}")
+            }
+
+            try {
+                val folderDocs = db.collection("note_folders").get().await().documents
+                for (doc in folderDocs) {
+                    val obj = org.json.JSONObject()
+                    doc.data?.forEach { (k, v) -> obj.put(k, v) }
+                    foldersArray.put(obj)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Export: remote folders fetch failed: ${e.message}")
+            }
+
+            try {
+                val noteDocs = db.collection("notes").get().await().documents
+                for (doc in noteDocs) {
+                    val obj = org.json.JSONObject()
+                    doc.data?.forEach { (k, v) -> obj.put(k, v) }
+                    notesArray.put(obj)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Export: remote notes fetch failed: ${e.message}")
+            }
+        }
+
+        // If remote was empty or unavailable, fallback to local
+        if (coursesArray.length() == 0) {
+            val localCourses = repository.getAllCoursesList()
+            for (c in localCourses) {
+                coursesArray.put(org.json.JSONObject().apply {
+                    put("id", c.id)
+                    put("name", c.name)
+                    put("teacher", c.teacher)
+                    put("colorHex", c.colorHex)
+                    put("iconName", c.iconName)
+                })
+            }
+        }
+
+        if (homeworksArray.length() == 0) {
+            val localHws = repository.getAllHomeworksList()
+            for (h in localHws) {
+                homeworksArray.put(org.json.JSONObject().apply {
+                    put("id", h.id)
+                    put("courseId", h.courseId)
+                    put("title", h.title)
+                    put("description", h.description)
+                    put("dueDateMillis", h.dueDateMillis)
+                    put("dueTimeText", h.dueTimeText)
+                    put("priority", h.priority)
+                    put("isCompleted", h.isCompleted)
+                    put("estimatedMinutes", h.estimatedMinutes)
+                    put("assignedTo", h.assignedTo)
+                    put("createdAtMillis", h.createdAtMillis)
+                    put("completedAtMillis", h.completedAtMillis ?: 0L)
+                    put("updatedAtMillis", h.updatedAtMillis)
+                })
+            }
+        }
+
+        if (foldersArray.length() == 0) {
+            val localFolders = notesRepository?.getAllFoldersList().orEmpty()
+            for (f in localFolders) {
+                foldersArray.put(org.json.JSONObject().apply {
+                    put("id", f.id)
+                    put("name", f.name)
+                    put("colorHex", f.colorHex)
+                    put("iconName", f.iconName)
+                })
+            }
+        }
+
+        if (notesArray.length() == 0) {
+            val localNotes = notesRepository?.getAllNotesList().orEmpty()
+            for (n in localNotes) {
+                notesArray.put(org.json.JSONObject().apply {
+                    put("id", n.id)
+                    put("title", n.title)
+                    put("content", n.content)
+                    put("folderId", n.folderId ?: 0L)
+                    put("colorHex", n.colorHex)
+                    put("isPinned", n.isPinned)
+                    put("isLocked", n.isLocked)
+                    put("noteType", n.type.name)
+                    put("assignedTo", n.assignedTo)
+                    put("createdAtMillis", n.createdAtMillis)
+                    put("updatedAtMillis", n.updatedAtMillis)
+                    put("drawingData", n.drawingData ?: "")
+                    put("reportData", n.reportData ?: "")
+                    put("imageUri", n.imageUri ?: "")
+                })
+            }
+        }
+
+        rootJson.put("courses", coursesArray)
+        rootJson.put("homeworks", homeworksArray)
+        rootJson.put("note_folders", foldersArray)
+        rootJson.put("notes", notesArray)
+
+        rootJson.toString(2)
+    }
+
+    /**
+     * Dışarıdan sağlanan JSON verisini ayrıştırıp hem Firestore'a hem yerel veritabanına yazar.
+     */
+    suspend fun importDataFromJson(jsonString: String): String = withContext(Dispatchers.IO) {
+        val cleanJson = jsonString.trim()
+            .removePrefix("```json")
+            .removePrefix("```JSON")
+            .removePrefix("```")
+            .removeSuffix("```")
+            .trim()
+
+        initFirebaseIfAvailable()
+        val db = firestore
+
+        var importedCourses = 0
+        var importedHws = 0
+        var importedFolders = 0
+        var importedNotes = 0
+
+        if (cleanJson.startsWith("[")) {
+            // Direct homework array import
+            val hwsArray = org.json.JSONArray(cleanJson)
+            for (i in 0 until hwsArray.length()) {
+                val obj = hwsArray.getJSONObject(i)
+                val id = obj.optLong("id", System.currentTimeMillis() + i)
+                val courseId = obj.optLong("courseId", 1L)
+                val title = obj.optString("title", "Ödev")
+                val description = obj.optString("description", "")
+                val dueDateMillis = obj.optLong("dueDateMillis", System.currentTimeMillis())
+                val dueTimeText = obj.optString("dueTimeText", "23:59")
+                val priority = obj.optString("priority", "MEDIUM")
+                val isCompleted = obj.optBoolean("isCompleted", false)
+                val estimatedMinutes = obj.optInt("estimatedMinutes", 30)
+                val assignedTo = obj.optString("assignedTo", "Tuna")
+                val createdAtMillis = obj.optLong("createdAtMillis", System.currentTimeMillis())
+                val completedAtMillis = if (obj.has("completedAtMillis") && !obj.isNull("completedAtMillis")) obj.optLong("completedAtMillis").takeIf { it > 0 } else null
+                val updatedAtMillis = obj.optLong("updatedAtMillis", System.currentTimeMillis())
+
+                val hw = Homework(
+                    id = id,
+                    courseId = courseId,
+                    title = title,
+                    description = description,
+                    dueDateMillis = dueDateMillis,
+                    dueTimeText = dueTimeText,
+                    priority = priority,
+                    isCompleted = isCompleted,
+                    estimatedMinutes = estimatedMinutes,
+                    createdAtMillis = createdAtMillis,
+                    completedAtMillis = completedAtMillis,
+                    assignedTo = assignedTo,
+                    updatedAtMillis = updatedAtMillis
+                )
+                repository.insertHomework(hw)
+
+                db?.collection("homeworks")?.document(id.toString())?.set(
+                    mapOf(
+                        "id" to id,
+                        "courseId" to courseId,
+                        "title" to title,
+                        "description" to description,
+                        "dueDateMillis" to dueDateMillis,
+                        "dueTimeText" to dueTimeText,
+                        "priority" to priority,
+                        "isCompleted" to isCompleted,
+                        "estimatedMinutes" to estimatedMinutes,
+                        "createdAtMillis" to createdAtMillis,
+                        "completedAtMillis" to (completedAtMillis ?: 0L),
+                        "assignedTo" to assignedTo,
+                        "updatedAtMillis" to updatedAtMillis
+                    )
+                )?.await()
+                importedHws++
+            }
+            return@withContext "JSON dizisi başarıyla içe aktarıldı! ($importedHws ödev yüklendi)"
+        }
+
+        val root = org.json.JSONObject(cleanJson)
+
+        // 1. Courses
+        if (root.has("courses")) {
+            val coursesArray = root.getJSONArray("courses")
+            for (i in 0 until coursesArray.length()) {
+                val obj = coursesArray.getJSONObject(i)
+                val id = obj.optLong("id", System.currentTimeMillis() + i)
+                val name = obj.optString("name", "Ders $id")
+                val teacher = obj.optString("teacher", "")
+                val colorHex = obj.optString("colorHex", "#3B82F6")
+                val iconName = obj.optString("iconName", "MenuBook")
+
+                val course = Course(id = id, name = name, teacher = teacher, colorHex = colorHex, iconName = iconName)
+                repository.insertCourse(course)
+
+                db?.collection("courses")?.document(id.toString())?.set(
+                    mapOf(
+                        "id" to id,
+                        "name" to name,
+                        "teacher" to teacher,
+                        "colorHex" to colorHex,
+                        "iconName" to iconName,
+                        "updatedAtMillis" to System.currentTimeMillis()
+                    )
+                )?.await()
+                importedCourses++
+            }
+        }
+
+        // 2. Folders
+        if (root.has("note_folders")) {
+            val foldersArray = root.getJSONArray("note_folders")
+            for (i in 0 until foldersArray.length()) {
+                val obj = foldersArray.getJSONObject(i)
+                val id = obj.optLong("id", System.currentTimeMillis() + i)
+                val name = obj.optString("name", "Klasör")
+                val colorHex = obj.optString("colorHex", "#1E88E5")
+                val iconName = obj.optString("iconName", "Folder")
+
+                val folder = NoteFolder(id = id, name = name, colorHex = colorHex, iconName = iconName)
+                notesRepository?.insertFolder(folder)
+
+                db?.collection("note_folders")?.document(id.toString())?.set(
+                    mapOf("id" to id, "name" to name, "colorHex" to colorHex, "iconName" to iconName)
+                )?.await()
+                importedFolders++
+            }
+        }
+
+        // 3. Homeworks
+        if (root.has("homeworks")) {
+            val hwsArray = root.getJSONArray("homeworks")
+            for (i in 0 until hwsArray.length()) {
+                val obj = hwsArray.getJSONObject(i)
+                val id = obj.optLong("id", System.currentTimeMillis() + i)
+                val courseId = obj.optLong("courseId", 1L)
+                val title = obj.optString("title", "Ödev")
+                val description = obj.optString("description", "")
+                val dueDateMillis = obj.optLong("dueDateMillis", System.currentTimeMillis())
+                val dueTimeText = obj.optString("dueTimeText", "23:59")
+                val priority = obj.optString("priority", "MEDIUM")
+                val isCompleted = obj.optBoolean("isCompleted", false)
+                val estimatedMinutes = obj.optInt("estimatedMinutes", 30)
+                val assignedTo = obj.optString("assignedTo", "Tuna")
+                val createdAtMillis = obj.optLong("createdAtMillis", System.currentTimeMillis())
+                val completedAtMillis = if (obj.has("completedAtMillis") && !obj.isNull("completedAtMillis")) obj.optLong("completedAtMillis").takeIf { it > 0 } else null
+                val updatedAtMillis = obj.optLong("updatedAtMillis", System.currentTimeMillis())
+
+                val hw = Homework(
+                    id = id,
+                    courseId = courseId,
+                    title = title,
+                    description = description,
+                    dueDateMillis = dueDateMillis,
+                    dueTimeText = dueTimeText,
+                    priority = priority,
+                    isCompleted = isCompleted,
+                    estimatedMinutes = estimatedMinutes,
+                    createdAtMillis = createdAtMillis,
+                    completedAtMillis = completedAtMillis,
+                    assignedTo = assignedTo,
+                    updatedAtMillis = updatedAtMillis
+                )
+                repository.insertHomework(hw)
+
+                db?.collection("homeworks")?.document(id.toString())?.set(
+                    mapOf(
+                        "id" to id,
+                        "courseId" to courseId,
+                        "title" to title,
+                        "description" to description,
+                        "dueDateMillis" to dueDateMillis,
+                        "dueTimeText" to dueTimeText,
+                        "priority" to priority,
+                        "isCompleted" to isCompleted,
+                        "estimatedMinutes" to estimatedMinutes,
+                        "createdAtMillis" to createdAtMillis,
+                        "completedAtMillis" to (completedAtMillis ?: 0L),
+                        "assignedTo" to assignedTo,
+                        "updatedAtMillis" to updatedAtMillis
+                    )
+                )?.await()
+                importedHws++
+            }
+        }
+
+        // 4. Notes
+        if (root.has("notes")) {
+            val notesArray = root.getJSONArray("notes")
+            for (i in 0 until notesArray.length()) {
+                val obj = notesArray.getJSONObject(i)
+                val id = obj.optLong("id", System.currentTimeMillis() + i)
+                val title = obj.optString("title", "Not")
+                val content = obj.optString("content", "")
+                val folderId = if (obj.has("folderId") && !obj.isNull("folderId")) obj.optLong("folderId").takeIf { it > 0 } else null
+                val colorHex = obj.optString("colorHex", "#FFF9C4")
+                val isPinned = obj.optBoolean("isPinned", false)
+                val isLocked = obj.optBoolean("isLocked", false)
+                val noteTypeName = obj.optString("noteType", "TEXT")
+                val nType = try { NoteType.valueOf(noteTypeName) } catch (_: Exception) { NoteType.TEXT }
+                val assignedTo = obj.optString("assignedTo", "Tuna")
+                val createdAtMillis = obj.optLong("createdAtMillis", System.currentTimeMillis())
+                val updatedAtMillis = obj.optLong("updatedAtMillis", System.currentTimeMillis())
+
+                val drawingData = obj.optString("drawingData", "").takeIf { it.isNotBlank() }
+                val reportData = obj.optString("reportData", "").takeIf { it.isNotBlank() }
+                val imageUri = obj.optString("imageUri", "").takeIf { it.isNotBlank() }
+
+                val note = Note(
+                    id = id,
+                    title = title,
+                    content = content,
+                    folderId = folderId,
+                    colorHex = colorHex,
+                    isPinned = isPinned,
+                    isLocked = isLocked,
+                    type = nType,
+                    createdAtMillis = createdAtMillis,
+                    updatedAtMillis = updatedAtMillis,
+                    assignedTo = assignedTo,
+                    drawingData = drawingData,
+                    reportData = reportData,
+                    imageUri = imageUri
+                )
+                notesRepository?.insertNote(note)
+
+                db?.collection("notes")?.document(id.toString())?.set(
+                    mapOf(
+                        "id" to id,
+                        "title" to title,
+                        "content" to content,
+                        "folderId" to (folderId ?: 0L),
+                        "colorHex" to colorHex,
+                        "isPinned" to isPinned,
+                        "isLocked" to isLocked,
+                        "noteType" to nType.name,
+                        "assignedTo" to assignedTo,
+                        "createdAtMillis" to createdAtMillis,
+                        "updatedAtMillis" to updatedAtMillis,
+                        "drawingData" to (drawingData ?: ""),
+                        "reportData" to (reportData ?: ""),
+                        "imageUri" to (imageUri ?: "")
+                    )
+                )?.await()
+                importedNotes++
+            }
+        }
+
+        "JSON başarıyla içe aktarıldı! ($importedCourses ders, $importedHws ödev, $importedFolders klasör, $importedNotes not)"
     }
 }

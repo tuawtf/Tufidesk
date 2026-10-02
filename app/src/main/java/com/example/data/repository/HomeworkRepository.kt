@@ -60,6 +60,14 @@ class HomeworkRepository(
         courseDao.deleteAllCourses()
     }
 
+    suspend fun getAllHomeworksList(): List<Homework> = withContext(Dispatchers.IO) {
+        homeworkDao.getAllHomeworksList()
+    }
+
+    suspend fun getAllCoursesList(): List<Course> = withContext(Dispatchers.IO) {
+        courseDao.getAllCoursesList()
+    }
+
     suspend fun resetToDemoData() = withContext(Dispatchers.IO) {
         clearAllData()
         seedDemoWeeklyData()

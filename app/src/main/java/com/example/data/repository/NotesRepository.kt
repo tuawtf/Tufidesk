@@ -39,8 +39,24 @@ class NotesRepository(
         noteDao.deleteFolder(folder)
     }
 
-    suspend fun seedInitialNotesIfNeeded() = withContext(Dispatchers.IO) {
-        if (noteDao.getNotesCount() == 0) {
+    suspend fun getAllNotesList(): List<Note> = withContext(Dispatchers.IO) {
+        noteDao.getAllNotesList()
+    }
+
+    suspend fun getAllFoldersList(): List<NoteFolder> = withContext(Dispatchers.IO) {
+        noteDao.getAllFoldersList()
+    }
+
+    suspend fun clearAll() = withContext(Dispatchers.IO) {
+        noteDao.deleteAllNotes()
+        noteDao.deleteAllFolders()
+    }
+
+    suspend fun seedInitialNotesIfNeeded(force: Boolean = false) = withContext(Dispatchers.IO) {
+        if (force) {
+            clearAll()
+        }
+        if (force || noteDao.getNotesCount() == 0) {
             val mathFolderId = noteDao.insertFolder(
                 NoteFolder(name = "Matematik", colorHex = "#1E88E5", iconName = "Calculate")
             )

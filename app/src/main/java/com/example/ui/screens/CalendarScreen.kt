@@ -431,6 +431,7 @@ fun MonthCalendarCard(
                                 homeworks.filter { it.homework.dueDateMillis in s..e }
                             }
                             val hwCount = dayHws.size
+                            val hasOverdue = dayHws.any { HomeworkViewModel.isOverdue(it.homework.dueDateMillis, it.homework.isCompleted) }
                             val hasPending = dayHws.any { !it.homework.isCompleted }
                             val isSelected = day.millis == selectedDayStart
 
@@ -439,6 +440,7 @@ fun MonthCalendarCard(
                                 isSelected = isSelected,
                                 homeworkCount = hwCount,
                                 hasPending = hasPending,
+                                hasOverdue = hasOverdue,
                                 modifier = Modifier
                                     .weight(1f)
                                     .aspectRatio(1f),
@@ -460,6 +462,7 @@ fun MonthDayCell(
     isSelected: Boolean,
     homeworkCount: Int,
     hasPending: Boolean,
+    hasOverdue: Boolean = false,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -510,7 +513,8 @@ fun MonthDayCell(
                         .background(
                             when {
                                 isSelected -> MaterialTheme.colorScheme.onPrimary
-                                hasPending -> MaterialTheme.colorScheme.error
+                                hasOverdue -> MaterialTheme.colorScheme.error
+                                hasPending -> MaterialTheme.colorScheme.primary
                                 else -> MaterialTheme.colorScheme.secondary
                             }
                         )
@@ -724,18 +728,27 @@ fun DayHomeworkCard(
                         )
                     }
 
-                    if (hw.assignedTo.isNotBlank()) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
-                        ) {
-                            Text(
-                                text = hw.assignedTo,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
+                    val isOverdue = HomeworkViewModel.isOverdue(hw.dueDateMillis, hw.isCompleted)
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (isOverdue) {
+                            MaterialTheme.colorScheme.errorContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
                         }
+                    ) {
+                        Text(
+                            text = if (isOverdue) "⚠️ Pazar Teslimi Gecikti" else "📅 Teslim: Pazar",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = if (isOverdue) FontWeight.Bold else FontWeight.Normal
+                            ),
+                            color = if (isOverdue) {
+                                MaterialTheme.colorScheme.onErrorContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
                     }
                 }
 

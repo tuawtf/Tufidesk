@@ -443,13 +443,15 @@ class HomeworkViewModel(
                 }
             }
             TimeFilter.THIS_WEEK -> {
+                val startOfWeek = getMondayOfWeek(now)
+                val endOfWeek = getSundayOfWeek(now)
                 list = list.filter {
-                    it.homework.dueDateMillis in startOfToday..endOfWeek
+                    it.homework.dueDateMillis in startOfWeek..endOfWeek
                 }
             }
             TimeFilter.OVERDUE -> {
                 list = list.filter {
-                    !it.homework.isCompleted && it.homework.dueDateMillis < startOfToday
+                    isOverdue(it.homework.dueDateMillis, it.homework.isCompleted, now)
                 }
             }
             TimeFilter.ALL -> {}
@@ -538,7 +540,7 @@ class HomeworkViewModel(
             !it.homework.isCompleted && it.homework.dueDateMillis in startOfToday..endOfToday
         }
         val overdue = scopedList.count {
-            !it.homework.isCompleted && it.homework.dueDateMillis < startOfToday
+            isOverdue(it.homework.dueDateMillis, it.homework.isCompleted, now)
         }
         val percentage = if (total > 0) (completed * 100) / total else 0
         val totalMinutes = scopedList.filter { !it.homework.isCompleted }.sumOf { it.homework.estimatedMinutes }
@@ -614,6 +616,39 @@ class HomeworkViewModel(
         viewModelScope.launch {
             repository.deleteHomework(homework)
             syncManager.deleteHomeworkFromCloud(homework.id)
+        }
+    }
+
+    fun resetFirebaseWithDemoData(onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val msg = syncManager.resetFirebaseWithDemoData()
+                onResult(true, msg)
+            } catch (e: Exception) {
+                onResult(false, e.localizedMessage ?: "Sıfırlama başarısız: ${e.message}")
+            }
+        }
+    }
+
+    fun exportFirebaseDataToJson(onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val json = syncManager.exportAllDataToJson()
+                onResult(true, json)
+            } catch (e: Exception) {
+                onResult(false, e.localizedMessage ?: "Dışa aktarma başarısız: ${e.message}")
+            }
+        }
+    }
+
+    fun importFirebaseDataFromJson(jsonString: String, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val msg = syncManager.importDataFromJson(jsonString)
+                onResult(true, msg)
+            } catch (e: Exception) {
+                onResult(false, e.localizedMessage ?: "İçe aktarma hatası: ${e.message}")
+            }
         }
     }
 
@@ -729,16 +764,50 @@ class HomeworkViewModel(
             return cal.timeInMillis
         }
 
-        fun getEndOfWeek(millis: Long): Long {
+        fun getMondayOfWeek(millis: Long): Long {
             val cal = Calendar.getInstance().apply {
                 timeInMillis = millis
-                add(Calendar.DAY_OF_YEAR, 7)
+                val dayOfWeek = get(Calendar.DAY_OF_WEEK)
+                val daysFromMonday = if (dayOfWeek == Calendar.SUNDAY) 6 else (dayOfWeek - Calendar.MONDAY)
+                add(Calendar.DAY_OF_YEAR, -daysFromMonday)
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            return cal.timeInMillis
+        }
+
+        /**
+         * O haftanın Pazar günü 23:59:59.999 zamanını döner.
+         * Teslim tarihi her zaman o haftanın Pazar günüdür.
+         */
+        fun getSundayOfWeek(millis: Long): Long {
+            val cal = Calendar.getInstance().apply {
+                timeInMillis = millis
+                val dayOfWeek = get(Calendar.DAY_OF_WEEK)
+                val daysUntilSunday = if (dayOfWeek == Calendar.SUNDAY) 0 else (Calendar.SATURDAY - dayOfWeek + 1)
+                add(Calendar.DAY_OF_YEAR, daysUntilSunday)
                 set(Calendar.HOUR_OF_DAY, 23)
                 set(Calendar.MINUTE, 59)
                 set(Calendar.SECOND, 59)
                 set(Calendar.MILLISECOND, 999)
             }
             return cal.timeInMillis
+        }
+
+        fun getEndOfWeek(millis: Long): Long {
+            return getSundayOfWeek(millis)
+        }
+
+        /**
+         * Bir ödev ancak o haftanın Pazar günü (23:59:59) bittiğinde ve tamamlanmamışsa gecikmiş sayılır.
+         * Gün bitti diye (örn. Çarşamba bittiğinde) gecikmiş olmaz.
+         */
+        fun isOverdue(dueDateMillis: Long, isCompleted: Boolean, now: Long = System.currentTimeMillis()): Boolean {
+            if (isCompleted) return false
+            val sundayDeadline = getSundayOfWeek(dueDateMillis)
+            return now > sundayDeadline
         }
     }
 }

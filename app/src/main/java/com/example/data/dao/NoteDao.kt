@@ -48,6 +48,12 @@ interface NoteDao {
     @Query("SELECT COUNT(*) FROM notes")
     suspend fun getNotesCount(): Int
 
+    @Query("SELECT * FROM notes")
+    suspend fun getAllNotesList(): List<Note>
+
+    @Query("SELECT * FROM note_folders")
+    suspend fun getAllFoldersList(): List<NoteFolder>
+
     @Query("DELETE FROM notes")
     suspend fun deleteAllNotes()
 
