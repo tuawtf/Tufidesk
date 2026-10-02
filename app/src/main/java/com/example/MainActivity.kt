@@ -75,6 +75,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.auth.AuthManager
@@ -90,6 +92,9 @@ import com.example.ui.HomeworkViewModel
 import com.example.ui.HomeworkViewModelFactory
 import com.example.ui.components.AddCourseDialog
 import com.example.ui.components.AddEditHomeworkDialog
+import com.example.ui.components.DynamicIslandController
+import com.example.ui.components.DynamicIslandOverlay
+import com.example.ui.components.IslandNotificationType
 import com.example.ui.screens.CalendarScreen
 import com.example.ui.screens.CoursesScreen
 import com.example.ui.screens.HomeScreen
@@ -157,6 +162,21 @@ class MainActivity : ComponentActivity() {
 fun HomeworkApp(viewModel: HomeworkViewModel) {
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val islandController = remember { DynamicIslandController() }
+    val context = LocalContext.current
+    val localView = LocalView.current
+
+    val showNotification: (String, IslandNotificationType, String?) -> Unit = { msg, type, title ->
+        islandController.show(
+            message = msg,
+            title = title,
+            type = type,
+            durationMillis = 2200L,
+            scope = coroutineScope,
+            context = context,
+            view = localView
+        )
+    }
 
     val filteredHomeworks by viewModel.filteredHomeworks.collectAsStateWithLifecycle()
     val allHomeworks by viewModel.allHomeworks.collectAsStateWithLifecycle()
@@ -267,10 +287,9 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     onSortChange = { viewModel.setSort(it) },
                     onToggleComplete = { hw ->
                         viewModel.toggleCompletion(hw)
-                        coroutineScope.launch {
-                            val msg = if (!hw.isCompleted) "Tebrikler! Ödev tamamlandı 🎉" else "Ödev bekleyenlere alındı"
-                            snackbarHostState.showSnackbar(msg)
-                        }
+                        val msg = if (!hw.isCompleted) "Tebrikler! Ödev tamamlandı 🎉" else "Ödev bekleyenlere alındı"
+                        val type = if (!hw.isCompleted) IslandNotificationType.SUCCESS else IslandNotificationType.INFO
+                        showNotification(msg, type, "Ödev")
                     },
                     onEditHomework = { hw ->
                         homeworkToEdit = hw
@@ -278,9 +297,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     },
                     onDeleteHomework = { hw ->
                         viewModel.deleteHomework(hw)
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Örnek silindi")
-                        }
+                        showNotification("Ödev silindi", IslandNotificationType.WARNING, "Silindi")
                     },
                     canManage = canManage,
                     hideCompletedInSettings = hideCompleted,
@@ -295,10 +312,9 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     onSelectDate = { viewModel.setSelectedCalendarDate(it) },
                     onToggleComplete = { hw ->
                         viewModel.toggleCompletion(hw)
-                        coroutineScope.launch {
-                            val msg = if (!hw.isCompleted) "Tebrikler! Ödev tamamlandı 🎉" else "Ödev bekleyenlere alındı"
-                            snackbarHostState.showSnackbar(msg)
-                        }
+                        val msg = if (!hw.isCompleted) "Tebrikler! Ödev tamamlandı 🎉" else "Ödev bekleyenlere alındı"
+                        val type = if (!hw.isCompleted) IslandNotificationType.SUCCESS else IslandNotificationType.INFO
+                        showNotification(msg, type, "Ödev")
                     },
                     onEditHomework = { hw ->
                         homeworkToEdit = hw
@@ -306,9 +322,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     },
                     onDeleteHomework = { hw ->
                         viewModel.deleteHomework(hw)
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Ödev silindi")
-                        }
+                        showNotification("Ödev silindi", IslandNotificationType.WARNING, "Silindi")
                     },
                     onAddNewHomeworkForDate = { dateMillis ->
                         homeworkToEdit = null
@@ -325,10 +339,9 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     homeworks = userHomeworks,
                     onToggleComplete = { hw ->
                         viewModel.toggleCompletion(hw)
-                        coroutineScope.launch {
-                            val msg = if (!hw.isCompleted) "Tebrikler! Ödev tamamlandı 🎉" else "Ödev bekleyenlere alındı"
-                            snackbarHostState.showSnackbar(msg)
-                        }
+                        val msg = if (!hw.isCompleted) "Tebrikler! Ödev tamamlandı 🎉" else "Ödev bekleyenlere alındı"
+                        val type = if (!hw.isCompleted) IslandNotificationType.SUCCESS else IslandNotificationType.INFO
+                        showNotification(msg, type, "Ödev")
                     }
                 )
 
@@ -341,42 +354,30 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     onSearchQueryChange = { viewModel.setNoteSearchQuery(it) },
                     onInsertNote = { note ->
                         viewModel.insertNote(note)
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Not kaydedildi 📝")
-                        }
+                        showNotification("Not kaydedildi 📝", IslandNotificationType.SUCCESS, "Google Notlar")
                     },
                     onUpdateNote = { note ->
                         viewModel.updateNote(note)
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Not güncellendi")
-                        }
+                        showNotification("Not güncellendi", IslandNotificationType.SUCCESS, "Google Notlar")
                     },
                     onDeleteNote = { note ->
                         viewModel.deleteNote(note)
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Not silindi")
-                        }
+                        showNotification("Not silindi", IslandNotificationType.WARNING, "Google Notlar")
                     },
                     onTogglePin = { note ->
                         viewModel.toggleNotePin(note)
                     },
                     onCreateFolder = { name, colorHex ->
                         viewModel.insertFolder(name, colorHex)
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("'$name' klasörü oluşturuldu 📁")
-                        }
+                        showNotification("'$name' klasörü oluşturuldu 📁", IslandNotificationType.SUCCESS, "Klasör")
                     },
                     onUpdateFolder = { folder ->
                         viewModel.updateFolder(folder)
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Klasör güncellendi 📁")
-                        }
+                        showNotification("Klasör güncellendi 📁", IslandNotificationType.SUCCESS, "Klasör")
                     },
                     onDeleteFolder = { folder ->
                         viewModel.deleteFolder(folder)
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Klasör silindi")
-                        }
+                        showNotification("Klasör silindi", IslandNotificationType.WARNING, "Klasör")
                     },
                     canManage = canManage,
                     currentUser = currentUser,
@@ -398,15 +399,11 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     onHideCompletedChange = { viewModel.setHideCompleted(it) },
                     onResetDemoData = {
                         viewModel.resetToDemoData()
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Örnek veriler başarıyla yüklendi")
-                        }
+                        showNotification("Örnek veriler başarıyla yüklendi", IslandNotificationType.SUCCESS, "Veriler")
                     },
                     onClearAllData = {
                         viewModel.clearAllData()
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Tüm veriler temizlendi")
-                        }
+                        showNotification("Tüm veriler temizlendi", IslandNotificationType.WARNING, "Veriler")
                     },
                     currentUser = currentUser,
                     isOnline = isOnline,
@@ -414,14 +411,12 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     syncErrorMessage = syncErrorMessage,
                     onManualSync = {
                         viewModel.syncCloudNow()
-                        coroutineScope.launch {
-                            if (!isOnline) {
-                                snackbarHostState.showSnackbar("İnternet bağlantısı yok. Veriler cihazda güvende!")
-                            } else if (syncState == SyncState.ERROR && syncErrorMessage != null) {
-                                snackbarHostState.showSnackbar("Hata: $syncErrorMessage")
-                            } else {
-                                snackbarHostState.showSnackbar("Bulut senkronizasyonu başlatıldı...")
-                            }
+                        if (!isOnline) {
+                            showNotification("İnternet bağlantısı yok. Veriler cihazda güvende!", IslandNotificationType.WARNING, "Bağlantı")
+                        } else if (syncState == SyncState.ERROR && syncErrorMessage != null) {
+                            showNotification("Hata: $syncErrorMessage", IslandNotificationType.ERROR, "Senkronizasyon")
+                        } else {
+                            showNotification("Bulut senkronizasyonu başlatıldı...", IslandNotificationType.INFO, "Senkronizasyon")
                         }
                     },
                     onLogout = {
@@ -477,12 +472,10 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                         syncState = syncState,
                         onSyncClick = {
                             viewModel.syncCloudNow()
-                            coroutineScope.launch {
-                                if (isOnline) {
-                                    snackbarHostState.showSnackbar("Bulut senkronizasyonu başlatıldı...")
-                                } else {
-                                    snackbarHostState.showSnackbar("Çevrimdışı mod: İnternet bağlantısı bekleniyor")
-                                }
+                            if (isOnline) {
+                                showNotification("Bulut senkronizasyonu başlatıldı...", IslandNotificationType.INFO, "Senkronizasyon")
+                            } else {
+                                showNotification("Çevrimdışı mod: İnternet bağlantısı bekleniyor", IslandNotificationType.WARNING, "Bağlantı")
                             }
                         },
                         onLogoutClick = {
@@ -498,7 +491,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                         modifier = Modifier
                             .fillMaxHeight()
                             .weight(1f),
-                        snackbarHost = { SnackbarHost(snackbarHostState) },
+                        snackbarHost = {},
                         topBar = {
                             TopAppBar(
                                 title = {
@@ -519,14 +512,12 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
 
                                     IconButton(onClick = {
                                         viewModel.syncCloudNow()
-                                        coroutineScope.launch {
-                                            if (!isOnline) {
-                                                snackbarHostState.showSnackbar("Çevrimdışı mod: İnternet bağlantısı bekleniyor")
-                                            } else if (syncState == SyncState.ERROR && syncErrorMessage != null) {
-                                                snackbarHostState.showSnackbar("Hata: $syncErrorMessage")
-                                            } else {
-                                                snackbarHostState.showSnackbar("Bulut senkronizasyonu başlatıldı...")
-                                            }
+                                        if (!isOnline) {
+                                            showNotification("Çevrimdışı mod: İnternet bağlantısı bekleniyor", IslandNotificationType.WARNING, "Bağlantı")
+                                        } else if (syncState == SyncState.ERROR && syncErrorMessage != null) {
+                                            showNotification("Hata: $syncErrorMessage", IslandNotificationType.ERROR, "Senkronizasyon")
+                                        } else {
+                                            showNotification("Bulut senkronizasyonu başlatıldı...", IslandNotificationType.INFO, "Senkronizasyon")
                                         }
                                     }) {
                                         val syncIcon = when {
@@ -565,7 +556,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
                 contentWindowInsets = WindowInsets.safeDrawing,
-                snackbarHost = { SnackbarHost(snackbarHostState) },
+                snackbarHost = {},
                 topBar = {
                     TopAppBar(
                         title = {
@@ -586,19 +577,15 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
 
                             // Cloud Sync status icon button
                             IconButton(onClick = {
-                                coroutineScope.launch {
-                                    if (!isOnline) {
-                                        snackbarHostState.showSnackbar("İnternet bağlantısı yok! Eşitleme başarısız ❌")
-                                    } else {
-                                        snackbarHostState.showSnackbar("Bulut senkronizasyonu başlatıldı...")
-                                        viewModel.syncCloudNow { success ->
-                                            coroutineScope.launch {
-                                                if (success) {
-                                                    snackbarHostState.showSnackbar("Bulut senkronizasyonu başarıyla tamamlandı ✅")
-                                                } else {
-                                                    snackbarHostState.showSnackbar("Bulut senkronizasyonu başarısız ❌")
-                                                }
-                                            }
+                                if (!isOnline) {
+                                    showNotification("İnternet bağlantısı yok! Eşitleme başarısız ❌", IslandNotificationType.ERROR, "Bağlantı")
+                                } else {
+                                    showNotification("Bulut senkronizasyonu başlatıldı...", IslandNotificationType.INFO, "Senkronizasyon")
+                                    viewModel.syncCloudNow { success ->
+                                        if (success) {
+                                            showNotification("Bulut senkronizasyonu başarıyla tamamlandı ✅", IslandNotificationType.SUCCESS, "Senkronizasyon")
+                                        } else {
+                                            showNotification("Bulut senkronizasyonu başarısız ❌", IslandNotificationType.ERROR, "Senkronizasyon")
                                         }
                                     }
                                 }
@@ -661,6 +648,12 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                 }
             }
         }
+
+        // Dynamic Island Overlay at top
+        DynamicIslandOverlay(
+            controller = islandController,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
     }
 
     // Add/Edit Homework Dialog
@@ -690,11 +683,11 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                 showAddEditHomeworkDialog = false
                 homeworkToEdit = null
                 newHomeworkInitialDate = null
-                coroutineScope.launch {
-                    snackbarHostState.showSnackbar(
-                        if (id == 0L) "Ödev başarıyla eklendi" else "Ödev güncellendi"
-                    )
-                }
+                showNotification(
+                    if (id == 0L) "Ödev başarıyla eklendi 📋" else "Ödev güncellendi",
+                    IslandNotificationType.SUCCESS,
+                    "Ödev"
+                )
             },
             onAddNewCourseRequest = {
                 courseToEdit = null
@@ -715,11 +708,11 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                 viewModel.saveCourse(id, name, teacher, colorHex, iconName)
                 showAddEditCourseDialog = false
                 courseToEdit = null
-                coroutineScope.launch {
-                    snackbarHostState.showSnackbar(
-                        if (id == 0L) "$name dersi eklendi" else "$name dersi güncellendi"
-                    )
-                }
+                showNotification(
+                    if (id == 0L) "$name dersi eklendi 📚" else "$name dersi güncellendi",
+                    IslandNotificationType.SUCCESS,
+                    "Ders"
+                )
             }
         )
     }
@@ -731,9 +724,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
             onSelectProfile = { profile ->
                 viewModel.selectProfile(profile)
                 showSwitchProfileDialog = false
-                coroutineScope.launch {
-                    snackbarHostState.showSnackbar("Profil değiştirildi: ${profile.name}")
-                }
+                showNotification("Profil değiştirildi: ${profile.name}", IslandNotificationType.INFO, "Profil")
             },
             onDismiss = {
                 showSwitchProfileDialog = false
