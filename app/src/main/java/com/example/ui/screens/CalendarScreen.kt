@@ -420,8 +420,23 @@ fun MonthCalendarCard(
             // Week-by-Week Rows
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 weeksOfMonth.forEach { weekDays ->
+                    val isCurrentWeek = weekDays.any { it.isToday }
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (isCurrentWeek) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                                else Color.Transparent
+                            )
+                            .then(
+                                if (isCurrentWeek) Modifier.border(
+                                    1.5.dp,
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                                    RoundedCornerShape(12.dp)
+                                ) else Modifier
+                            )
+                            .padding(horizontal = 2.dp, vertical = 2.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         weekDays.forEach { day ->
@@ -438,6 +453,7 @@ fun MonthCalendarCard(
                             MonthDayCell(
                                 day = day,
                                 isSelected = isSelected,
+                                isCurrentWeek = isCurrentWeek,
                                 homeworkCount = hwCount,
                                 hasPending = hasPending,
                                 hasOverdue = hasOverdue,
@@ -460,6 +476,7 @@ fun MonthCalendarCard(
 fun MonthDayCell(
     day: MonthCalendarDay,
     isSelected: Boolean,
+    isCurrentWeek: Boolean = false,
     homeworkCount: Int,
     hasPending: Boolean,
     hasOverdue: Boolean = false,
@@ -473,13 +490,14 @@ fun MonthDayCell(
             .background(
                 when {
                     isSelected -> MaterialTheme.colorScheme.primary
-                    day.isToday -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                    day.isToday -> MaterialTheme.colorScheme.primaryContainer
+                    isCurrentWeek && day.isCurrentMonth -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                     else -> Color.Transparent
                 }
             )
             .then(
                 if (day.isToday && !isSelected) {
-                    Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                    Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
                 } else Modifier
             )
             .clickable { onClick() },
@@ -729,26 +747,18 @@ fun DayHomeworkCard(
                     }
 
                     val isOverdue = HomeworkViewModel.isOverdue(hw.dueDateMillis, hw.isCompleted)
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = if (isOverdue) {
-                            MaterialTheme.colorScheme.errorContainer
-                        } else {
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                    if (isOverdue) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.errorContainer
+                        ) {
+                            Text(
+                                text = "⚠️ Gecikti",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
                         }
-                    ) {
-                        Text(
-                            text = if (isOverdue) "⚠️ Pazar Teslimi Gecikti" else "📅 Teslim: Pazar",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = if (isOverdue) FontWeight.Bold else FontWeight.Normal
-                            ),
-                            color = if (isOverdue) {
-                                MaterialTheme.colorScheme.onErrorContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
                     }
                 }
 

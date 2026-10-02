@@ -327,7 +327,7 @@ fun DueDateChip(
     val sundayDateFormat = SimpleDateFormat("d MMMM EEEE", Locale("tr"))
 
     val targetDayName = dayFormat.format(Date(dueDateMillis))
-    val sundayDeadlineStr = sundayDateFormat.format(Date(sundayDeadlineMillis))
+    val timeSuffix = if (dueTimeText.isNotBlank()) " $dueTimeText" else ""
 
     val (chipText, chipBg, chipColor, chipIcon) = when {
         isCompleted -> Quadruple(
@@ -337,31 +337,25 @@ fun DueDateChip(
             Icons.Default.Check
         )
         isOverdue -> Quadruple(
-            "Gecikti! (Son Teslim: $sundayDeadlineStr)",
+            "Gecikti",
             MaterialTheme.colorScheme.errorContainer,
             MaterialTheme.colorScheme.onErrorContainer,
             Icons.Default.Warning
         )
         isSameDay -> Quadruple(
-            "Bugün Yapılacak • Teslim: Pazar $dueTimeText",
+            "Bugün$timeSuffix",
             MaterialTheme.colorScheme.tertiaryContainer,
             MaterialTheme.colorScheme.onTertiaryContainer,
             Icons.Default.AccessTime
         )
         isTomorrow -> Quadruple(
-            "Yarın Yapılacak • Teslim: Pazar $dueTimeText",
+            "Yarın$timeSuffix",
             MaterialTheme.colorScheme.primaryContainer,
             MaterialTheme.colorScheme.onPrimaryContainer,
             Icons.Default.AccessTime
         )
-        dueDateMillis < now && !isSameDay -> Quadruple(
-            "Hedef: $targetDayName • Teslim: Pazar $dueTimeText",
-            MaterialTheme.colorScheme.surfaceVariant,
-            MaterialTheme.colorScheme.onSurfaceVariant,
-            Icons.Default.AccessTime
-        )
         else -> Quadruple(
-            "Planlanan: $targetDayName • Teslim: Pazar $dueTimeText",
+            "$targetDayName$timeSuffix",
             MaterialTheme.colorScheme.surfaceVariant,
             MaterialTheme.colorScheme.onSurfaceVariant,
             Icons.Default.AccessTime
