@@ -1,6 +1,8 @@
 package com.example.ui.components
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -43,6 +45,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -60,6 +63,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
@@ -67,6 +71,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -86,7 +93,7 @@ data class IslandNotification(
     val message: String,
     val title: String? = null,
     val type: IslandNotificationType = IslandNotificationType.SUCCESS,
-    val durationMillis: Long = 2400L
+    val durationMillis: Long = 2500L
 )
 
 /**
@@ -104,7 +111,7 @@ class DynamicIslandController {
         message: String,
         title: String? = null,
         type: IslandNotificationType = IslandNotificationType.SUCCESS,
-        durationMillis: Long = 2400L,
+        durationMillis: Long = 2500L,
         scope: CoroutineScope,
         context: Context? = null,
         view: View? = null
@@ -168,13 +175,10 @@ class DynamicIslandController {
 
 /**
  * Dinamik Ada Bileşeni:
- * - Ön kamera deliğini tespit eder (ekranın üst kısmında o noktadan başlar).
- * - İlk açılışta kamera etrafında 26x26dp siyah bir daire olarak başlar.
- * - Yavaş ve akıcı bir şekilde (580ms) yanlara doğru genişleyerek dinamik bir kapsüle dönüşür.
- * - Genişliği artırılmıştır (~345dp), fakat asla ekranın tamamını kaplamaz.
- * - Tik işareti (check) ve tüm bileşenler Material 3 temasıyla uyumlu yaylı animasyona (spring bounce) sahiptir.
- * - Parlama (glow/neon) yoktur; sade mat yüzey ve kurumsal Material 3 renkleri kullanılır.
- * - Halihazırda açıkken yeni bildirim gelirse ada kapanıp açılmaz; yeni bildirim içeriği animasyonsuz anında güncellenir.
+ * - Uyarı geldiğinde Status Bar gizlenir, çakışma önlenir; bildirim kapandığında Status Bar geri açılır.
+ * - Boyutları Bottom Bar (Ada Menü) ile tam aynı boyutta tasarlanmıştır (64dp yükseklik, kenar boşlukları 16dp, yuvarlatılmış 26dp köşe).
+ * - Ön kamera noktasından daire olarak doğup aşağı ve yanlara doğru pürüzsüzce genişler.
+ * - Material 3 tik işareti ve dinamik durum rozeti içerir.
  */
 @Composable
 fun DynamicIslandOverlay(
@@ -187,11 +191,20 @@ fun DynamicIslandOverlay(
     val view = LocalView.current
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
+    val context = LocalContext.current
+
+    val activity = remember(context) {
+        var ctx = context
+        while (ctx is ContextWrapper) {
+            if (ctx is Activity) return@remember ctx
+            ctx = ctx.baseContext
+        }
+        null
+    }
 
     // Ön kamera deliğinin yatay merkez oranı (0.0 sol, 0.5 orta, 1.0 sağ)
     var cutoutPivotX by remember { mutableFloatStateOf(0.5f) }
     var cutoutTopDp by remember { mutableStateOf(8.dp) }
-    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     LaunchedEffect(view, view.width) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -205,11 +218,11 @@ fun DynamicIslandOverlay(
                 cutoutTopDp = with(density) { maxOf(topCutout.top.toDp(), 6.dp) }
             } else {
                 cutoutPivotX = 0.5f
-                cutoutTopDp = maxOf(statusBarTop / 2, 8.dp)
+                cutoutTopDp = 8.dp
             }
         } else {
             cutoutPivotX = 0.5f
-            cutoutTopDp = maxOf(statusBarTop / 2, 8.dp)
+            cutoutTopDp = 8.dp
         }
     }
 
@@ -240,25 +253,47 @@ fun DynamicIslandOverlay(
         }
     }
 
+    // Uyarı geldiğinde status bar'ı otomatik gizle; kapandığında eski haline getir
+    val isIslandActive = isVisible || animProgress.value > 0.001f
+    DisposableEffect(isIslandActive, activity) {
+        activity?.window?.let { window ->
+            val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+            if (isIslandActive) {
+                insetsController.hide(WindowInsetsCompat.Type.statusBars())
+                insetsController.systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            } else {
+                insetsController.show(WindowInsetsCompat.Type.statusBars())
+            }
+        }
+        onDispose {
+            activity?.window?.let { window ->
+                val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+                insetsController.show(WindowInsetsCompat.Type.statusBars())
+            }
+        }
+    }
+
     val progress = animProgress.value
     if (progress > 0.001f) {
         val active = displayNotif ?: return
 
-        // Daha geniş ada hedefi (ekran genişliğine duyarlı, en fazla 345dp)
+        // Bottom Bar (Ada Menü) ile tam aynı boyutlandırma:
+        // Kenarlardan 16dp + 16dp = 32dp boşluk, yükseklik 64dp, köşe yuvarlatma 26dp
         val screenWidth = configuration.screenWidthDp.dp
-        val targetWidth = minOf(screenWidth - 24.dp, 345.dp)
-        val targetHeight = 52.dp
+        val targetWidth = minOf(screenWidth - 32.dp, 560.dp)
+        val targetHeight = 64.dp
 
-        val currentWidth = lerp(26.dp, targetWidth, progress)
-        val currentHeight = lerp(26.dp, targetHeight, progress)
+        val currentWidth = lerp(28.dp, targetWidth, progress)
+        val currentHeight = lerp(28.dp, targetHeight, progress)
         val cornerRadius = lerp(currentHeight / 2, 26.dp, progress)
 
         // İçerik (metin ve simgeler) ada yeterince genişledikten sonra görünür
-        val contentAlpha = ((progress - 0.35f) / 0.65f).coerceIn(0f, 1f)
+        val contentAlpha = ((progress - 0.32f) / 0.68f).coerceIn(0f, 1f)
 
         // Dinamik tik işareti ve ikon yaylı büyüme animasyonu (spring bounce)
         val iconScale by animateFloatAsState(
-            targetValue = if (contentAlpha > 0.3f) 1f else 0.2f,
+            targetValue = if (contentAlpha > 0.25f) 1f else 0.2f,
             animationSpec = spring(
                 dampingRatio = Spring.DampingRatioMediumBouncy,
                 stiffness = Spring.StiffnessLow
@@ -304,16 +339,16 @@ fun DynamicIslandOverlay(
         Box(
             modifier = modifier
                 .fillMaxWidth()
-                .padding(top = cutoutTopDp, start = 12.dp, end = 12.dp),
+                .padding(top = maxOf(cutoutTopDp, 10.dp), start = 16.dp, end = 16.dp),
             contentAlignment = BiasAlignment(horizontalBias, -1f)
         ) {
             Box(
                 modifier = Modifier
                     .width(currentWidth)
                     .height(currentHeight)
-                    // Doğal ve temiz Material gölge
+                    // Bottom bar ile aynı doğal gölge ve köşe yapısı
                     .shadow(
-                        elevation = (5 * progress).dp,
+                        elevation = (8 * progress).dp,
                         shape = RoundedCornerShape(cornerRadius),
                         clip = false
                     )
@@ -322,11 +357,11 @@ fun DynamicIslandOverlay(
                     .background(Color(0xFF1B1B1F))
                     .border(
                         width = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.30f),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.40f),
                         shape = RoundedCornerShape(cornerRadius)
                     )
                     .clickable { controller.dismiss() }
-                    .padding(horizontal = 14.dp),
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
                 if (contentAlpha > 0.05f) {
@@ -340,7 +375,7 @@ fun DynamicIslandOverlay(
                         // Sol: Dinamik Yaylı İkon Rozeti (Material 3 Tik İşareti)
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(38.dp)
                                 .graphicsLayer {
                                     scaleX = iconScale
                                     scaleY = iconScale
@@ -353,13 +388,13 @@ fun DynamicIslandOverlay(
                                 imageVector = typeIcon,
                                 contentDescription = null,
                                 tint = typeColor,
-                                modifier = Modifier.size(19.dp)
+                                modifier = Modifier.size(22.dp)
                             )
                         }
 
                         Spacer(modifier = Modifier.width(12.dp))
 
-                        // Orta: Başlık ve Mesaj Bilgisi
+                        // Orta: Başlık ve Mesaj Bilgisi (Genişletilmiş yükseklik sayesinde daha okunaklı)
                         Column(
                             modifier = Modifier.weight(1f),
                             verticalArrangement = Arrangement.Center
@@ -367,9 +402,9 @@ fun DynamicIslandOverlay(
                             if (!active.title.isNullOrBlank()) {
                                 Text(
                                     text = active.title,
-                                    style = MaterialTheme.typography.labelSmall.copy(
+                                    style = MaterialTheme.typography.labelMedium.copy(
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 11.sp
+                                        fontSize = 11.5.sp
                                     ),
                                     color = typeColor,
                                     maxLines = 1,
@@ -380,7 +415,7 @@ fun DynamicIslandOverlay(
                                 text = active.message,
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     fontWeight = FontWeight.SemiBold,
-                                    fontSize = 13.sp
+                                    fontSize = 13.5.sp
                                 ),
                                 color = Color.White,
                                 maxLines = 1,
@@ -388,18 +423,18 @@ fun DynamicIslandOverlay(
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         // Sağ: Dinamik Material 3 Durum Rozeti
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = typeBg.copy(alpha = 0.8f),
+                            color = typeBg.copy(alpha = 0.85f),
                             contentColor = typeColor
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
                             ) {
                                 Box(
                                     modifier = Modifier
@@ -411,7 +446,7 @@ fun DynamicIslandOverlay(
                                     text = dynamicBadgeText,
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 10.sp
+                                        fontSize = 11.sp
                                     )
                                 )
                             }
