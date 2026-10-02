@@ -23,16 +23,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Calculate
-import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.HourglassTop
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.Card
+import androidx.compose.material3.Badge
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -47,10 +48,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+/**
+ * Material 3 Tasarım Sistemine Uyarlanmış Araçlar ve Modüller Ekranı.
+ */
 @Composable
 fun ToolsScreen(
     noteCount: Int,
+    examCount: Int = 0,
     onOpenNotes: () -> Unit,
+    onOpenExams: () -> Unit,
+    onOpenTimer: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyVerticalGrid(
@@ -62,17 +69,17 @@ fun ToolsScreen(
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Üst Başlık Banner
+        // Material 3 Üst Başlık Banner Kartı (Tonal Surface)
         item(span = { GridItemSpan(2) }) {
-            Card(
-                shape = RoundedCornerShape(22.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+            ElevatedCard(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                 ),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 6.dp)
+                    .padding(bottom = 4.dp)
             ) {
                 Row(
                     modifier = Modifier
@@ -82,7 +89,7 @@ fun ToolsScreen(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(46.dp)
+                            .size(48.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
@@ -90,7 +97,7 @@ fun ToolsScreen(
                         Icon(
                             imageVector = Icons.Default.GridView,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -98,12 +105,13 @@ fun ToolsScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Araçlar & Modüller",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onSurface
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Çalışma ve verimlilik araçlarını buradan yönetebilirsiniz",
-                            style = MaterialTheme.typography.bodySmall,
+                            text = "Ders çalışma, analiz ve odaklanma araçları",
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -111,102 +119,105 @@ fun ToolsScreen(
             }
         }
 
-        // 1. KARE ARAÇ KARTI: NOTLAR (Tıklanınca Notlar Ekranına Geçer)
+        // 1. M3 KARE KART: NOTLAR (Google Keep Stili Not Defteri)
         item {
-            SquareToolCard(
+            M3SquareToolCard(
                 title = "Notlar",
-                description = if (noteCount > 0) "$noteCount not kayıtlı" else "Not defteri ve listeler",
+                description = if (noteCount > 0) "$noteCount not kayıtlı" else "Not defteri, liste ve çizimler",
                 icon = Icons.Default.Description,
-                iconTint = MaterialTheme.colorScheme.primary,
-                iconBg = MaterialTheme.colorScheme.primaryContainer,
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                iconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 badgeText = if (noteCount > 0) "$noteCount" else null,
+                badgeContainerColor = MaterialTheme.colorScheme.primary,
+                badgeContentColor = MaterialTheme.colorScheme.onPrimary,
                 isAvailable = true,
                 onClick = onOpenNotes,
                 testTag = "tool_card_notes"
             )
         }
 
-        // 2. KARE ARAÇ KARTI: SAYAÇ / ODAK (Gelecek araçlar için hazır kare kart)
+        // 2. M3 KARE KART: DENEMELER (TYT, AYT, LGS Net Takibi)
         item {
-            SquareToolCard(
+            M3SquareToolCard(
+                title = "Denemeler",
+                description = if (examCount > 0) "$examCount sınav karnesi" else "TYT, AYT ve LGS net takibi",
+                icon = Icons.Default.Assessment,
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                iconContainerColor = MaterialTheme.colorScheme.errorContainer,
+                iconContentColor = MaterialTheme.colorScheme.onErrorContainer,
+                badgeText = if (examCount > 0) "$examCount" else "Yeni",
+                badgeContainerColor = MaterialTheme.colorScheme.error,
+                badgeContentColor = MaterialTheme.colorScheme.onError,
+                isAvailable = true,
+                onClick = onOpenExams,
+                testTag = "tool_card_exams"
+            )
+        }
+
+        // 3. M3 KARE KART: SAYAÇ & ODAK (Pomodoro, Kronometre, Zamanlayıcı)
+        item {
+            M3SquareToolCard(
                 title = "Sayaç & Odak",
-                description = "Pomodoro ve çalışma kronometresi",
+                description = "Pomodoro, Kronometre & Geri Sayım",
                 icon = Icons.Default.HourglassTop,
-                iconTint = MaterialTheme.colorScheme.tertiary,
-                iconBg = MaterialTheme.colorScheme.tertiaryContainer,
-                badgeText = "Yakında",
-                isAvailable = false,
-                onClick = {},
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                iconContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                iconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                badgeText = "Aktif",
+                badgeContainerColor = MaterialTheme.colorScheme.tertiary,
+                badgeContentColor = MaterialTheme.colorScheme.onTertiary,
+                isAvailable = true,
+                onClick = onOpenTimer,
                 testTag = "tool_card_pomodoro"
             )
         }
 
-        // 3. KARE ARAÇ KARTI: DERS PROGRAMI
+        // 4. M3 KARE KART: DERS PROGRAMI (Haftalık Çizelge)
         item {
-            SquareToolCard(
+            M3SquareToolCard(
                 title = "Ders Programı",
                 description = "Haftalık etüt ve ders çizelgesi",
-                icon = Icons.Default.CalendarToday,
-                iconTint = MaterialTheme.colorScheme.secondary,
-                iconBg = MaterialTheme.colorScheme.secondaryContainer,
+                icon = Icons.Default.CalendarMonth,
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                iconContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                 badgeText = "Yakında",
+                badgeContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                badgeContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 isAvailable = false,
                 onClick = {},
                 testTag = "tool_card_schedule"
-            )
-        }
-
-        // 4. KARE ARAÇ KARTI: NOT HESAPLAYICI
-        item {
-            SquareToolCard(
-                title = "Not Hesaplayıcı",
-                description = "Vize, final ve ortalama hesabı",
-                icon = Icons.Default.Calculate,
-                iconTint = Color(0xFF0D9488),
-                iconBg = Color(0xFFCCFBF1),
-                badgeText = "Yakında",
-                isAvailable = false,
-                onClick = {},
-                testTag = "tool_card_calc"
             )
         }
     }
 }
 
 /**
- * Kullanıcının istediği kare araç kartı bileşeni (1:1 Aspect Ratio).
+ * Material 3 Tasarım Sistemine uygun 1:1 Oranlı Kare Kart Bileşeni.
  */
 @Composable
-fun SquareToolCard(
+fun M3SquareToolCard(
     title: String,
     description: String,
     icon: ImageVector,
-    iconTint: Color,
-    iconBg: Color,
+    containerColor: Color,
+    iconContainerColor: Color,
+    iconContentColor: Color,
     badgeText: String? = null,
+    badgeContainerColor: Color = MaterialTheme.colorScheme.primary,
+    badgeContentColor: Color = MaterialTheme.colorScheme.onPrimary,
     isAvailable: Boolean = true,
     onClick: () -> Unit = {},
     testTag: String = ""
 ) {
-    Card(
+    ElevatedCard(
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isAvailable) {
-                MaterialTheme.colorScheme.surface
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-            }
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = if (isAvailable) containerColor else MaterialTheme.colorScheme.surfaceContainerLowest
         ),
-        border = BorderStroke(
-            width = 1.dp,
-            color = if (isAvailable) {
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-            } else {
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)
-            }
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = if (isAvailable) 3.dp else 0.dp
+        elevation = CardDefaults.elevatedCardElevation(
+            defaultElevation = if (isAvailable) 2.dp else 0.dp
         ),
         modifier = Modifier
             .fillMaxWidth()
@@ -222,7 +233,7 @@ fun SquareToolCard(
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.Start
         ) {
-            // Üst Kısım: İkon ve Rozet
+            // Üst Bölüm: İkon Konteynırı ve M3 Rozet (Badge)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -230,15 +241,15 @@ fun SquareToolCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(42.dp)
+                        .size(44.dp)
                         .clip(RoundedCornerShape(14.dp))
-                        .background(iconBg),
+                        .background(if (isAvailable) iconContainerColor else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = iconTint,
+                        tint = if (isAvailable) iconContentColor else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -246,16 +257,16 @@ fun SquareToolCard(
                 if (badgeText != null) {
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = if (isAvailable) iconTint.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = if (isAvailable) iconTint else MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (isAvailable) badgeContainerColor else MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = if (isAvailable) badgeContentColor else MaterialTheme.colorScheme.onSurfaceVariant
                     ) {
                         Text(
                             text = badgeText,
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 10.sp
+                                fontSize = 11.sp
                             ),
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                         )
                     }
                 }
@@ -263,7 +274,7 @@ fun SquareToolCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Alt Kısım: Başlık, Açıklama ve Giriş Ok İşareti
+            // Alt Bölüm: Başlık, Açıklama ve Giriş İkonu
             Column {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -276,7 +287,7 @@ fun SquareToolCard(
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.sp
                         ),
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = if (isAvailable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -284,7 +295,7 @@ fun SquareToolCard(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                             contentDescription = null,
-                            tint = iconTint,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp)
                         )
                     }

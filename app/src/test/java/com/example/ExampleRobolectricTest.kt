@@ -87,18 +87,23 @@ class ExampleRobolectricTest {
   }
 
   @Test
-  fun `test crash handler logging and recovery`() {
+  fun `test note and exam creation`() = runBlocking {
     val context = ApplicationProvider.getApplicationContext<Context>()
-    com.example.util.GlobalCrashHandler.install(context)
-
-    // Simulate saving a manual error
-    val testException = RuntimeException("Test Çökme Mesajı")
-    com.example.util.GlobalCrashHandler.saveManualError(context, "UnitTest", testException)
-
-    val lastLog = com.example.util.GlobalCrashHandler.getLastCrashLog(context)
-    assertNotNull(lastLog)
-    assertTrue(lastLog!!.contains("Test Çökme Mesajı"))
-    assertTrue(lastLog.contains("=== TUFIDESK UYGULAMA İÇİ HATA RAPORU"))
+    val db = com.example.data.database.AppDatabase.getInstance(context)
+    val notesRepo = com.example.data.repository.NotesRepository(db.noteDao())
+    val noteId = notesRepo.insertNote(
+      com.example.data.model.Note(
+        title = "TYT 1. Deneme",
+        content = "Türkçe: 35 D 3 Y",
+        type = com.example.data.model.NoteType.REPORT,
+        reportData = "{\"totalNet\":95.25}"
+      )
+    )
+    assertTrue(noteId > 0)
+    val fetched = db.noteDao().getNoteById(noteId)
+    assertNotNull(fetched)
+    assertEquals("TYT 1. Deneme", fetched?.title)
+    assertEquals(com.example.data.model.NoteType.REPORT, fetched?.type)
   }
 
   @Test

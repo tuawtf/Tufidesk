@@ -115,6 +115,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -249,6 +250,7 @@ fun NotesScreen(
     confirmDelete: Boolean = true,
     moveCheckedToBottom: Boolean = true,
     onSwitchProfile: () -> Unit = {},
+    onSelectionModeChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
@@ -258,6 +260,10 @@ fun NotesScreen(
     // Multi-selection mode state
     var selectedNoteIds by remember { mutableStateOf(setOf<Long>()) }
     val isSelectionMode = selectedNoteIds.isNotEmpty()
+
+    LaunchedEffect(isSelectionMode) {
+        onSelectionModeChange(isSelectionMode)
+    }
 
     BackHandler(enabled = isSelectionMode) {
         selectedNoteIds = emptySet()
@@ -313,9 +319,6 @@ fun NotesScreen(
     val pinnedNotes = remember(currentFolderNotes) { currentFolderNotes.filter { it.isPinned } }
     val otherNotes = remember(currentFolderNotes) { currentFolderNotes.filter { !it.isPinned } }
 
-    val denemeFolder = remember(folders) {
-        folders.find { it.name.contains("Deneme", ignoreCase = true) }
-    }
     val regularFolders = remember(folders) {
         folders.filter { !it.name.contains("Deneme", ignoreCase = true) }
     }
@@ -513,32 +516,7 @@ fun NotesScreen(
                     }
                 }
 
-                // 1. Featured Long Card: Deneme Sınavları (Non-deletable, distinct exam banner card)
-                if (denemeFolder != null) {
-                    item(span = StaggeredGridItemSpan.FullLine) {
-                        val reportCount = remember(notes, denemeFolder.id) {
-                            notes.count { it.folderId == denemeFolder.id || it.type == NoteType.REPORT }
-                        }
-                        DenemeExamFolderCard(
-                            folder = denemeFolder,
-                            noteCount = reportCount,
-                            isHovered = hoveredFolderId == denemeFolder.id,
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onSelectFolder(denemeFolder.id)
-                            },
-                            onLongClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                folderOptionsToManage = denemeFolder
-                            },
-                            modifier = Modifier.onGloballyPositioned { coords ->
-                                folderBounds[denemeFolder.id] = coords.boundsInRoot()
-                            }
-                        )
-                    }
-                }
-
-                // 2. Regular Folders (Material Theme styled, delete button removed, long-press to manage)
+                // Regular Folders (Material Theme styled, delete button removed, long-press to manage)
                 items(
                     items = regularFolders,
                     key = { "folder_${it.id}" }
@@ -1085,7 +1063,7 @@ fun NotesScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = 4.dp)
+                    .padding(end = 16.dp, bottom = 84.dp)
             ) {
                 // Speed Dial Pill Buttons (Visible when open)
                 AnimatedVisibility(
@@ -1097,19 +1075,7 @@ fun NotesScreen(
                         horizontalAlignment = Alignment.End,
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // 1. Rapor
-                        KeepSpeedDialPill(
-                            text = "Rapor",
-                            icon = Icons.Default.Assessment,
-                            accentColor = Color(0xFFE53935),
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                isFabMenuOpen = false
-                                showReportDialog = true
-                            }
-                        )
-
-                        // 2. Klasör
+                        // 1. Klasör
                         KeepSpeedDialPill(
                             text = "Klasör",
                             icon = Icons.Default.Folder,

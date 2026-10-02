@@ -107,12 +107,15 @@ import com.example.ui.components.DynamicIslandOverlay
 import com.example.ui.components.IslandNotificationType
 import com.example.ui.screens.CalendarScreen
 import com.example.ui.screens.CoursesScreen
+import com.example.ui.screens.DenemeExamScreen
+import com.example.ui.screens.FocusTimerScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.LoginScreen
 import com.example.ui.screens.NotesScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.StatsScreen
 import com.example.ui.screens.ToolsScreen
+import com.example.data.model.NoteType
 import com.example.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -272,6 +275,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
     var isSettingsOpen by rememberSaveable { mutableStateOf(false) }
     var activeTool by rememberSaveable { mutableStateOf<String?>(null) }
     var isFullScreen by rememberSaveable { mutableStateOf(false) }
+    var isSelectionActive by rememberSaveable { mutableStateOf(false) }
 
     val activity = remember(context) {
         var ctx = context
@@ -340,7 +344,12 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
         }
         currentTab == 1 -> "Ödev Takvimi"
         currentTab == 2 -> "İstatistikler"
-        currentTab == 3 -> if (activeTool == "notes") "Notlar & Raporlar" else "Araçlar"
+        currentTab == 3 -> when (activeTool) {
+            "notes" -> "Notlar"
+            "exams" -> "Deneme Sınavları"
+            "timer" -> "Sayaç & Odak"
+            else -> "Araçlar"
+        }
         else -> "TufiDESK"
     }
 
@@ -483,56 +492,91 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     )
 
                     3 -> {
-                        if (activeTool == "notes") {
-                            NotesScreen(
-                                notes = userNotes,
-                                folders = noteFolders,
-                                selectedFolderId = selectedNoteFolderId,
-                                searchQuery = noteSearchQuery,
-                                onSelectFolder = { viewModel.setSelectedNoteFolder(it) },
-                                onSearchQueryChange = { viewModel.setNoteSearchQuery(it) },
-                                onInsertNote = { note ->
-                                    viewModel.insertNote(note)
-                                    showNotification("Not kaydedildi 📝", IslandNotificationType.SUCCESS, "Google Notlar")
-                                },
-                                onUpdateNote = { note ->
-                                    viewModel.updateNote(note)
-                                    showNotification("Not güncellendi", IslandNotificationType.SUCCESS, "Google Notlar")
-                                },
-                                onDeleteNote = { note ->
-                                    viewModel.deleteNote(note)
-                                    showNotification("Not silindi", IslandNotificationType.WARNING, "Google Notlar")
-                                },
-                                onTogglePin = { note ->
-                                    viewModel.toggleNotePin(note)
-                                },
-                                onCreateFolder = { name, colorHex ->
-                                    viewModel.insertFolder(name, colorHex)
-                                    showNotification("'$name' klasörü oluşturuldu 📁", IslandNotificationType.SUCCESS, "Klasör")
-                                },
-                                onUpdateFolder = { folder ->
-                                    viewModel.updateFolder(folder)
-                                    showNotification("Klasör güncellendi 📁", IslandNotificationType.SUCCESS, "Klasör")
-                                },
-                                onDeleteFolder = { folder ->
-                                    viewModel.deleteFolder(folder)
-                                    showNotification("Klasör silindi", IslandNotificationType.WARNING, "Klasör")
-                                },
-                                canManage = canManage,
-                                currentUser = currentUser,
-                                currentUserAssigned = currentUser?.name ?: "Tuna",
-                                isGridLayout = noteLayoutGrid,
-                                onToggleLayoutGrid = { viewModel.setNoteLayoutGrid(it) },
-                                showWordCount = noteShowWordCount,
-                                confirmDelete = noteConfirmDelete,
-                                moveCheckedToBottom = keepMoveCheckedToBottom,
-                                onSwitchProfile = { showSwitchProfileDialog = true }
-                            )
-                        } else {
-                            ToolsScreen(
-                                noteCount = userNotes.size,
-                                onOpenNotes = { activeTool = "notes" }
-                            )
+                        when (activeTool) {
+                            "notes" -> {
+                                NotesScreen(
+                                    notes = userNotes,
+                                    folders = noteFolders,
+                                    selectedFolderId = selectedNoteFolderId,
+                                    searchQuery = noteSearchQuery,
+                                    onSelectFolder = { viewModel.setSelectedNoteFolder(it) },
+                                    onSearchQueryChange = { viewModel.setNoteSearchQuery(it) },
+                                    onInsertNote = { note ->
+                                        viewModel.insertNote(note)
+                                        showNotification("Not kaydedildi 📝", IslandNotificationType.SUCCESS, "Google Notlar")
+                                    },
+                                    onUpdateNote = { note ->
+                                        viewModel.updateNote(note)
+                                        showNotification("Not güncellendi", IslandNotificationType.SUCCESS, "Google Notlar")
+                                    },
+                                    onDeleteNote = { note ->
+                                        viewModel.deleteNote(note)
+                                        showNotification("Not silindi", IslandNotificationType.WARNING, "Google Notlar")
+                                    },
+                                    onTogglePin = { note ->
+                                        viewModel.toggleNotePin(note)
+                                    },
+                                    onCreateFolder = { name, colorHex ->
+                                        viewModel.insertFolder(name, colorHex)
+                                        showNotification("'$name' klasörü oluşturuldu 📁", IslandNotificationType.SUCCESS, "Klasör")
+                                    },
+                                    onUpdateFolder = { folder ->
+                                        viewModel.updateFolder(folder)
+                                        showNotification("Klasör güncellendi 📁", IslandNotificationType.SUCCESS, "Klasör")
+                                    },
+                                    onDeleteFolder = { folder ->
+                                        viewModel.deleteFolder(folder)
+                                        showNotification("Klasör silindi", IslandNotificationType.WARNING, "Klasör")
+                                    },
+                                    canManage = canManage,
+                                    currentUser = currentUser,
+                                    currentUserAssigned = currentUser?.name ?: "Tuna",
+                                    isGridLayout = noteLayoutGrid,
+                                    onToggleLayoutGrid = { viewModel.setNoteLayoutGrid(it) },
+                                    showWordCount = noteShowWordCount,
+                                    confirmDelete = noteConfirmDelete,
+                                    moveCheckedToBottom = keepMoveCheckedToBottom,
+                                    onSwitchProfile = { showSwitchProfileDialog = true },
+                                    onSelectionModeChange = { isSelectionActive = it }
+                                )
+                            }
+                            "exams" -> {
+                                DenemeExamScreen(
+                                    notes = userNotes,
+                                    currentUserAssigned = currentUser?.name ?: "Tuna",
+                                    onInsertExam = { note ->
+                                        viewModel.insertNote(note)
+                                        showNotification("Deneme sınavı kaydedildi 🎯", IslandNotificationType.SUCCESS, "Denemeler")
+                                    },
+                                    onUpdateExam = { note ->
+                                        viewModel.updateNote(note)
+                                        showNotification("Deneme güncellendi 🎯", IslandNotificationType.SUCCESS, "Denemeler")
+                                    },
+                                    onDeleteExam = { note ->
+                                        viewModel.deleteNote(note)
+                                        showNotification("Deneme silindi", IslandNotificationType.WARNING, "Denemeler")
+                                    },
+                                    onNotify = { msg ->
+                                        showNotification(msg, IslandNotificationType.INFO, "Denemeler")
+                                    }
+                                )
+                            }
+                            "timer" -> {
+                                FocusTimerScreen(
+                                    onNotify = { msg ->
+                                        showNotification(msg, IslandNotificationType.SUCCESS, "Sayaç & Odak")
+                                    }
+                                )
+                            }
+                            else -> {
+                                ToolsScreen(
+                                    noteCount = userNotes.count { it.type != NoteType.REPORT },
+                                    examCount = userNotes.count { it.type == NoteType.REPORT },
+                                    onOpenNotes = { activeTool = "notes" },
+                                    onOpenExams = { activeTool = "exams" },
+                                    onOpenTimer = { activeTool = "timer" }
+                                )
+                            }
                         }
                     }
                 }
@@ -763,7 +807,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     )
                 },
                 bottomBar = {
-                    if (!floatingBottomBar && !isSettingsOpen) {
+                    if (!floatingBottomBar && !isSettingsOpen && !isSelectionActive) {
                         IslandBottomNavigation(
                             currentTab = currentTab,
                             onTabSelected = { currentTab = it },
@@ -804,7 +848,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     screenContent()
 
                     // Tamamen havada yüzen ada menüsü (Arkada hiçbir siyahlık veya şerit yok)
-                    if (floatingBottomBar && !isSettingsOpen) {
+                    if (floatingBottomBar && !isSettingsOpen && !isSelectionActive) {
                         IslandBottomNavigation(
                             currentTab = currentTab,
                             onTabSelected = { currentTab = it },
