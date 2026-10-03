@@ -50,6 +50,7 @@ import androidx.compose.material3.ElevatedFilterChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -104,9 +105,29 @@ enum class ExamCategory(val title: String) {
     ALL("Tümü"),
     TYT("TYT"),
     AYT("AYT"),
-    LGS("LGS"),
     BRANCH("Branş Denemesi")
 }
+
+data class BranchPreset(
+    val name: String,
+    val defaultQuestions: Int,
+    val defaultDuration: Int
+)
+
+val PRESET_BRANCH_SUBJECTS = listOf(
+    BranchPreset("Türkçe", 40, 45),
+    BranchPreset("Matematik", 40, 50),
+    BranchPreset("Fen Bilimleri", 20, 25),
+    BranchPreset("Sosyal Bilimler", 20, 25),
+    BranchPreset("Fizik", 14, 20),
+    BranchPreset("Kimya", 13, 18),
+    BranchPreset("Biyoloji", 13, 18),
+    BranchPreset("Geometri", 10, 15),
+    BranchPreset("Tarih", 10, 12),
+    BranchPreset("Coğrafya", 10, 12),
+    BranchPreset("Felsefe", 10, 10),
+    BranchPreset("Din Kültürü", 10, 10)
+)
 
 data class SubjectScore(
     val name: String,
@@ -119,7 +140,7 @@ data class SubjectScore(
 data class ExamRecord(
     val id: Long,
     val examName: String,
-    val category: String, // TYT, AYT, LGS, BRANS
+    val category: String, // TYT, AYT, BRANS
     val dateMillis: Long,
     val totalNet: Double,
     val maxQuestions: Int,
@@ -158,9 +179,10 @@ fun DenemeExamScreen(
             try {
                 val json = if (note.reportData.isNullOrBlank()) JSONObject() else JSONObject(note.reportData)
                 val examName = json.optString("examName", note.title.ifBlank { "Deneme Sınavı" })
-                val category = json.optString("category", if (examName.contains("AYT", true)) "AYT" else if (examName.contains("LGS", true)) "LGS" else "TYT")
+                val rawCategory = json.optString("category", if (examName.contains("AYT", true)) "AYT" else if (examName.contains("Branş", true)) "Branş" else "TYT")
+                val category = if (rawCategory.equals("LGS", ignoreCase = true)) "TYT" else rawCategory
                 val totalNet = json.optDouble("totalNet", 0.0)
-                val maxQuestions = json.optInt("maxQuestions", if (category == "LGS") 90 else if (category == "AYT") 80 else 120)
+                val maxQuestions = json.optInt("maxQuestions", if (category == "AYT") 80 else if (category == "Branş" || category == "BRANS") 40 else 120)
                 val targetNet = if (json.has("targetNet")) json.optDouble("targetNet") else null
                 val duration = if (json.has("duration")) json.optInt("duration") else null
                 val difficulty = json.optInt("difficulty", 3)
@@ -229,7 +251,6 @@ fun DenemeExamScreen(
             ExamCategory.ALL -> examRecords
             ExamCategory.TYT -> examRecords.filter { it.category.equals("TYT", ignoreCase = true) }
             ExamCategory.AYT -> examRecords.filter { it.category.equals("AYT", ignoreCase = true) }
-            ExamCategory.LGS -> examRecords.filter { it.category.equals("LGS", ignoreCase = true) }
             ExamCategory.BRANCH -> examRecords.filter { it.category.equals("BRANS", ignoreCase = true) || it.category.contains("Branş", ignoreCase = true) }
         }
     }
@@ -289,7 +310,7 @@ fun DenemeExamScreen(
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
-                                        text = "TYT, AYT, LGS & Branş Netleri",
+                                        text = "TYT, AYT & Branş Netleri",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -873,10 +894,10 @@ private fun M3AddEditExamDialog(
 ) {
     val haptic = LocalHapticFeedback.current
 
-    val categories = listOf("TYT", "AYT", "LGS", "Branş")
+    val categories = listOf("TYT", "AYT", "Branş")
     var selectedCategoryIndex by remember {
         val initialCat = existingExam?.category ?: "TYT"
-        val idx = categories.indexOf(initialCat)
+        val idx = categories.indexOf(if (initialCat.equals("BRANS", ignoreCase = true)) "Branş" else initialCat)
         mutableIntStateOf(if (idx >= 0) idx else 0)
     }
     val examCategory = categories[selectedCategoryIndex]
@@ -903,16 +924,9 @@ private fun M3AddEditExamDialog(
                 list.add(SubjectInputState("Kimya", 13, 10, 1))
                 list.add(SubjectInputState("Biyoloji", 13, 11, 1))
             }
-            "LGS" -> {
-                list.add(SubjectInputState("Türkçe", 20, 18, 1))
-                list.add(SubjectInputState("Matematik", 20, 15, 2))
-                list.add(SubjectInputState("Fen Bilimleri", 20, 18, 1))
-                list.add(SubjectInputState("T.C. İnkılap", 10, 9, 1))
-                list.add(SubjectInputState("Din Kültürü", 10, 10, 0))
-                list.add(SubjectInputState("İngilizce", 10, 9, 1))
-            }
             else -> {
-                list.add(SubjectInputState("Branş Dersi", 40, 35, 3))
+                // Branş Denemesi varsayılan olarak 40 soruluk Türkçe ile başlar
+                list.add(SubjectInputState("Türkçe", 40, 34, 3))
             }
         }
         list
@@ -926,7 +940,7 @@ private fun M3AddEditExamDialog(
         }
     }
 
-    val divisor = if (examCategory == "LGS") 3.0 else 4.0
+    val divisor = 4.0
     val calculatedTotalNet = subjectsState.sumOf { (it.correct - (it.wrong / divisor)).coerceAtLeast(0.0) }
 
     AlertDialog(
@@ -942,7 +956,7 @@ private fun M3AddEditExamDialog(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Sınav Türü Segmented Button Row (M3 Standardı)
+                // Sınav Türü Segmented Button Row (M3 Standardı: TYT, AYT, Branş)
                 item {
                     Text(
                         text = "Sınav Türü",
@@ -954,10 +968,100 @@ private fun M3AddEditExamDialog(
                         categories.forEachIndexed { index, label ->
                             SegmentedButton(
                                 shape = SegmentedButtonDefaults.itemShape(index = index, count = categories.size),
-                                onClick = { selectedCategoryIndex = index },
+                                onClick = {
+                                    selectedCategoryIndex = index
+                                    if (label == "TYT") {
+                                        examName = "TYT 1. Genel Deneme"
+                                        durationText = "135"
+                                        targetNetText = "95.0"
+                                    } else if (label == "AYT") {
+                                        examName = "AYT 1. Alan Denemesi"
+                                        durationText = "180"
+                                        targetNetText = "65.0"
+                                    } else {
+                                        examName = "Türkçe Branş Denemesi"
+                                        durationText = "45"
+                                        targetNetText = "35.0"
+                                    }
+                                },
                                 selected = index == selectedCategoryIndex,
                                 label = { Text(label, style = MaterialTheme.typography.labelSmall) }
                             )
+                        }
+                    }
+                }
+
+                // ================= BRANŞ DENEMESİ İÇİN DERS SEÇİM BÖLÜMÜ =================
+                if (examCategory == "Branş") {
+                    item {
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Branş Dersi Seçimi",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "Ders & Soru Sayısı",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            // Hızlı Ders Seçim Çipleri (Türkçe: 40, Matematik: 40, Fen: 20, Sosyal: 20 vb.)
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                contentPadding = PaddingValues(vertical = 4.dp)
+                            ) {
+                                items(PRESET_BRANCH_SUBJECTS) { preset ->
+                                    val isSelected = subjectsState.firstOrNull()?.name == preset.name &&
+                                            subjectsState.firstOrNull()?.totalQuestions == preset.defaultQuestions
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            subjectsState.clear()
+                                            subjectsState.add(
+                                                SubjectInputState(
+                                                    name = preset.name,
+                                                    totalQuestions = preset.defaultQuestions,
+                                                    correct = (preset.defaultQuestions * 0.8).toInt(),
+                                                    wrong = 2
+                                                )
+                                            )
+                                            examName = "${preset.name} Branş Denemesi"
+                                            durationText = preset.defaultDuration.toString()
+                                            targetNetText = String.format(Locale.getDefault(), "%.1f", preset.defaultQuestions * 0.85)
+                                        },
+                                        label = {
+                                            Text(
+                                                text = "${preset.name} (${preset.defaultQuestions} Soru)",
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                                )
+                                            )
+                                        },
+                                        leadingIcon = if (isSelected) {
+                                            {
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        } else null,
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -1008,7 +1112,7 @@ private fun M3AddEditExamDialog(
                                 contentColor = MaterialTheme.colorScheme.onPrimary
                             ) {
                                 Text(
-                                    text = "1 / ${divisor.toInt()} Yanlış",
+                                    text = "4 Yanlış 1 Doğru",
                                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
@@ -1035,19 +1139,56 @@ private fun M3AddEditExamDialog(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(subject.name, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
-                                Text(
-                                    text = String.format(Locale.getDefault(), "%.2f Net", subNet),
-                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                    color = MaterialTheme.colorScheme.primary
-                                )
+                            if (examCategory == "Branş") {
+                                // Branş denemesinde ders adı ve soru sayısını özelleştirebilme
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    OutlinedTextField(
+                                        value = subject.name,
+                                        onValueChange = { newName ->
+                                            subjectsState[index] = subject.copy(name = newName)
+                                        },
+                                        label = { Text("Branş Dersi") },
+                                        modifier = Modifier.weight(1.5f),
+                                        shape = RoundedCornerShape(10.dp),
+                                        singleLine = true
+                                    )
+                                    OutlinedTextField(
+                                        value = if (subject.totalQuestions == 0) "" else subject.totalQuestions.toString(),
+                                        onValueChange = { newTotal ->
+                                            val t = newTotal.toIntOrNull() ?: 0
+                                            subjectsState[index] = subject.copy(totalQuestions = t)
+                                        },
+                                        label = { Text("Soru Sayısı") },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(10.dp),
+                                        singleLine = true
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                            } else {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "${subject.name} (${subject.totalQuestions} Soru)",
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                                    )
+                                    Text(
+                                        text = String.format(Locale.getDefault(), "%.2f Net", subNet),
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
                             }
-                            Spacer(modifier = Modifier.height(8.dp))
+
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1056,7 +1197,7 @@ private fun M3AddEditExamDialog(
                                     value = if (subject.correct == 0) "" else subject.correct.toString(),
                                     onValueChange = { str ->
                                         val c = str.toIntOrNull() ?: 0
-                                        subjectsState[index] = subject.copy(correct = c.coerceIn(0, subject.totalQuestions))
+                                        subjectsState[index] = subject.copy(correct = c.coerceIn(0, subject.totalQuestions.coerceAtLeast(1)))
                                     },
                                     label = { Text("Doğru (D)") },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -1069,7 +1210,8 @@ private fun M3AddEditExamDialog(
                                     value = if (subject.wrong == 0) "" else subject.wrong.toString(),
                                     onValueChange = { str ->
                                         val w = str.toIntOrNull() ?: 0
-                                        subjectsState[index] = subject.copy(wrong = w.coerceIn(0, subject.totalQuestions - subject.correct))
+                                        val maxWrong = (subject.totalQuestions - subject.correct).coerceAtLeast(0)
+                                        subjectsState[index] = subject.copy(wrong = w.coerceIn(0, maxWrong))
                                     },
                                     label = { Text("Yanlış (Y)") },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

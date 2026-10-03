@@ -25,6 +25,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.ripple
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -44,6 +47,57 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.Screen
+
+/**
+ * Sabit (Fixed) Standart Material 3 Alt Gezinme Çubuğu.
+ * - Ekrana tam oturan, kenardan kenara standart alt çubuk.
+ */
+@Composable
+fun FixedStandardBottomNavigation(
+    currentTab: Int,
+    onTabSelected: (Int) -> Unit,
+    navItems: List<Screen>,
+    modifier: Modifier = Modifier
+) {
+    NavigationBar(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("fixed_bottom_nav_bar"),
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = 3.dp
+    ) {
+        navItems.forEachIndexed { index, screen ->
+            val isSelected = currentTab == index
+            NavigationBarItem(
+                selected = isSelected,
+                onClick = { onTabSelected(index) },
+                icon = {
+                    Icon(
+                        imageVector = if (isSelected) screen.selectedIcon else screen.unselectedIcon,
+                        contentDescription = screen.title
+                    )
+                },
+                label = {
+                    Text(
+                        text = screen.title,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        ),
+                        maxLines = 1
+                    )
+                },
+                alwaysShowLabel = false,
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            )
+        }
+    }
+}
 
 /**
  * Modern Yüzen Ada (Floating Island Dock) Alt Gezinme Çubuğu.

@@ -52,8 +52,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.model.Course
 import com.example.data.model.Homework
 import com.example.data.model.HomeworkWithCourse
 import com.example.data.model.UserAccount
@@ -63,6 +65,7 @@ import com.example.ui.StatusFilter
 import com.example.ui.TimeFilter
 import com.example.ui.components.FilterBar
 import com.example.ui.components.HomeworkItemCard
+import com.example.ui.components.SwipeableHeroSection
 import com.example.ui.components.UserFlowerAvatar
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.OutlinedButton
@@ -92,6 +95,7 @@ fun HomeScreen(
     adminAssignedFilter: String = "Elif",
     onAdminAssignedFilterChange: (String) -> Unit = {},
     onSwitchProfile: () -> Unit = {},
+    courses: List<Course> = emptyList(),
     modifier: Modifier = Modifier
 ) {
     val todayFormatted = remember {
@@ -113,11 +117,13 @@ fun HomeScreen(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Minimalist Material 3 Hero Greeting & Progress Header
+        // Minimalist Material 3 Hero Greeting & Progress Header (Yana kaydırarak TufiAI Derece Koçuna geçilebilir)
         item {
-            MinimalHeroBanner(
+            SwipeableHeroSection(
                 todayDate = todayFormatted,
-                stats = stats
+                stats = stats,
+                courses = courses,
+                homeworks = homeworks
             )
         }
 
@@ -244,11 +250,13 @@ fun HomeScreen(
 @Composable
 fun MinimalHeroBanner(
     todayDate: String,
-    stats: HomeworkStats
+    stats: HomeworkStats,
+    modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
+            .height(148.dp)
             .testTag("hero_banner_card"),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
@@ -258,8 +266,9 @@ fun MinimalHeroBanner(
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(18.dp)
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -269,13 +278,12 @@ fun MinimalHeroBanner(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = todayDate,
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "İyi Çalışmalar 📚",
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, fontSize = 18.sp),
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -284,11 +292,11 @@ fun MinimalHeroBanner(
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.padding(start = 12.dp)
+                    modifier = Modifier.padding(start = 8.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                     ) {
                         Text(
                             text = "%${stats.completionPercentage}",
@@ -297,7 +305,7 @@ fun MinimalHeroBanner(
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
                         Text(
                             text = "bitti",
                             style = MaterialTheme.typography.labelSmall,
@@ -306,8 +314,6 @@ fun MinimalHeroBanner(
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(10.dp))
 
             // Motivation text
             val motivationText = when {
@@ -320,11 +326,11 @@ fun MinimalHeroBanner(
 
             Text(
                 text = motivationText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.5.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
-
-            Spacer(modifier = Modifier.height(10.dp))
 
             // Progress Bar
             LinearProgressIndicator(

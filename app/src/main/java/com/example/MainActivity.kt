@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.example.ui.components.FixedStandardBottomNavigation
 import com.example.ui.components.IslandBottomNavigation
 import com.example.ui.components.TabletIslandNavigation
 import com.example.ui.components.UserFlowerAvatar
@@ -446,7 +448,11 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
         if (isSettingsOpen) {
             renderSettings()
         } else {
-            Crossfade(targetState = currentTab, label = "tab_crossfade") { tab ->
+            Crossfade(
+                targetState = currentTab,
+                animationSpec = tween(90),
+                label = "tab_crossfade"
+            ) { tab ->
                 val targetScreen = navItems.getOrNull(tab) ?: Screen.Home
                 when (targetScreen) {
                     Screen.Home -> HomeScreen(
@@ -476,7 +482,8 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                         hideCompletedInSettings = hideCompleted,
                         currentUser = currentUser,
                         adminAssignedFilter = adminAssignedFilter,
-                        onAdminAssignedFilterChange = { viewModel.setAdminAssignedFilter(it) }
+                        onAdminAssignedFilterChange = { viewModel.setAdminAssignedFilter(it) },
+                        courses = courses
                     )
 
                     Screen.Calendar -> CalendarScreen(
@@ -510,6 +517,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                         stats = stats,
                         courses = courses,
                         homeworks = userHomeworks,
+                        notes = userNotes,
                         onToggleComplete = { hw ->
                             viewModel.toggleCompletion(hw)
                             val msg = if (!hw.isCompleted) "Tebrikler! Ödev tamamlandı 🎉" else "Ödev bekleyenlere alındı"
@@ -726,7 +734,8 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                         hideCompletedInSettings = hideCompleted,
                         currentUser = currentUser,
                         adminAssignedFilter = adminAssignedFilter,
-                        onAdminAssignedFilterChange = { viewModel.setAdminAssignedFilter(it) }
+                        onAdminAssignedFilterChange = { viewModel.setAdminAssignedFilter(it) },
+                        courses = courses
                     )
                 }
             }
@@ -959,7 +968,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                 },
                 bottomBar = {
                     if (!floatingBottomBar && !isSettingsOpen && !isSelectionActive && !isTimerActive) {
-                        IslandBottomNavigation(
+                        FixedStandardBottomNavigation(
                             currentTab = currentTab,
                             onTabSelected = { index ->
                                 navItems.getOrNull(index)?.let { currentRoute = it.route }

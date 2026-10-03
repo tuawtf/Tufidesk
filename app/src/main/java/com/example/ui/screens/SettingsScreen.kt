@@ -371,9 +371,9 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 SettingsSwitchItem(
-                    icon = Icons.Default.Layers,
-                    title = "Tam Yüzen Alt Menü (Siyahlığı Kaldır)",
-                    subtitle = "Alt menünün arkasındaki siyah çubuğu kaldırarak tamamen havada yüzen ada görünümü sağlar",
+                    icon = if (floatingBottomBar) Icons.Default.Layers else Icons.Default.GridView,
+                    title = if (floatingBottomBar) "Yüzen Ada Alt Bar" else "Sabit Alt Bar",
+                    subtitle = if (floatingBottomBar) "Havada süzülen ada kapsülü görünümü (Açık: Yüzen Ada, Kapalı: Sabit Alt Bar)" else "Ekrana tam oturan standart sabit Material 3 alt gezinme çubuğu",
                     checked = floatingBottomBar,
                     onCheckedChange = onFloatingBottomBarChange
                 )
