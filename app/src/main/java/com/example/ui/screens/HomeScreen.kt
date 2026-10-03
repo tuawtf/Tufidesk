@@ -96,6 +96,7 @@ fun HomeScreen(
     onAdminAssignedFilterChange: (String) -> Unit = {},
     onSwitchProfile: () -> Unit = {},
     courses: List<Course> = emptyList(),
+    onNavigateToTufiAI: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val todayFormatted = remember {
@@ -117,13 +118,14 @@ fun HomeScreen(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Minimalist Material 3 Hero Greeting & Progress Header (Yana kaydırarak TufiAI Derece Koçuna geçilebilir)
+        // Minimalist Material 3 Hero Greeting & Progress Header (Yana kaydırarak Tufi AI kartına geçilebilir)
         item {
             SwipeableHeroSection(
                 todayDate = todayFormatted,
                 stats = stats,
                 courses = courses,
-                homeworks = homeworks
+                homeworks = homeworks,
+                onNavigateToTufiAI = onNavigateToTufiAI
             )
         }
 

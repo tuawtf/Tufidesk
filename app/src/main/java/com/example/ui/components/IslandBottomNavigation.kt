@@ -218,7 +218,7 @@ fun IslandBottomNavItem(
         Row(
             modifier = Modifier
                 .padding(
-                    horizontal = if (isSelected) 14.dp else 11.dp,
+                    horizontal = if (isSelected && label.isNotBlank()) 14.dp else 11.dp,
                     vertical = 10.dp
                 ),
             verticalAlignment = Alignment.CenterVertically,
@@ -226,16 +226,16 @@ fun IslandBottomNavItem(
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = label,
+                contentDescription = label.ifBlank { "Menü" },
                 tint = contentColor,
                 modifier = Modifier
                     .size(23.dp)
                     .graphicsLayer(scaleX = iconScale, scaleY = iconScale)
             )
 
-            // Seçildiğinde yana doğru pürüzsüzce genişleyip metni gösterir
+            // Seçildiğinde yana doğru pürüzsüzce genişleyip metni gösterir (metin boş değilse)
             AnimatedVisibility(
-                visible = isSelected,
+                visible = isSelected && label.isNotBlank(),
                 enter = fadeIn(animationSpec = tween(180)) + expandHorizontally(
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioLowBouncy,

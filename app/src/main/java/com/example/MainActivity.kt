@@ -119,12 +119,14 @@ import com.example.ui.screens.NotesScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.StatsScreen
 import com.example.ui.screens.ToolsScreen
+import com.example.ui.screens.TufiAIScreen
 import com.example.data.model.NoteType
 import com.example.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.filled.AutoAwesome
 
 sealed class Screen(
     val route: String,
@@ -134,6 +136,7 @@ sealed class Screen(
 ) {
     data object Home : Screen("home", "Ödevler", Icons.Filled.Assignment, Icons.Outlined.Assignment)
     data object Calendar : Screen("calendar", "Takvim", Icons.Filled.CalendarMonth, Icons.Outlined.CalendarMonth)
+    data object TufiAI : Screen("tufi_ai", "Tufi AI", Icons.Filled.AutoAwesome, Icons.Filled.AutoAwesome)
     data object Stats : Screen("stats", "İstatistik", Icons.Filled.BarChart, Icons.Outlined.BarChart)
     data object Notes : Screen("notes", "Notlar", Icons.Filled.Description, Icons.Outlined.Description)
     data object Exams : Screen("exams", "Denemeler", Icons.Filled.Assessment, Icons.Filled.Assessment)
@@ -327,6 +330,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
         buildList {
             add(Screen.Home)
             add(Screen.Calendar)
+            add(Screen.TufiAI)
             add(Screen.Stats)
             if (pinnedBottomTools.contains("notes")) add(Screen.Notes)
             if (pinnedBottomTools.contains("exams")) add(Screen.Exams)
@@ -368,6 +372,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
             }
         }
         selectedScreen == Screen.Calendar -> "Ödev Takvimi"
+        selectedScreen == Screen.TufiAI -> "Tufi AI"
         selectedScreen == Screen.Stats -> "İstatistikler"
         selectedScreen == Screen.Notes -> "Notlar"
         selectedScreen == Screen.Exams -> "Deneme Sınavları"
@@ -483,7 +488,8 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                         currentUser = currentUser,
                         adminAssignedFilter = adminAssignedFilter,
                         onAdminAssignedFilterChange = { viewModel.setAdminAssignedFilter(it) },
-                        courses = courses
+                        courses = courses,
+                        onNavigateToTufiAI = { currentRoute = Screen.TufiAI.route }
                     )
 
                     Screen.Calendar -> CalendarScreen(
@@ -511,6 +517,12 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                             showAddEditHomeworkDialog = true
                         },
                         canManage = canManage
+                    )
+
+                    Screen.TufiAI -> TufiAIScreen(
+                        courses = courses,
+                        homeworks = filteredHomeworks,
+                        onBack = { currentRoute = Screen.Home.route }
                     )
 
                     Screen.Stats -> StatsScreen(
@@ -735,7 +747,8 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                         currentUser = currentUser,
                         adminAssignedFilter = adminAssignedFilter,
                         onAdminAssignedFilterChange = { viewModel.setAdminAssignedFilter(it) },
-                        courses = courses
+                        courses = courses,
+                        onNavigateToTufiAI = { currentRoute = Screen.TufiAI.route }
                     )
                 }
             }

@@ -214,7 +214,7 @@ private fun TimerBottomIslandNavigation(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // EN SOLDA ÖZEL FARKLI TASARIMLI ARAÇLAR BUTONU
+                // EN SOLDA ÖZEL FARKLI TASARIMLI ARAÇLAR BUTONU (Yazısız, sadece kompakt ikon)
                 Surface(
                     shape = RoundedCornerShape(22.dp),
                     color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.85f),
@@ -230,24 +230,15 @@ private fun TimerBottomIslandNavigation(
                         )
                         .testTag("timer_back_to_tools_button")
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Box(
+                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 10.dp),
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.GridView,
                             contentDescription = "Araçlar Menüsü",
                             tint = MaterialTheme.colorScheme.onSecondaryContainer,
                             modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Araçlar",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            ),
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                     }
                 }

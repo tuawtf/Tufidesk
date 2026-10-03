@@ -3,6 +3,8 @@ package com.example.data.ai
 import android.content.Context
 import android.util.Log
 import com.example.BuildConfig
+import com.example.data.model.Course
+import com.example.data.model.HomeworkWithCourse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -12,31 +14,22 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
-data class CourseBenefitItem(
-    val courseName: String,
-    val benefit: String,
-    val whyItMatters: String,
-    val futureOrYksImpact: String
-)
-
-data class StudyRecommendationItem(
-    val courseName: String,
-    val whatToStudy: String,
-    val howToStudy: String,
-    val dereceTechnique: String
-)
-
+/**
+ * Tufi AI sadeleştirilmiş ve doğrudan ödevlere odaklı koçluk modeli.
+ */
 data class TufiAICoachAdvice(
     val headline: String,
     val summary: String,
-    val courseBenefits: List<CourseBenefitItem>,
-    val studyRecommendations: List<StudyRecommendationItem>,
-    val dereceTactic: String,
-    val motivationQuote: String,
+    val todayTasksInsight: String,       // Bugünkü ödevler hakkında somut veri ve strateji
+    val missingTasksInsight: String,     // Eksik / bekleyen / geciken ödevler analizi
+    val weeklyInsight: String,           // Hafta hakkında genel veri ve tempo
+    val stepByStepPlan: List<String>,    // Bugünkü ödevleri nasıl ilerletmeli (adım adım yol haritası)
+    val studyMethodTip: String,          // Nasıl çalışmalı (taktik, odak, pomodoro)
     val timestampMillis: Long = System.currentTimeMillis(),
     val isFromApi: Boolean = true
 )
@@ -44,8 +37,11 @@ data class TufiAICoachAdvice(
 object TufiAIService {
     private const val TAG = "TufiAIService"
     private const val PREFS_NAME = "tufiai_cache_prefs"
-    private const val PREF_KEY_ADVICE_PREFIX = "advice_"
+    private const val PREF_KEY_ADVICE_PREFIX = "advice_v2_"
+    private const val PREF_KEY_SIG_PREFIX = "sig_v2_"
     private const val PREF_KEY_CUSTOM_API_KEY = "custom_deepseek_api_key"
+    private const val PREF_KEY_LAST_SAVED_MESSAGE = "last_saved_advice_v2"
+    private const val PREF_KEY_LAST_SAVED_SIG = "last_saved_sig_v2"
 
     private val client by lazy {
         OkHttpClient.Builder()
@@ -74,94 +70,119 @@ object TufiAIService {
         prefs.edit().putString(PREF_KEY_CUSTOM_API_KEY, key.trim()).apply()
     }
 
+    /**
+     * Akıllı Token Tasarrufu:
+     * Ödevlerde değişiklik yapılmadığı sürece kaydedilen mesaj kullanılır,
+     * gereksiz API çağrısı yapılmaz.
+     */
     suspend fun getCoachingAdvice(
         context: Context,
-        courses: List<String>,
-        homeworkTitles: List<String>,
+        courses: List<Course> = emptyList(),
+        homeworks: List<HomeworkWithCourse> = emptyList(),
         forceRefresh: Boolean = false
     ): TufiAICoachAdvice = withContext(Dispatchers.IO) {
         val todayKey = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        val hwSignature = homeworks.map { "${it.homework.id}_${it.homework.isCompleted}_${it.homework.dueDateMillis}" }.sorted().joinToString(";")
+        val currentSignature = "$todayKey|$hwSignature"
+
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val cachedJson = prefs.getString("$PREF_KEY_ADVICE_PREFIX$todayKey", null)
+            ?: prefs.getString(PREF_KEY_LAST_SAVED_MESSAGE, null)
+        val cachedSig = prefs.getString("$PREF_KEY_SIG_PREFIX$todayKey", null)
+            ?: prefs.getString(PREF_KEY_LAST_SAVED_SIG, null)
 
+        // 1. Önbellek kontrolü (Token Tasarrufu)
         if (!forceRefresh && !cachedJson.isNullOrBlank()) {
             try {
-                val parsed = parseAdviceFromJson(JSONObject(cachedJson))
-                if (parsed != null) {
-                    return@withContext parsed
+                if (cachedSig == currentSignature || cachedJson.isNotBlank()) {
+                    val parsed = parseAdviceFromJson(JSONObject(cachedJson))
+                    if (parsed != null) {
+                        Log.d(TAG, "Token Tasarrufu: Kayıtlı Tufi AI mesajı kullanıldı.")
+                        return@withContext parsed
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Cache parse error", e)
             }
         }
 
+        // 2. API Çağrısı (API anahtarı varsa)
         val apiKey = getApiKey(context)
-        val effectiveCourses = if (courses.isNotEmpty()) courses else listOf("Matematik", "Türkçe", "Fizik", "Tarih")
-
         if (apiKey.isNotBlank()) {
             try {
-                val apiAdvice = callDeepSeekApi(apiKey, effectiveCourses, homeworkTitles)
+                val apiAdvice = callDeepSeekApi(apiKey, homeworks)
                 if (apiAdvice != null) {
-                    // Save to cache
                     try {
                         val serialized = serializeAdviceToJson(apiAdvice).toString()
-                        prefs.edit().putString("$PREF_KEY_ADVICE_PREFIX$todayKey", serialized).apply()
+                        prefs.edit()
+                            .putString("$PREF_KEY_ADVICE_PREFIX$todayKey", serialized)
+                            .putString("$PREF_KEY_SIG_PREFIX$todayKey", currentSignature)
+                            .putString(PREF_KEY_LAST_SAVED_MESSAGE, serialized)
+                            .putString(PREF_KEY_LAST_SAVED_SIG, currentSignature)
+                            .apply()
+
+                        try {
+                            val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                            val docData = hashMapOf(
+                                "todayKey" to todayKey,
+                                "signature" to currentSignature,
+                                "adviceJson" to serialized,
+                                "updatedAt" to System.currentTimeMillis()
+                            )
+                            db.collection("tufi_ai_cache").document(todayKey).set(docData)
+                        } catch (_: Exception) {}
                     } catch (e: Exception) {
                         Log.e(TAG, "Failed to cache advice", e)
                     }
                     return@withContext apiAdvice
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "DeepSeek API call failed, falling back to built-in Derece intelligence", e)
+                Log.e(TAG, "DeepSeek API call failed, falling back to built-in guidance", e)
             }
         }
 
-        // Offline / Fallback Derece Intelligence
-        val fallback = generateBuiltInDereceAdvice(effectiveCourses, homeworkTitles)
-        fallback
+        // 3. Fallback: Çevrimdışı ve yerel akıllı ödev analizi
+        if (!cachedJson.isNullOrBlank()) {
+            try {
+                val parsed = parseAdviceFromJson(JSONObject(cachedJson))
+                if (parsed != null) return@withContext parsed
+            } catch (_: Exception) {}
+        }
+
+        generateBuiltInAdvice(homeworks)
     }
 
     private fun callDeepSeekApi(
         apiKey: String,
-        courses: List<String>,
-        homeworkTitles: List<String>
+        homeworks: List<HomeworkWithCourse>
     ): TufiAICoachAdvice? {
-        val prompt = buildPrompt(courses, homeworkTitles)
+        val prompt = buildPrompt(homeworks)
 
         val messagesArray = JSONArray().apply {
             put(JSONObject().apply {
                 put("role", "system")
                 put("content", """
-                    Sen TufiAI'sın; YKS ve lise sınavlarında Türkiye 1.si ve ilk 100'e giren derece öğrencilerinin çalışma disiplini, turlama tekniği, MEB kazanım testleri, analiz/yanlış defteri metotları ve çalışma psikolojisini mükemmel bilen samimi, motive edici ve stratejik bir yapay zeka derece koçusun.
+                    Sen Tufi AI'sın. Öğrencinin karmaşık felsefi ders açıklamalarına değil; doğrudan bugünkü ödevlerine, eksik kalanlarına, haftalık temposuna ve bunları nasıl ilerletmesi gerektiğine odaklanan pratik, net ve samimi bir çalışma koçusun.
                     
-                    Görevin: Öğrencinin bugünkü derslerini analiz ederek:
-                    1. Bu derslerin bize ne faydası olduğunu, zihinsel kapasiteye, problem çözme yeteneğine ve YKS/hayat başarısına somut katkısını açıklamak.
-                    2. Bugün neye çalışmamız gerektiğini (kritik konular, soru tipleri) netleştirmek.
-                    3. Derece öğrencilerinin bu derslere nasıl çalıştığını (somut taktikler, süreler, soru adetleri, kaynak sıralaması) anlatmak.
-                    4. Derece öğrencisi altın tavsiyesi ve motivasyon notu vermek.
+                    Görevin:
+                    1. Bugünkü ödevler hakkında net durum ve öncelik tespiti yapmak.
+                    2. Eksik veya bekleyen ödevler varsa bunların nasıl toparlanacağını söylemek.
+                    3. Bu haftanın genel yoğunluğu ve haftayı nasıl planlayacağı hakkında bilgi vermek.
+                    4. Bugünkü ödevleri nasıl ilerletmesi gerektiğine dair 3 somut adım ve 1 verimli çalışma taktiği (Pomodoro vb.) sunmak.
                     
-                    LÜTFEN SADECE AŞAĞIDAKİ GEÇERLİ JSON FORMATINDA CEVAP VER. Markdown bloğu veya fazladan metin ekleme, doğrudan JSON nesnesi döndür:
+                    LÜTFEN SADECE VE DOĞRUDAN AŞAĞIDAKİ JSON FORMATINDA CEVAP VER. Markdown etiketi koyma:
                     {
-                      "headline": "kısa ve etkileyici koçluk başlığı",
-                      "summary": "1-2 cümlelik bugünkü stratejik özet",
-                      "courseBenefits": [
-                        {
-                          "courseName": "Ders Adı",
-                          "benefit": "Bu dersin bize kazandırdığı temel zihinsel güç ve beceri",
-                          "whyItMatters": "Neden öğrenmeliyiz ve hayattaki karşılığı nedir?",
-                          "futureOrYksImpact": "YKS'de ve kariyerdeki kritik etkisi"
-                        }
+                      "headline": "Kısa ve motive edici başlık (örn: Bugünün Rotası: 2 Kritik Ödev)",
+                      "summary": "1-2 cümlelik genel değerlendirme",
+                      "todayTasksInsight": "Bugünkü ödevler hakkında net bilgi ve öneri",
+                      "missingTasksInsight": "Eksik / bekleyen ödevlerin durumu ve toparlama tüyosu",
+                      "weeklyInsight": "Bu hafta hakkında veri, tempo ve plan önerisi",
+                      "stepByStepPlan": [
+                        "1. Adım: ...",
+                        "2. Adım: ...",
+                        "3. Adım: ..."
                       ],
-                      "studyRecommendations": [
-                        {
-                          "courseName": "Ders Adı",
-                          "whatToStudy": "Bugün tam olarak hangi konu/kazanıma odaklanılmalı?",
-                          "howToStudy": "Adım adım çalışma yöntemi (konu-soru dengesi)",
-                          "dereceTechnique": "Derece öğrencisi taktiği (örn: Analiz Defteri, 3 Kaynak Turlaması)"
-                        }
-                      ],
-                      "dereceTactic": "Türkiye derece öğrencilerinin uyguladığı günün altın stratejisi",
-                      "motivationQuote": "Motive edici derece sözü"
+                      "studyMethodTip": "Bugünkü çalışmayı hızlandıracak pratik bir taktik (örn. Pomodoro süresi veya mola kuralı)"
                     }
                 """.trimIndent())
             })
@@ -174,7 +195,7 @@ object TufiAIService {
         val requestJson = JSONObject().apply {
             put("model", "deepseek-chat")
             put("messages", messagesArray)
-            put("temperature", 0.6)
+            put("temperature", 0.5)
             put("stream", false)
         }
 
@@ -201,7 +222,6 @@ object TufiAIService {
             val message = choices.getJSONObject(0).optJSONObject("message") ?: return null
             val content = message.optString("content", "").trim()
 
-            // Clean markdown code blocks if wrapped in ```json ... ```
             val cleanJsonString = when {
                 content.startsWith("```json") -> content.removePrefix("```json").substringBeforeLast("```").trim()
                 content.startsWith("```") -> content.removePrefix("```").substringBeforeLast("```").trim()
@@ -213,68 +233,72 @@ object TufiAIService {
         }
     }
 
-    private fun buildPrompt(courses: List<String>, homeworkTitles: List<String>): String {
-        val coursesStr = courses.joinToString(", ")
-        val hwStr = if (homeworkTitles.isNotEmpty()) {
-            "Bugün teslim veya çalışma listesindeki ödevler: ${homeworkTitles.joinToString(", ")}."
-        } else {
-            "Bugün özel bir ödev girilmemiş, genel ders çalışma programı."
-        }
+    private fun buildPrompt(homeworks: List<HomeworkWithCourse>): String {
+        val now = System.currentTimeMillis()
+        val cal = Calendar.getInstance().apply { timeInMillis = now }
+        cal.set(Calendar.HOUR_OF_DAY, 0)
+        cal.set(Calendar.MINUTE, 0)
+        cal.set(Calendar.SECOND, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        val startOfToday = cal.timeInMillis
 
-        return """
-            Bugünkü derslerimiz: $coursesStr.
-            $hwStr
-            
-            Lütfen derece öğrencilerinin çalışma disiplini ve tecrübeleriyle bu dersleri bize neden çalıştığımızı, neye ve nasıl çalışmamız gerektiğini somut taktiklerle anlat. Belirtilen JSON şablonunda cevap ver.
-        """.trimIndent()
+        cal.set(Calendar.HOUR_OF_DAY, 23)
+        cal.set(Calendar.MINUTE, 59)
+        cal.set(Calendar.SECOND, 59)
+        val endOfToday = cal.timeInMillis
+        val endOfWeek = startOfToday + 7 * 86400000L
+
+        val pending = homeworks.filter { !it.homework.isCompleted }
+        val completed = homeworks.filter { it.homework.isCompleted }
+        val dueToday = pending.filter { it.homework.dueDateMillis in startOfToday..endOfToday }
+        val overdue = pending.filter { it.homework.dueDateMillis in 1 until startOfToday }
+        val dueThisWeek = pending.filter { it.homework.dueDateMillis in (endOfToday + 1)..endOfWeek }
+
+        return buildString {
+            appendLine("Öğrencinin Mevcut Ödev Durumu:")
+            appendLine("- Bugün teslim edilecek ödev sayısı: ${dueToday.size}")
+            if (dueToday.isNotEmpty()) {
+                appendLine("  Bugünküler: ${dueToday.joinToString { "${it.course?.name ?: "Ders"}: ${it.homework.title}" }}")
+            }
+            appendLine("- Gecikmiş / eksik ödev sayısı: ${overdue.size}")
+            if (overdue.isNotEmpty()) {
+                appendLine("  Eksikler: ${overdue.joinToString { "${it.course?.name ?: "Ders"}: ${it.homework.title}" }}")
+            }
+            appendLine("- Bu hafta içinde teslim edilecek diğer ödevler: ${dueThisWeek.size}")
+            appendLine("- Toplam ödev: ${homeworks.size}, Tamamlanan: ${completed.size}, Bekleyen: ${pending.size}")
+        }
     }
 
     private fun parseAdviceFromJson(json: JSONObject, isFromApi: Boolean = true): TufiAICoachAdvice? {
         try {
-            val headline = json.optString("headline", "Bugünün Stratejik Koçluk Planı")
-            val summary = json.optString("summary", "Bugünkü derslerin zihinsel gelişimin ve sınav hedefin için büyük bir fırsat.")
-            val dereceTactic = json.optString("dereceTactic", "Çözemediğin her soruyu kesip 'Analiz Defteri'ne yapıştır. 3 gün sonra tekrar çöz!")
-            val motivationQuote = json.optString("motivationQuote", "“Zor sorular seni eler değil, seni dereceye taşır.”")
+            val headline = json.optString("headline", "Bugünün Çalışma Rotası")
+            val summary = json.optString("summary", "Ödevlerini düzenli tamamlayarak gününü verimli kapat.")
+            val todayTasksInsight = json.optString("todayTasksInsight", "Bugünkü ödevlerini öncelik sırasına göre tamamlamaya başla.")
+            val missingTasksInsight = json.optString("missingTasksInsight", "Eksik ödevlerini biriktirmeden kısa bloklarla eritebilirsin.")
+            val weeklyInsight = json.optString("weeklyInsight", "Bu haftanın temposunu koruyarak ilerle.")
+            val studyMethodTip = json.optString("studyMethodTip", "25 dakika çalışma, 5 dakika mola kuralını (Pomodoro) uygula.")
 
-            val benefits = mutableListOf<CourseBenefitItem>()
-            val benefitsArray = json.optJSONArray("courseBenefits")
-            if (benefitsArray != null) {
-                for (i in 0 until benefitsArray.length()) {
-                    val item = benefitsArray.getJSONObject(i)
-                    benefits.add(
-                        CourseBenefitItem(
-                            courseName = item.optString("courseName", "Ders"),
-                            benefit = item.optString("benefit", ""),
-                            whyItMatters = item.optString("whyItMatters", ""),
-                            futureOrYksImpact = item.optString("futureOrYksImpact", "")
-                        )
-                    )
+            val steps = mutableListOf<String>()
+            val stepsArray = json.optJSONArray("stepByStepPlan")
+            if (stepsArray != null) {
+                for (i in 0 until stepsArray.length()) {
+                    steps.add(stepsArray.getString(i))
                 }
             }
-
-            val recommendations = mutableListOf<StudyRecommendationItem>()
-            val recArray = json.optJSONArray("studyRecommendations")
-            if (recArray != null) {
-                for (i in 0 until recArray.length()) {
-                    val item = recArray.getJSONObject(i)
-                    recommendations.add(
-                        StudyRecommendationItem(
-                            courseName = item.optString("courseName", "Ders"),
-                            whatToStudy = item.optString("whatToStudy", ""),
-                            howToStudy = item.optString("howToStudy", ""),
-                            dereceTechnique = item.optString("dereceTechnique", "")
-                        )
-                    )
-                }
+            if (steps.isEmpty()) {
+                steps.add("1. Adım: Teslim tarihi en yakın ödevine 30 dakika odaklan.")
+                steps.add("2. Adım: Kısa bir mola verip bekleyen soruları çöz.")
+                steps.add("3. Adım: Tamamladığın ödevleri işaretleyip gününü tamamla.")
             }
 
             return TufiAICoachAdvice(
                 headline = headline,
                 summary = summary,
-                courseBenefits = benefits,
-                studyRecommendations = recommendations,
-                dereceTactic = dereceTactic,
-                motivationQuote = motivationQuote,
+                todayTasksInsight = todayTasksInsight,
+                missingTasksInsight = missingTasksInsight,
+                weeklyInsight = weeklyInsight,
+                stepByStepPlan = steps,
+                studyMethodTip = studyMethodTip,
                 isFromApi = isFromApi
             )
         } catch (e: Exception) {
@@ -287,185 +311,109 @@ object TufiAIService {
         return JSONObject().apply {
             put("headline", advice.headline)
             put("summary", advice.summary)
-            put("dereceTactic", advice.dereceTactic)
-            put("motivationQuote", advice.motivationQuote)
+            put("todayTasksInsight", advice.todayTasksInsight)
+            put("missingTasksInsight", advice.missingTasksInsight)
+            put("weeklyInsight", advice.weeklyInsight)
+            put("studyMethodTip", advice.studyMethodTip)
 
-            val benefitsArray = JSONArray()
-            advice.courseBenefits.forEach { b ->
-                benefitsArray.put(JSONObject().apply {
-                    put("courseName", b.courseName)
-                    put("benefit", b.benefit)
-                    put("whyItMatters", b.whyItMatters)
-                    put("futureOrYksImpact", b.futureOrYksImpact)
-                })
-            }
-            put("courseBenefits", benefitsArray)
-
-            val recArray = JSONArray()
-            advice.studyRecommendations.forEach { r ->
-                recArray.put(JSONObject().apply {
-                    put("courseName", r.courseName)
-                    put("whatToStudy", r.whatToStudy)
-                    put("howToStudy", r.howToStudy)
-                    put("dereceTechnique", r.dereceTechnique)
-                })
-            }
-            put("studyRecommendations", recArray)
+            val stepsArray = JSONArray()
+            advice.stepByStepPlan.forEach { stepsArray.put(it) }
+            put("stepByStepPlan", stepsArray)
         }
     }
 
     /**
-     * Built-in rich intelligence collected from top Türkiye YKS champions & Derece students.
-     * Ensures the user receives profound, high-value coaching even without network connectivity.
+     * Çevrimdışı / Dahili Akıllı Analiz Motoru:
+     * Öğrencinin gerçek ödev verilerini analiz eder; ders ders soyut veri yerine
+     * bugünkü ödevleri, eksikleri, haftayı ve nasıl çalışması gerektiğini hesaplar.
      */
-    fun generateBuiltInDereceAdvice(
-        courses: List<String>,
-        homeworkTitles: List<String>
-    ): TufiAICoachAdvice {
-        val benefits = mutableListOf<CourseBenefitItem>()
-        val recommendations = mutableListOf<StudyRecommendationItem>()
+    fun generateBuiltInAdvice(homeworks: List<HomeworkWithCourse>): TufiAICoachAdvice {
+        val now = System.currentTimeMillis()
+        val cal = Calendar.getInstance().apply { timeInMillis = now }
+        cal.set(Calendar.HOUR_OF_DAY, 0)
+        cal.set(Calendar.MINUTE, 0)
+        cal.set(Calendar.SECOND, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        val startOfToday = cal.timeInMillis
 
-        val distinctCourses = courses.distinct().ifEmpty { listOf("Matematik", "Türkçe", "Fizik") }
+        cal.set(Calendar.HOUR_OF_DAY, 23)
+        cal.set(Calendar.MINUTE, 59)
+        cal.set(Calendar.SECOND, 59)
+        val endOfToday = cal.timeInMillis
+        val endOfWeek = startOfToday + 7 * 86400000L
 
-        distinctCourses.forEach { course ->
-            val norm = course.lowercase(Locale("tr"))
-            when {
-                norm.contains("mat") -> {
-                    benefits.add(
-                        CourseBenefitItem(
-                            courseName = course,
-                            benefit = "Soyut bağlantı kurma, yüksek analitik modelleme ve adım adım problem çözme yeteneği kazandırır.",
-                            whyItMatters = "Gelecekte yazılım, yapay zeka, finans ve stratejik karar alma mekanizmalarının temel zihinsel altyapısıdır.",
-                            futureOrYksImpact = "YKS TYT & AYT'de en yüksek standart sapmaya ve puan katsayısına sahip belirleyici branştır."
-                        )
-                    )
-                    recommendations.add(
-                        StudyRecommendationItem(
-                            courseName = course,
-                            whatToStudy = "Konu eksiği varsa temel kavram mantığını kavra, ardından doğrudan yeni nesil problemlere geç.",
-                            howToStudy = "Formülleri ezberleme; ispatını bir kez kağıda yaz. 1 orta seviye soru bankasından sonra hemen deneme formatına geç.",
-                            dereceTechnique = "3 Kaynak Turlaması: Kolay kaynakta oyalanma; doğrudan MEB OGM Materyal + Orta + İleri düzey kaynak tara."
-                        )
-                    )
-                }
-                norm.contains("fizik") -> {
-                    benefits.add(
-                        CourseBenefitItem(
-                            courseName = course,
-                            benefit = "Evrenin mantığını matematiksel gözle modellemeyi, sebep-sonuç ilişkisini net görmeyi sağlar.",
-                            whyItMatters = "Mühendislik, teknoloji ve gerçek hayat mekaniğinde olayların 'neden' öyle çalıştığını anlamanı sağlar.",
-                            futureOrYksImpact = "Öğrencilerin en çok ön yargıyla yaklaştığı, bu yüzden doğru çözenin binlerce kişiyi elediği derstir."
-                        )
-                    )
-                    recommendations.add(
-                        StudyRecommendationItem(
-                            courseName = course,
-                            whatToStudy = "Kuvvet, hareket, enerji veya elektrik alanındaki kavram yanılgılarını temizle.",
-                            howToStudy = "Şekil çizerek çöz. Soruyu okurken verilenleri ve isteneni mutlaka kağıda şematize et.",
-                            dereceTechnique = "MEB Deneyleri Analizi: Derece öğrencileri MEB fizik kitabındaki şekilli kazanım sorularını satır satır inceler."
-                        )
-                    )
-                }
-                norm.contains("kimya") -> {
-                    benefits.add(
-                        CourseBenefitItem(
-                            courseName = course,
-                            benefit = "Maddenin mikroskobik dünyası ile makroskobik sonuçları arasındaki dönüşümleri anlamayı öğretir.",
-                            whyItMatters = "Tıp, eczacılık, malzeme bilimi ve enerji sektörlerinin can damarıdır.",
-                            futureOrYksImpact = "AYT Sayısalda en hızlı nete dönüştürülen ve doğru çalışıldığında fullenmesi en kolay derstir."
-                        )
-                    )
-                    recommendations.add(
-                        StudyRecommendationItem(
-                            courseName = course,
-                            whatToStudy = "Mol kavramı, periyodik sistem veya organik/denge bağıntıları.",
-                            howToStudy = "Bileşik adlandırma ve tepkime denkleştirme refleks haline gelene kadar pratik yap.",
-                            dereceTechnique = "Tablo & Duvar Notları: İstisnaları (gaz yasaları, orbital sıraları) göz hizana asıp her gün 2 dakika göz gezdir."
-                        )
-                    )
-                }
-                norm.contains("biyoloji") -> {
-                    benefits.add(
-                        CourseBenefitItem(
-                            courseName = course,
-                            benefit = "Canlı sistemlerin muazzam dengesini, genetik ve hücresel mekanizmaları keşfetmeni sağlar.",
-                            whyItMatters = "Biyoteknoloji, sağlık, beslenme ve çevre korumanın temelidir.",
-                            futureOrYksImpact = "Bilgi doğruluğu gerektirir; yorum soruları ancak sağlam terminolojiyle eksiksiz çözülür."
-                        )
-                    )
-                    recommendations.add(
-                        StudyRecommendationItem(
-                            courseName = course,
-                            whatToStudy = "Hücre bölünmeleri, kalıtım veya sistemler (dolaşım, sinir).",
-                            howToStudy = "Pasif okuma yapma! Boş bir kağıt alıp sistemi baştan sona kendi cümlelerinle çiz ve anlat (Feynman Tekniği).",
-                            dereceTechnique = "Renkli Kavram Haritası: Derece öğrencileri MEB kitabındaki tüm şemaları kendi elleriyle yeniden çizer."
-                        )
-                    )
-                }
-                norm.contains("türkçe") || norm.contains("edebiyat") -> {
-                    benefits.add(
-                        CourseBenefitItem(
-                            courseName = course,
-                            benefit = "Hızlı anlama, derin muhakeme, odaklanma ve kelimelerin arkasındaki niyeti kavrama gücü verir.",
-                            whyItMatters = "Hangi meslekte olursan ol, ikna kabiliyeti, hitabet ve doğru ifade etme gücü kariyerini belirler.",
-                            futureOrYksImpact = "YKS'nin zaman tuzaklarını aşmanın tek anahtarıdır; Türkçeyi 30-35 dakikada bitiren dereceye koşar."
-                        )
-                    )
-                    recommendations.add(
-                        StudyRecommendationItem(
-                            courseName = course,
-                            whatToStudy = "Paragrafta ana fikir, akışı bozan cümle ve dil bilgisinde karma soru çözümleri.",
-                            howToStudy = "Her sabah zihnin en berrakken 20 paragraf sorusunu kronometre açarak çöz. Seçenekleri eleme gerekçeni netleştir.",
-                            dereceTechnique = "Zamanlı Paragraf Rutini: Derece öğrencileri son 1 yıl boyunca hiçbir sabahı 20 paragraf çözmeden geçirmez."
-                        )
-                    )
-                }
-                norm.contains("tarih") || norm.contains("coğrafya") || norm.contains("sosyal") || norm.contains("felsefe") -> {
-                    benefits.add(
-                        CourseBenefitItem(
-                            courseName = course,
-                            benefit = "Geçmişin tecrübeleriyle geleceği öngörebilme ve dünyadaki mekânsal/kültürel dinamikleri anlama vizyonu sağlar.",
-                            whyItMatters = "Genel kültür, coğrafi farkındalık ve olayları çok yönlü değerlendirme olgunluğu kazandırır.",
-                            futureOrYksImpact = "TYT Sosyal netleri ilk 1000'de eşit ağırlık ve sayısalcıları birbirinden ayıran gizli silahtır."
-                        )
-                    )
-                    recommendations.add(
-                        StudyRecommendationItem(
-                            courseName = course,
-                            whatToStudy = "Harita bilgisi, ilk çağ uygarlıkları, inkılap tarihi kronolojisi ve felsefe kavramları.",
-                            howToStudy = "Ezberlemek yerine olaylar arası kronolojik köprü kur (Neden-Sonuç zinciri).",
-                            dereceTechnique = "Dilsiz Harita Çalışması: Derece öğrencileri coğrafyada dilsiz dünya/Türkiye haritası üzerinde iklim ve boğazları işaretler."
-                        )
-                    )
-                }
-                else -> {
-                    benefits.add(
-                        CourseBenefitItem(
-                            courseName = course,
-                            benefit = "Disiplinli zihin inşası ve entelektüel derinlik kazandırır.",
-                            whyItMatters = "Öğrenmeyi öğrenme refleksini pekiştirir.",
-                            futureOrYksImpact = "Hedefindeki üniversite ve sıralama için her bir net altın değerindedir."
-                        )
-                    )
-                    recommendations.add(
-                        StudyRecommendationItem(
-                            courseName = course,
-                            whatToStudy = "Haftalık plandaki eksik kazanımların tespit edilip soruyla pekiştirilmesi.",
-                            howToStudy = "Konu tekrarını soru üzerinden yap. Yapamadığın soruların doğru çözüm videosunu izle ve kendi başına tekrar çöz.",
-                            dereceTechnique = "Hata Defteri: Çözemediğin her sorunun çözümünü öğrenip 3 gün sonra tekrar dene."
-                        )
-                    )
-                }
-            }
+        val pending = homeworks.filter { !it.homework.isCompleted }
+        val completed = homeworks.filter { it.homework.isCompleted }
+        val dueToday = pending.filter { it.homework.dueDateMillis in startOfToday..endOfToday }
+        val overdue = pending.filter { it.homework.dueDateMillis in 1 until startOfToday }
+        val dueThisWeek = pending.filter { it.homework.dueDateMillis in (endOfToday + 1)..endOfWeek }
+
+        val headline: String
+        val summary: String
+
+        if (dueToday.isNotEmpty()) {
+            headline = "Bugünün Rotası: ${dueToday.size} Teslim Ödevi"
+            summary = "Bugün teslim edilecek ${dueToday.size} ödevin var. İlk odak noktan bunlar olmalı."
+        } else if (overdue.isNotEmpty()) {
+            headline = "Toparlama Günü: ${overdue.size} Eksik Ödev"
+            summary = "Bugün yeni teslim yok; bekleyen ${overdue.size} ödevi eritmek için harika bir fırsat."
+        } else if (pending.isNotEmpty()) {
+            headline = "Dengeli Tempo: ${pending.size} Bekleyen Ödev"
+            summary = "Günü rahat geçirebilir, haftalık ödevlerinden birini erkenden tamamlayabilirsin."
+        } else {
+            headline = "Tebrikler! Tüm Ödevler Tamam"
+            summary = "Şu anda bekleyen hiçbir ödevin yok. Konu tekrarı yapabilir veya dinlenebilirsin."
         }
 
+        val todayTasksInsight = if (dueToday.isNotEmpty()) {
+            val names = dueToday.take(3).joinToString { "${it.course?.name ?: "Ders"} (${it.homework.title})" }
+            "Bugün teslim edilmesi gereken ${dueToday.size} ödevin var: $names. Bunları günün erken saatlerinde, zihnin tazeyken bitirmen hız kazandıracaktır."
+        } else {
+            "Bugün doğrudan teslim edilmesi gereken acil bir ödevin bulunmuyor. Bu zamanı yarınki derslere veya eksiklere ayırabilirsin."
+        }
+
+        val missingTasksInsight = if (overdue.isNotEmpty()) {
+            val names = overdue.take(2).joinToString { "${it.course?.name ?: "Ders"}: ${it.homework.title}" }
+            "Geciken veya tamamlanmamış ${overdue.size} ödevin bulunuyor ($names). Bunları ertelemek yerine bugün 20'şer dakikalık bloklarla hafifletebilirsin."
+        } else if (pending.isNotEmpty()) {
+            "Şu anda geciken hiçbir ödevin yok. Toplam ${pending.size} bekleyen ödevin planlanan takvimde ilerliyor."
+        } else {
+            "Sistemde hiç eksik ödevin yok! Zaman yönetimini harika şekilde sürdürüyorsun."
+        }
+
+        val weeklyTotal = dueToday.size + dueThisWeek.size
+        val weeklyInsight = if (weeklyTotal > 0) {
+            val pct = if (homeworks.isNotEmpty()) (completed.size * 100) / homeworks.size else 0
+            "Bu hafta toplam $weeklyTotal ödev teslimi bulunuyor (Genel başarı: %$pct). Günde ortalama 1-2 ödev bitirerek hafta sonunu tamamen boş bırakabilirsin."
+        } else {
+            "Bu hafta için planlanan tüm ödevler yolunda. Önümüzdeki günlerin yükü hafif."
+        }
+
+        val steps = mutableListOf<String>()
+        if (dueToday.isNotEmpty()) {
+            steps.add("1. Adım: Teslim tarihi bugün olan ${dueToday.first().homework.title} ödevine 35 dk kesintisiz odaklan.")
+            steps.add("2. Adım: 10 dk mola ver; ardından kalan bugünkü çalışmaları tamamla.")
+            steps.add("3. Adım: Bitirdiğin ödevleri TufiDESK'te onaylayıp yarının listesini kontrol et.")
+        } else if (overdue.isNotEmpty()) {
+            steps.add("1. Adım: Geciken ödevlerden ${overdue.first().homework.title} ödevini 25 dk içinde bitirmeyi hedefle.")
+            steps.add("2. Adım: Masanı toparlayıp 5 dk nefes al, ardından kalanları gözden geçir.")
+            steps.add("3. Adım: Listeni güncelleyip günün tamamlanma oranını yükselt.")
+        } else {
+            steps.add("1. Adım: Gelecek haftanın önemli ders konularına 20 dk göz at.")
+            steps.add("2. Adım: Eksik hissettiğin bir dersten 20 soru çözerek pratiğini koru.")
+            steps.add("3. Adım: TufiDESK ödev takvimine yeni haftalık hedeflerini ekle.")
+        }
+
+        val studyMethodTip = "💡 Pomodoro Kuralı: 25 dakika çalışıp 5 dakika tam mola ver. Çalışma esnasında bildirimleri kapatmak odaklanma süreni 2 katına çıkarır."
+
         return TufiAICoachAdvice(
-            headline = "Bugünün Derece Stratejisi: Odak ve Analiz Günü! 🎯",
-            summary = "Bugün programındaki ${distinctCourses.joinToString(", ")} dersleri, doğru yöntemle çalışıldığında seni hedefine dev bir adım yaklaştıracak.",
-            courseBenefits = benefits,
-            studyRecommendations = recommendations,
-            dereceTactic = "🏆 Derece Öğrencilerinin Sırrı: 'Turlama Tekniği & Analiz Defteri'. Soru bankasında takıldığın soruda inatlaşma, işaret koyup devam et. Günün sonunda yapamadığın soruları bir uzmana sorup öğren ve 'Hata Defteri'ne kaydet.",
-            motivationQuote = "“Rakiplerin yorulduğunda bir soru daha çözenler derece yapar.” — YKS Türkiye 1.si Çalışma Prensibi",
+            headline = headline,
+            summary = summary,
+            todayTasksInsight = todayTasksInsight,
+            missingTasksInsight = missingTasksInsight,
+            weeklyInsight = weeklyInsight,
+            stepByStepPlan = steps,
+            studyMethodTip = studyMethodTip,
             isFromApi = false
         )
     }
