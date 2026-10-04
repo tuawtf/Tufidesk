@@ -349,6 +349,8 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
     }
 
     val isTimerActive = (selectedScreen == Screen.Timer) || (selectedScreen == Screen.Tools && activeTool == "timer")
+    val isNotesActive = (selectedScreen == Screen.Notes) || (selectedScreen == Screen.Tools && activeTool == "notes")
+    val isCustomBottomBarActive = isTimerActive || isNotesActive
 
     // Handle back button on sub-tabs
     BackHandler(enabled = isSettingsOpen) {
@@ -561,8 +563,8 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                             onTogglePin = { note ->
                                 viewModel.toggleNotePin(note)
                             },
-                            onCreateFolder = { name, colorHex ->
-                                viewModel.insertFolder(name, colorHex)
+                            onCreateFolder = { name, colorHex, iconName ->
+                                viewModel.insertFolder(name, colorHex, iconName)
                                 showNotification("'$name' klasörü oluşturuldu 📁", IslandNotificationType.SUCCESS, "Klasör")
                             },
                             onUpdateFolder = { folder ->
@@ -572,6 +574,9 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                             onDeleteFolder = { folder ->
                                 viewModel.deleteFolder(folder)
                                 showNotification("Klasör silindi", IslandNotificationType.WARNING, "Klasör")
+                            },
+                            onBackToTools = {
+                                currentRoute = Screen.Tools.route
                             },
                             canManage = canManage,
                             currentUser = currentUser,
@@ -645,8 +650,8 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                                     onTogglePin = { note ->
                                         viewModel.toggleNotePin(note)
                                     },
-                                    onCreateFolder = { name, colorHex ->
-                                        viewModel.insertFolder(name, colorHex)
+                                    onCreateFolder = { name, colorHex, iconName ->
+                                        viewModel.insertFolder(name, colorHex, iconName)
                                         showNotification("'$name' klasörü oluşturuldu 📁", IslandNotificationType.SUCCESS, "Klasör")
                                     },
                                     onUpdateFolder = { folder ->
@@ -656,6 +661,9 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                                     onDeleteFolder = { folder ->
                                         viewModel.deleteFolder(folder)
                                         showNotification("Klasör silindi", IslandNotificationType.WARNING, "Klasör")
+                                    },
+                                    onBackToTools = {
+                                        activeTool = null
                                     },
                                     canManage = canManage,
                                     currentUser = currentUser,
@@ -980,7 +988,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     )
                 },
                 bottomBar = {
-                    if (!floatingBottomBar && !isSettingsOpen && !isSelectionActive && !isTimerActive) {
+                    if (!floatingBottomBar && !isSettingsOpen && !isSelectionActive && !isCustomBottomBarActive) {
                         FixedStandardBottomNavigation(
                             currentTab = currentTab,
                             onTabSelected = { index ->
@@ -1023,7 +1031,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     screenContent()
 
                     // Tamamen havada yüzen ada menüsü (Arkada hiçbir siyahlık veya şerit yok)
-                    if (floatingBottomBar && !isSettingsOpen && !isSelectionActive && !isTimerActive) {
+                    if (floatingBottomBar && !isSettingsOpen && !isSelectionActive && !isCustomBottomBarActive) {
                         IslandBottomNavigation(
                             currentTab = currentTab,
                             onTabSelected = { index ->

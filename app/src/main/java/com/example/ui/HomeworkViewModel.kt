@@ -293,9 +293,9 @@ class HomeworkViewModel(
         }
     }
 
-    fun insertFolder(name: String, colorHex: String) {
+    fun insertFolder(name: String, colorHex: String, iconName: String = "Folder") {
         viewModelScope.launch {
-            notesRepository.insertFolder(NoteFolder(name = name, colorHex = colorHex))
+            notesRepository.insertFolder(NoteFolder(name = name, colorHex = colorHex, iconName = iconName))
         }
     }
 

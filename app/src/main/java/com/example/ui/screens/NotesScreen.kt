@@ -48,6 +48,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import com.example.ui.components.NotesBottomIslandNavigation
+import com.example.ui.components.FolderIconPickerDialog
+import com.example.ui.util.FolderIconHelper
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -238,7 +241,7 @@ fun NotesScreen(
     onUpdateNote: (Note) -> Unit,
     onDeleteNote: (Note) -> Unit,
     onTogglePin: (Note) -> Unit,
-    onCreateFolder: (name: String, colorHex: String) -> Unit,
+    onCreateFolder: (name: String, colorHex: String, iconName: String) -> Unit = { _, _, _ -> },
     onUpdateFolder: (NoteFolder) -> Unit = {},
     onDeleteFolder: (NoteFolder) -> Unit,
     canManage: Boolean = true,
@@ -251,6 +254,7 @@ fun NotesScreen(
     moveCheckedToBottom: Boolean = true,
     onSwitchProfile: () -> Unit = {},
     onSelectionModeChange: (Boolean) -> Unit = {},
+    onBackToTools: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
@@ -287,6 +291,7 @@ fun NotesScreen(
     var showBatchDeleteConfirm by remember { mutableStateOf(false) }
 
     var folderOptionsToManage by remember { mutableStateOf<NoteFolder?>(null) }
+    var folderForIconPicker by remember { mutableStateOf<NoteFolder?>(null) }
     var folderToEdit by remember { mutableStateOf<NoteFolder?>(null) }
     var folderToDeleteConfirm by remember { mutableStateOf<NoteFolder?>(null) }
 
@@ -1161,9 +1166,38 @@ fun NotesScreen(
                 }
             }
         }
+
+        // Google Notlar Modern Yüzen Ada (Floating Island) Alt Gezinme Çubuğu
+        // En sağda Araçlar menüsüne dönüş düğmesi, solunda ise "Tümü" ve klasörler
+        if (!isSelectionMode) {
+            NotesBottomIslandNavigation(
+                folders = regularFolders,
+                selectedFolderId = selectedFolderId,
+                onSelectFolder = onSelectFolder,
+                onLongClickFolder = { folder ->
+                    folderForIconPicker = folder
+                },
+                onBackToTools = onBackToTools,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
+        }
     }
 
     // ================= DIALOGS & EDITORS =================
+
+    // Folder Icon Picker Dialog (Triggered on folder long-press in bottom bar or manage options)
+    if (folderForIconPicker != null) {
+        val folder = folderForIconPicker!!
+        FolderIconPickerDialog(
+            folder = folder,
+            onSelectIcon = { newIconKey ->
+                val updated = folder.copy(iconName = newIconKey)
+                onUpdateFolder(updated)
+                folderForIconPicker = null
+            },
+            onDismiss = { folderForIconPicker = null }
+        )
+    }
 
     // 1. Text Note Dialog (Google Keep style)
     if (showTextNoteDialog) {
@@ -1237,8 +1271,8 @@ fun NotesScreen(
     if (showFolderDialog) {
         KeepCreateFolderDialog(
             onDismiss = { showFolderDialog = false },
-            onSave = { name, colorHex ->
-                onCreateFolder(name, colorHex)
+            onSave = { name, colorHex, iconName ->
+                onCreateFolder(name, colorHex, iconName)
                 showFolderDialog = false
             }
         )
@@ -1406,7 +1440,7 @@ fun NotesScreen(
             onDismissRequest = { folderOptionsToManage = null },
             icon = {
                 Icon(
-                    imageVector = if (isDeneme) Icons.Default.Assessment else Icons.Default.Folder,
+                    imageVector = if (isDeneme) Icons.Default.Assessment else FolderIconHelper.getIcon(folder.iconName),
                     contentDescription = null,
                     tint = try { Color(android.graphics.Color.parseColor(folder.colorHex)) } catch (_: Exception) { MaterialTheme.colorScheme.primary }
                 )
@@ -1427,6 +1461,22 @@ fun NotesScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(4.dp))
+                        OutlinedButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                folderForIconPicker = folder
+                                folderOptionsToManage = null
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = FolderIconHelper.getIcon(folder.iconName),
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Simgeyi Değiştir")
+                        }
                         OutlinedButton(
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -1682,7 +1732,7 @@ fun NoteFolderCard(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        imageVector = Icons.Default.Folder,
+                        imageVector = FolderIconHelper.getIcon(folder.iconName),
                         contentDescription = null,
                         tint = folderColor,
                         modifier = Modifier.size(22.dp)
@@ -1861,11 +1911,24 @@ fun KeepEditFolderDialog(
 ) {
     var name by remember { mutableStateOf(folder.name) }
     var selectedColor by remember { mutableStateOf(folder.colorHex) }
+    var selectedIcon by remember { mutableStateOf(folder.iconName) }
+    var showIconPicker by remember { mutableStateOf(false) }
 
     val folderColors = listOf(
         "#1E88E5", "#43A047", "#E53935", "#8E24AA",
         "#FB8C00", "#00ACC1", "#3949AB", "#D81B60"
     )
+
+    if (showIconPicker) {
+        FolderIconPickerDialog(
+            folder = folder.copy(iconName = selectedIcon),
+            onSelectIcon = { newIcon ->
+                selectedIcon = newIcon
+                showIconPicker = false
+            },
+            onDismiss = { showIconPicker = false }
+        )
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1879,6 +1942,42 @@ fun KeepEditFolderDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                // Klasör Simgesi Seçimi
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { showIconPicker = true }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = FolderIconHelper.getIcon(selectedIcon),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Klasör Simgesi",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
+                            )
+                        }
+                        Text(
+                            text = "Değiştir ❯",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
 
                 Text("Klasör Rengi:", style = MaterialTheme.typography.labelMedium)
                 Row(
@@ -1907,7 +2006,7 @@ fun KeepEditFolderDialog(
             OutlinedButton(
                 onClick = {
                     if (name.isNotBlank()) {
-                        onSave(folder.copy(name = name.trim(), colorHex = selectedColor))
+                        onSave(folder.copy(name = name.trim(), colorHex = selectedColor, iconName = selectedIcon))
                     }
                 },
                 enabled = name.isNotBlank()
@@ -3811,15 +3910,28 @@ fun KeepImageNoteEditDialog(
 @Composable
 fun KeepCreateFolderDialog(
     onDismiss: () -> Unit,
-    onSave: (name: String, colorHex: String) -> Unit
+    onSave: (name: String, colorHex: String, iconName: String) -> Unit
 ) {
     var folderName by remember { mutableStateOf("") }
     var selectedColor by remember { mutableStateOf("#1E88E5") }
+    var selectedIcon by remember { mutableStateOf("Folder") }
+    var showIconPicker by remember { mutableStateOf(false) }
 
     val folderColors = listOf(
         "#1E88E5", "#43A047", "#E53935", "#8E24AA",
         "#FB8C00", "#00ACC1", "#3949AB", "#D81B60"
     )
+
+    if (showIconPicker) {
+        FolderIconPickerDialog(
+            folder = NoteFolder(name = folderName.ifBlank { "Yeni Klasör" }, colorHex = selectedColor, iconName = selectedIcon),
+            onSelectIcon = { newIcon ->
+                selectedIcon = newIcon
+                showIconPicker = false
+            },
+            onDismiss = { showIconPicker = false }
+        )
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -3834,6 +3946,42 @@ fun KeepCreateFolderDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                // Klasör Simgesi Seçimi
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { showIconPicker = true }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = FolderIconHelper.getIcon(selectedIcon),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Klasör Simgesi",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
+                            )
+                        }
+                        Text(
+                            text = "Seç ❯",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
 
                 Text("Klasör Rengi:", style = MaterialTheme.typography.labelMedium)
                 Row(
@@ -3862,7 +4010,7 @@ fun KeepCreateFolderDialog(
             OutlinedButton(
                 onClick = {
                     if (folderName.isNotBlank()) {
-                        onSave(folderName.trim(), selectedColor)
+                        onSave(folderName.trim(), selectedColor, selectedIcon)
                     }
                 },
                 enabled = folderName.isNotBlank()
