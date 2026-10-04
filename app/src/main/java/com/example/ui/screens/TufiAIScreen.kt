@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
@@ -80,7 +81,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
@@ -114,11 +114,12 @@ import java.util.Locale
 
 /**
  * Kullanıcının İstediği Özel Morfizasyon Aşamaları:
- * 1. TABS: Standart alt gezinme adası.
- * 2. STAR_SPINNING: SADECE YILDIZLAR 720 derece yavaş ve genişleyerek döner (yazı kesinlikle dönmez!).
- * 3. STAR_MOVING_LEFT: Yıldız akıcı animasyonla en sola geçer ve 4'LÜ KARE formatını alır.
- * 4. EXPANDING_UP: Bar üste doğru genişler ve "Tufi AI'a sor..." metin kutusu gelir.
- * 5. TEXTBOX: Tam aktif ChatGPT tarzı metin çubuğu.
+ * 1. TABS: Standart alt gezinme adası (Home, Calendar, Tufi AI, Stats, Tools).
+ * 2. STAR_SPINNING: SADECE YILDIZ 720 derece yavaşça dönüp genişler. "Tufi AI" yazısı KESİNLİKLE DÖNMEZ, solarak kapanır.
+ * 3. STAR_MOVING_LEFT: Diğer sekmeler küçülerek kapanır, yıldız doğal akışla en sola geçer ve 4'LÜ KARE formatını alır.
+ * 4. EXPANDING_UP: Bar yukarı ve yana doğru genişler (ChatGPT kapsülü).
+ * 5. TEXTBOX: "Tufi AI'a sor..." tam aktif.
+ * 6. KAREYE TIKLAYINCA: Textbox solar, bar orijinal ada boyutuna daralır, 4'lü kare yıldıza dönüşüp ortaya kayar, "Tufi AI" yazısı ve sekmeler çakışmasız açılır.
  */
 enum class TufiBarMorphState {
     TABS,
@@ -130,6 +131,9 @@ enum class TufiBarMorphState {
 
 private fun lerpFloat(start: Float, stop: Float, fraction: Float): Float =
     start + fraction * (stop - start)
+
+private fun lerpDp(start: Dp, stop: Dp, fraction: Float): Dp =
+    (start.value + fraction * (stop.value - start.value)).dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -163,107 +167,103 @@ fun TufiAIScreen(
     var isAdviceLoading by remember { mutableStateOf(false) }
 
     // =========================================================================
-    // SİNEMATİK ANİMASYON DURUMLARI
+    // SİNEMATİK ANİMASYON DURUMLARI (Çakışmasız Doğal Düzen Akışı)
     // =========================================================================
     var morphState by remember { mutableStateOf(TufiBarMorphState.TABS) }
     val starRotation = remember { Animatable(0f) }
     val starScale = remember { Animatable(1f) }
     val starMorphProgress = remember { Animatable(0f) } // 0f = Yıldız, 1f = 4'lü Kare
-    val starSlideToLeftFraction = remember { Animatable(0f) } // 0f = Orta/yerinde, 1f = En sol
-    val otherTabsAlpha = remember { Animatable(1f) }
-    val barHeight = remember { Animatable(52f) }
-    val barWidthFraction = remember { Animatable(0.70f) } // 0.70f = Sekmeler boyutu, 1f = Tam genişlik
+    val tabsShrinkProgress = remember { Animatable(0f) } // 0f = Sekmeler açık, 1f = Sekmeler kapalı (yıldız en solda)
+    val tufiTextProgress = remember { Animatable(1f) }   // 1f = "Tufi AI" yazısı açık, 0f = Kapalı
+    val barExpandProgress = remember { Animatable(0f) }  // 0f = Ada boyutu, 1f = Tam genişlik
     val textboxAlpha = remember { Animatable(0f) }
 
-    // Geri tuşu: Textbox'tayken sekme adasına geri döner, sekme adasındayken ana ekrana döner
+    // Geri Dönüş Fonksiyonu: 4'lü kareye tıklandığında bar eski boyutuna kusursuz döner
     fun morphBackToTabs() {
         coroutineScope.launch {
+            // 1. Textbox içeriklerini soldur
             morphState = TufiBarMorphState.EXPANDING_UP
-            textboxAlpha.animateTo(0f, tween(150))
+            textboxAlpha.animateTo(0f, tween(140))
+
+            // 2. Bar genişliğini ve yüksekliğini orijinal ada boyutuna daralt
             launch {
-                barHeight.animateTo(52f, tween(280))
-            }
-            launch {
-                barWidthFraction.animateTo(0.70f, tween(280))
+                barExpandProgress.animateTo(0f, tween(320, easing = FastOutSlowInEasing))
             }
             delay(140)
+
+            // 3. 4'lü kare yıldıza dönüşür ve diğer sekmeler açılarak yıldızı doğal olarak ortaya taşır
             morphState = TufiBarMorphState.STAR_MOVING_LEFT
             launch {
-                starMorphProgress.animateTo(0f, tween(300))
+                starMorphProgress.animateTo(0f, tween(260))
             }
             launch {
-                starSlideToLeftFraction.animateTo(0f, tween(400, easing = FastOutSlowInEasing))
+                tabsShrinkProgress.animateTo(0f, tween(400, easing = FastOutSlowInEasing))
             }
-            delay(350)
+            delay(320)
+
+            // 4. "Tufi AI" yazısı yıldızın yanında çakışmasız genişler ve tam ada haline gelinir
             morphState = TufiBarMorphState.TABS
             starRotation.snapTo(0f)
             starScale.snapTo(1f)
-            otherTabsAlpha.animateTo(1f, tween(260))
+            tufiTextProgress.animateTo(1f, tween(300, easing = FastOutSlowInEasing))
         }
     }
 
+    // İleri Animasyon: Yıldız döner -> Genişler -> Sola kayar -> 4'lü kare olur -> Textbox açılır
     fun startForwardCinematicAnimation() {
         coroutineScope.launch {
-            // Başlangıç değerlerini sıfırla
             morphState = TufiBarMorphState.TABS
             starRotation.snapTo(0f)
             starScale.snapTo(1f)
             starMorphProgress.snapTo(0f)
-            starSlideToLeftFraction.snapTo(0f)
-            barHeight.snapTo(52f)
-            barWidthFraction.snapTo(0.70f)
-            otherTabsAlpha.snapTo(1f)
+            tabsShrinkProgress.snapTo(0f)
+            tufiTextProgress.snapTo(1f)
+            barExpandProgress.snapTo(0f)
             textboxAlpha.snapTo(0f)
 
-            delay(150)
+            delay(120)
 
-            // 1. AŞAMA: SADECE YILDIZLAR DÖNÜP GENİŞLEYECEK (Daha yavaş ve akıcı, yazı dönmez!)
+            // 1. AŞAMA: SADECE YILDIZ DÖNER VE GENİŞLER ("Tufi AI" yazısı KESİNLİKLE dönmez, solarak kapanır)
             morphState = TufiBarMorphState.STAR_SPINNING
             launch {
-                otherTabsAlpha.animateTo(0f, tween(350))
+                tufiTextProgress.animateTo(0f, tween(350, easing = FastOutSlowInEasing))
             }
             launch {
-                // Yıldız 1.55 katına kadar yavaşça büyür ve hafifçe geri oturur
-                starScale.animateTo(1.55f, tween(500, easing = FastOutSlowInEasing))
-                starScale.animateTo(1.30f, tween(400, easing = FastOutSlowInEasing))
+                starScale.animateTo(1.55f, tween(480, easing = FastOutSlowInEasing))
+                starScale.animateTo(1.20f, tween(420, easing = FastOutSlowInEasing))
             }
             // Yıldız 720 derece yavaş ve sinematik döner (900ms)
             starRotation.animateTo(720f, tween(900, easing = FastOutSlowInEasing))
 
-            // 2. AŞAMA: YILDIZ EN SOLA GEÇECEK VE 4'LÜ KARE FORMATINI ALACAK
+            // 2. AŞAMA: DİĞER SEKMELELER DARALIR, YILDIZ EN SOLA KAYAR VE 4'LÜ KARE OLUR
             morphState = TufiBarMorphState.STAR_MOVING_LEFT
             launch {
-                // Sola kayma animasyonu
-                starSlideToLeftFraction.animateTo(1f, tween(550, easing = FastOutSlowInEasing))
+                tabsShrinkProgress.animateTo(1f, tween(500, easing = FastOutSlowInEasing))
             }
             launch {
                 delay(180)
-                // 4'lü kareye dönüşme animasyonu
-                starMorphProgress.animateTo(1f, tween(380, easing = FastOutSlowInEasing))
-                starScale.animateTo(1.0f, tween(320))
+                starMorphProgress.animateTo(1f, tween(350, easing = FastOutSlowInEasing))
+                starScale.animateTo(1.0f, tween(300))
             }
-            delay(500)
+            delay(480)
 
-            // 3. AŞAMA: BAR ÜSTE DOĞRU GENİŞLEYECEK
+            // 3. AŞAMA: BAR ÜSTE VE YANA DOĞRU GENİŞLER
             morphState = TufiBarMorphState.EXPANDING_UP
             launch {
-                barHeight.animateTo(60f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
+                barExpandProgress.animateTo(1f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
             }
-            launch {
-                barWidthFraction.animateTo(1f, tween(380, easing = FastOutSlowInEasing))
-            }
-            delay(240)
+            delay(220)
 
-            // 4. AŞAMA: "TUFI AI'A SOR" TEXT BAR GELECEK
+            // 4. AŞAMA: "TUFI AI'A SOR" TEXT BAR GÖRÜNÜR
             morphState = TufiBarMorphState.TEXTBOX
             textboxAlpha.animateTo(1f, tween(250))
         }
     }
 
-    BackHandler(enabled = morphState == TufiBarMorphState.TEXTBOX) {
+    BackHandler(enabled = morphState == TufiBarMorphState.TEXTBOX || barExpandProgress.value > 0.1f) {
         morphBackToTabs()
     }
-    BackHandler(enabled = morphState == TufiBarMorphState.TABS) {
+    BackHandler(enabled = morphState == TufiBarMorphState.TABS && barExpandProgress.value <= 0.1f) {
         onBack()
     }
 
@@ -426,7 +426,7 @@ fun TufiAIScreen(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
                             onClick = {
-                                if (morphState == TufiBarMorphState.TEXTBOX) {
+                                if (morphState == TufiBarMorphState.TEXTBOX || barExpandProgress.value > 0.1f) {
                                     morphBackToTabs()
                                 } else {
                                     onBack()
@@ -737,45 +737,55 @@ fun TufiAIScreen(
         }
 
         // =========================================================================
-        // SİNEMATİK DÖNÜŞEN ALT BAR (Yıldız Dönüşü -> Sola Kayma -> 4'lü Kare -> Textbox)
+        // SİNEMATİK DÖNÜŞEN ALT BAR (Doğal Akış: Çakışmasız ve Kusursuz Geri Dönüşlü)
         // =========================================================================
-        val isTextboxFull = morphState == TufiBarMorphState.TEXTBOX
-        val isExpandingOrDone = morphState == TufiBarMorphState.EXPANDING_UP || isTextboxFull
+        val isTextbox = morphState == TufiBarMorphState.TEXTBOX
+        val barHeightDp = lerpDp(52.dp, 58.dp, barExpandProgress.value)
+        val cornerDp = lerpDp(28.dp, 29.dp, barExpandProgress.value)
 
-        val containerBg = if (isExpandingOrDone) Color(0xFF212121) else MaterialTheme.colorScheme.surface
-        val containerBorder = if (isExpandingOrDone) Color(0xFF383838) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-        val containerRadius = if (isExpandingOrDone) 30.dp else 28.dp
+        val barBgColor by animateColorAsState(
+            targetValue = if (isTextbox || barExpandProgress.value > 0.5f) Color(0xFF212121) else MaterialTheme.colorScheme.surface,
+            animationSpec = tween(250),
+            label = "bar_bg_color"
+        )
+        val barBorderColor by animateColorAsState(
+            targetValue = if (isTextbox || barExpandProgress.value > 0.5f) Color(0xFF383838) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+            animationSpec = tween(250),
+            label = "bar_border_color"
+        )
 
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .padding(
-                    start = if (isExpandingOrDone) 14.dp else 16.dp,
-                    end = if (isExpandingOrDone) 14.dp else 16.dp,
+                    start = if (isTextbox || barExpandProgress.value > 0.1f) 14.dp else 16.dp,
+                    end = if (isTextbox || barExpandProgress.value > 0.1f) 14.dp else 16.dp,
                     bottom = bottomOffset,
                     top = 4.dp
                 ),
             contentAlignment = Alignment.Center
         ) {
             Surface(
-                shape = RoundedCornerShape(containerRadius),
-                color = containerBg,
+                shape = RoundedCornerShape(cornerDp),
+                color = barBgColor,
                 tonalElevation = 6.dp,
-                shadowElevation = if (isExpandingOrDone) 12.dp else 10.dp,
-                border = BorderStroke(1.dp, containerBorder),
+                shadowElevation = if (isTextbox) 12.dp else 10.dp,
+                border = BorderStroke(1.dp, barBorderColor),
                 modifier = Modifier
                     .then(
-                        if (isExpandingOrDone) {
-                            Modifier.fillMaxWidth(barWidthFraction.value)
+                        if (isTextbox) {
+                            Modifier.fillMaxWidth()
+                        } else if (barExpandProgress.value > 0.01f) {
+                            Modifier.fillMaxWidth(lerpFloat(0.68f, 1f, barExpandProgress.value))
                         } else {
                             Modifier.wrapContentWidth()
                         }
                     )
-                    .height(barHeight.value.dp)
+                    .height(barHeightDp)
                     .testTag("tufi_morphing_bottom_bar")
             ) {
-                if (isTextboxFull) {
+                if (isTextbox) {
                     // =========================================================
                     // 5. AŞAMA: "TUFI AI'A SOR" CHATGPT METİN GİRİŞ KAPSÜLÜ
                     // =========================================================
@@ -864,7 +874,7 @@ fun TufiAIScreen(
                                 modifier = Modifier
                                     .size(36.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFF2563EB))
+                                    .background(Color(0xFF2563EB)) // ChatGPT ses modu mavisi
                                     .clickable { startSpeechToText() },
                                 contentAlignment = Alignment.Center
                             ) {
@@ -891,88 +901,103 @@ fun TufiAIScreen(
                     }
                 } else {
                     // =========================================================
-                    // 1, 2, 3 & 4. AŞAMALAR: YILDIZ DÖNMESİ -> SOLA KAYIŞ -> 4'LÜ KARE
+                    // 1, 2, 3 & 4. AŞAMALAR: STANDART ADA & ÇAKIŞMASIZ DOĞAL DÖNÜŞÜM
                     // =========================================================
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
+                    Row(
+                        modifier = Modifier
+                            .padding(horizontal = 6.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy((6f * (1f - tabsShrinkProgress.value)).dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Diğer sekmeler (Sadece TABS modundayken görünür, yıldız dönmeye başlayınca solar)
-                        Row(
-                            modifier = Modifier
-                                .padding(horizontal = 6.dp, vertical = 6.dp)
-                                .graphicsLayer { alpha = otherTabsAlpha.value },
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            navItems.forEachIndexed { index, screen ->
-                                val isSelected = currentTab == index
-                                val isTufi = screen == Screen.TufiAI
+                        navItems.forEachIndexed { index, screen ->
+                            val isSelected = currentTab == index
+                            val isTufi = screen == Screen.TufiAI
 
-                                if (isTufi) {
-                                    // Tufi AI sekme yeri (burada sadece yazı var, yıldız üstte bağımsız animasyonla döner!)
-                                    Row(
+                            if (isTufi) {
+                                // Tufi AI Sekme Kapsülü
+                                Row(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .background(
+                                            if (morphState == TufiBarMorphState.TABS)
+                                                MaterialTheme.colorScheme.primaryContainer
+                                            else
+                                                Color.Transparent
+                                        )
+                                        .padding(
+                                            horizontal = (12f * (1f - tabsShrinkProgress.value) + 4f).dp,
+                                            vertical = 6.dp
+                                        )
+                                        .clickable {
+                                            if (morphState == TufiBarMorphState.TABS) {
+                                                startForwardCinematicAnimation()
+                                            }
+                                        },
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy((6f * tufiTextProgress.value).dp)
+                                ) {
+                                    // SADECE YILDIZ / 4'LÜ KARE İKONU (Yazıdan tamamen bağımsız döner!)
+                                    Box(
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(20.dp))
-                                            .background(MaterialTheme.colorScheme.primaryContainer)
-                                            .padding(horizontal = 14.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            .size(24.dp)
+                                            .graphicsLayer {
+                                                rotationZ = starRotation.value
+                                                scaleX = starScale.value
+                                                scaleY = starScale.value
+                                            },
+                                        contentAlignment = Alignment.Center
                                     ) {
-                                        // Yıldızın boşluğu (yer tutucu)
-                                        Spacer(modifier = Modifier.size(20.dp))
-                                        // YAZI DÖNMEZ! Sadece yerinde durur ve solar
+                                        if (starMorphProgress.value < 0.5f) {
+                                            Icon(
+                                                imageVector = Icons.Default.AutoAwesome,
+                                                contentDescription = "Tufi AI Yıldızı",
+                                                tint = if (morphState == TufiBarMorphState.TABS)
+                                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                                else
+                                                    Color(0xFF60A5FA),
+                                                modifier = Modifier.size(22.dp)
+                                            )
+                                        } else {
+                                            FourSquaresIcon(
+                                                color = Color.White,
+                                                sizeDp = 18.dp
+                                            )
+                                        }
+                                    }
+
+                                    // TUFI AI YAZISI (Yazı KESİNLİKLE DÖNMEZ! Şeffaflığıyla kapanır/açılır)
+                                    if (tufiTextProgress.value > 0.02f) {
                                         Text(
                                             text = screen.title,
                                             style = MaterialTheme.typography.labelMedium.copy(
                                                 fontWeight = FontWeight.Bold,
                                                 color = MaterialTheme.colorScheme.onPrimaryContainer
-                                            )
+                                            ),
+                                            maxLines = 1,
+                                            modifier = Modifier.graphicsLayer {
+                                                alpha = tufiTextProgress.value
+                                            }
                                         )
                                     }
-                                } else {
-                                    IslandBottomNavItem(
-                                        icon = if (isSelected) screen.selectedIcon else screen.unselectedIcon,
-                                        label = screen.title,
-                                        isSelected = isSelected,
-                                        onClick = { onTabSelected(index) },
-                                        testTag = "nav_tab_${screen.route}"
-                                    )
                                 }
-                            }
-                        }
-
-                        // SADECE YILDIZ VE 4'LÜ KARE ANİMASYON KATMANI (Yazıdan tamamen bağımsız!)
-                        val horizontalBias = lerpFloat(0.04f, -0.92f, starSlideToLeftFraction.value)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 8.dp),
-                            contentAlignment = BiasAlignment(horizontalBias, 0f)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .graphicsLayer {
-                                        rotationZ = starRotation.value
-                                        scaleX = starScale.value
-                                        scaleY = starScale.value
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (starMorphProgress.value < 0.5f) {
-                                    // 1. AŞAMA: SADECE YILDIZ DÖNÜYOR VE GENİŞLİYOR (Yazı kesinlikle dönmüyor!)
-                                    Icon(
-                                        imageVector = Icons.Default.AutoAwesome,
-                                        contentDescription = "Tufi AI Yıldızı",
-                                        tint = if (isExpandingOrDone) Color(0xFF60A5FA) else MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                } else {
-                                    // 2 & 3. AŞAMA: EN SOLA GEÇTİ VE 4'LÜ KARE FORMATINI ALDI
-                                    FourSquaresIcon(
-                                        color = Color.White,
-                                        sizeDp = 18.dp
-                                    )
+                            } else {
+                                // Diğer Sekmeler (Home, Calendar, Stats, Tools)
+                                val tabScale = (1f - tabsShrinkProgress.value)
+                                if (tabScale > 0.02f) {
+                                    Box(
+                                        modifier = Modifier.graphicsLayer {
+                                            alpha = tabScale
+                                            scaleX = tabScale
+                                        }
+                                    ) {
+                                        IslandBottomNavItem(
+                                            icon = if (isSelected) screen.selectedIcon else screen.unselectedIcon,
+                                            label = screen.title,
+                                            isSelected = isSelected,
+                                            onClick = { onTabSelected(index) },
+                                            testTag = "nav_tab_${screen.route}"
+                                        )
+                                    }
                                 }
                             }
                         }
