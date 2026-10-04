@@ -57,12 +57,17 @@ object TufiAIService {
 
     private val client by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(45, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(25, TimeUnit.SECONDS)
+            .readTimeout(40, TimeUnit.SECONDS)
+            .writeTimeout(25, TimeUnit.SECONDS)
             .build()
     }
 
+    /**
+     * Aktif API anahtarını döner:
+     * 1. Kullanıcının arayüzden girdiği özel anahtar (SharedPreferences)
+     * 2. BuildConfig içerisinde tanımlı anahtarlar (DEEPSEEK_API_KEY veya GEMINI_API_KEY)
+     */
     fun getApiKey(context: Context): String {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val customKey = prefs.getString(PREF_KEY_CUSTOM_API_KEY, null)?.trim()
@@ -77,9 +82,98 @@ object TufiAIService {
         return if (buildKey.isNotBlank() && buildKey != "MY_DEEPSEEK_API_KEY") buildKey else ""
     }
 
+    fun isApiKeyConfigured(context: Context): Boolean {
+        return getApiKey(context).isNotBlank()
+    }
+
     fun saveCustomApiKey(context: Context, key: String) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putString(PREF_KEY_CUSTOM_API_KEY, key.trim()).apply()
+    }
+
+    /**
+     * API anahtarını canlı olarak test eder.
+     * Hem DeepSeek (sk-...) hem de Google Gemini (AIzaSy...) anahtarlarını destekler.
+     */
+    suspend fun testConnection(context: Context, key: String): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+        val trimmedKey = key.trim()
+        if (trimmedKey.isBlank()) {
+            return@withContext Pair(false, "API anahtarı boş olamaz.")
+        }
+
+        val isGemini = trimmedKey.startsWith("AIzaSy")
+        val startTime = System.currentTimeMillis()
+
+        try {
+            if (isGemini) {
+                val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$trimmedKey"
+                val json = JSONObject().apply {
+                    put("contents", JSONArray().apply {
+                        put(JSONObject().apply {
+                            put("parts", JSONArray().apply {
+                                put(JSONObject().apply { put("text", "Merhaba, bağlantı testi.") })
+                            })
+                        })
+                    })
+                }
+                val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+                val request = Request.Builder().url(url).post(body).build()
+                client.newCall(request).execute().use { response ->
+                    val duration = System.currentTimeMillis() - startTime
+                    if (response.isSuccessful) {
+                        Pair(true, "Gemini API bağlantısı başarılı! (${duration}ms)")
+                    } else {
+                        val code = response.code
+                        val errorMsg = when (code) {
+                            400 -> "Geçersiz istek (400): Anahtar formatını kontrol edin."
+                            403 -> "Yetki hatası (403): API anahtarınız Gemini API için etkinleştirilmemiş."
+                            404 -> "Model bulunamadı (404)."
+                            429 -> "Hız sınırı aşıldı (429): Lütfen biraz bekleyin."
+                            else -> "HTTP $code hatası: ${response.message}"
+                        }
+                        Pair(false, errorMsg)
+                    }
+                }
+            } else {
+                // DeepSeek API
+                val url = "https://api.deepseek.com/chat/completions"
+                val json = JSONObject().apply {
+                    put("model", "deepseek-chat")
+                    put("messages", JSONArray().apply {
+                        put(JSONObject().apply {
+                            put("role", "user")
+                            put("content", "ping")
+                        })
+                    })
+                    put("max_tokens", 5)
+                }
+                val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+                val request = Request.Builder()
+                    .url(url)
+                    .header("Authorization", "Bearer $trimmedKey")
+                    .header("Content-Type", "application/json")
+                    .post(body)
+                    .build()
+
+                client.newCall(request).execute().use { response ->
+                    val duration = System.currentTimeMillis() - startTime
+                    if (response.isSuccessful) {
+                        Pair(true, "DeepSeek API bağlantısı başarılı! (${duration}ms)")
+                    } else {
+                        val code = response.code
+                        val errorMsg = when (code) {
+                            401 -> "Yetkilendirme hatası (401): API anahtarı geçersiz."
+                            402 -> "Yetersiz bakiye (402): DeepSeek hesabınızda kullanılabilir bakiye kalmamış."
+                            429 -> "İstek sınırı aşıldı (429): Lütfen biraz bekleyin."
+                            else -> "HTTP $code hatası: ${response.message}"
+                        }
+                        Pair(false, errorMsg)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Pair(false, "Bağlantı hatası: ${e.localizedMessage ?: "Sunucuya ulaşılamadı"}")
+        }
     }
 
     // ==========================================
@@ -105,26 +199,25 @@ object TufiAIService {
             }
             list
         } catch (e: Exception) {
+            Log.e(TAG, "Chat history parse error", e)
             emptyList()
         }
     }
 
     fun saveChatHistory(context: Context, messages: List<TufiChatMessage>) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        try {
-            val array = JSONArray()
-            // Bellek ve performans için son 40 mesaj saklanır
-            messages.takeLast(40).forEach { msg ->
-                val obj = JSONObject().apply {
-                    put("id", msg.id)
-                    put("isUser", msg.isUser)
-                    put("text", msg.text)
-                    put("timestampMillis", msg.timestampMillis)
-                }
-                array.put(obj)
+        val array = JSONArray()
+        // En son 50 mesajı sakla
+        messages.takeLast(50).forEach { msg ->
+            val obj = JSONObject().apply {
+                put("id", msg.id)
+                put("isUser", msg.isUser)
+                put("text", msg.text)
+                put("timestampMillis", msg.timestampMillis)
             }
-            prefs.edit().putString(PREF_KEY_CHAT_HISTORY, array.toString()).apply()
-        } catch (_: Exception) {}
+            array.put(obj)
+        }
+        prefs.edit().putString(PREF_KEY_CHAT_HISTORY, array.toString()).apply()
     }
 
     fun clearChatHistory(context: Context) {
@@ -144,16 +237,47 @@ object TufiAIService {
         homeworks: List<HomeworkWithCourse>
     ): String = withContext(Dispatchers.IO) {
         val apiKey = getApiKey(context)
-        if (apiKey.isNotBlank()) {
-            try {
-                val apiResponse = callDeepSeekChatApi(apiKey, question, history, homeworks)
-                if (!apiResponse.isNullOrBlank()) {
-                    return@withContext apiResponse
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "DeepSeek chat API call failed, using built-in coach", e)
-            }
+        if (apiKey.isBlank()) {
+            val local = generateLocalChatAnswer(question, courses, homeworks)
+            return@withContext """
+                ⚠️ **Tufi AI API Anahtarı Tanımlanmadı**
+
+                GitHub'dan indirilen projelerde gizli API anahtarları yer almaz.
+                Sağ üstteki **Anahtar 🔑** simgesine dokunarak kendi **DeepSeek** (`sk-...`) veya **Google Gemini** (`AIzaSy...`) API anahtarınızı tanımlayabilirsiniz.
+
+                ---
+                🤖 **Tufi AI (Çevrimdışı Mod):**
+                $local
+            """.trimIndent()
         }
+
+        try {
+            val isGemini = apiKey.startsWith("AIzaSy")
+            val apiResponse = if (isGemini) {
+                callGeminiChatApi(apiKey, question, history, courses, homeworks)
+            } else {
+                callDeepSeekChatApi(apiKey, question, history, homeworks)
+            }
+
+            if (!apiResponse.isNullOrBlank()) {
+                return@withContext apiResponse
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "AI chat API call failed", e)
+            val local = generateLocalChatAnswer(question, courses, homeworks)
+            val errorMsg = e.localizedMessage ?: "Bağlantı hatası"
+            return@withContext """
+                ⚠️ **Canlı Yapay Zeka Yanıtı Alınamadı**
+                *(Hata: $errorMsg)*
+                
+                Sağ üstteki **Anahtar 🔑** butonundan API anahtarınızı ve bakiye durumunuzu kontrol edebilirsiniz.
+
+                ---
+                🤖 **Tufi AI (Çevrimdışı Mod):**
+                $local
+            """.trimIndent()
+        }
+
         generateLocalChatAnswer(question, courses, homeworks)
     }
 
@@ -163,35 +287,7 @@ object TufiAIService {
         history: List<TufiChatMessage>,
         homeworks: List<HomeworkWithCourse>
     ): String? {
-        val now = System.currentTimeMillis()
-        val cal = Calendar.getInstance().apply { timeInMillis = now }
-        cal.set(Calendar.HOUR_OF_DAY, 0)
-        cal.set(Calendar.MINUTE, 0)
-        cal.set(Calendar.SECOND, 0)
-        cal.set(Calendar.MILLISECOND, 0)
-        val startOfToday = cal.timeInMillis
-
-        cal.set(Calendar.HOUR_OF_DAY, 23)
-        cal.set(Calendar.MINUTE, 59)
-        cal.set(Calendar.SECOND, 59)
-        val endOfToday = cal.timeInMillis
-
-        val pending = homeworks.filter { !it.homework.isCompleted }
-        val dueToday = pending.filter { it.homework.dueDateMillis in startOfToday..endOfToday }
-        val overdue = pending.filter { it.homework.dueDateMillis in 1 until startOfToday }
-
-        val contextInfo = buildString {
-            append("Öğrencinin anlık durumu: ")
-            append("Bugün teslim edilecek ${dueToday.size} ödev var")
-            if (dueToday.isNotEmpty()) {
-                append(" (${dueToday.joinToString { "${it.course?.name ?: "Ders"}: ${it.homework.title}" }})")
-            }
-            append(", geciken/eksik ${overdue.size} ödev var")
-            if (overdue.isNotEmpty()) {
-                append(" (${overdue.take(2).joinToString { "${it.course?.name ?: "Ders"}: ${it.homework.title}" }})")
-            }
-            append(", toplam bekleyen: ${pending.size}.")
-        }
+        val contextInfo = buildHomeworkContext(homeworks)
 
         val messagesArray = JSONArray().apply {
             put(JSONObject().apply {
@@ -234,7 +330,11 @@ object TufiAIService {
             .build()
 
         client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return null
+            if (!response.isSuccessful) {
+                val err = response.body?.string() ?: ""
+                Log.e(TAG, "DeepSeek chat error (${response.code}): $err")
+                return null
+            }
             val responseBody = response.body?.string() ?: return null
             val respJson = JSONObject(responseBody)
             val choices = respJson.optJSONArray("choices") ?: return null
@@ -244,18 +344,120 @@ object TufiAIService {
         }
     }
 
+    private fun callGeminiChatApi(
+        apiKey: String,
+        question: String,
+        history: List<TufiChatMessage>,
+        courses: List<Course>,
+        homeworks: List<HomeworkWithCourse>
+    ): String? {
+        val contextInfo = buildHomeworkContext(homeworks)
+
+        val systemInstructionText = """
+            Sen Tufi AI'sın. TufiDESK ödev ve çalışma takip uygulamasında öğrencinin samimi, pratik, doğrudan ve motive edici yapay zeka koçusun.
+            Doğrudan, sade, gereksiz laf kalabalığı yapmadan, net ve uygulanabilir yanıtlar ver.
+            $contextInfo
+            Cevaplarını Türkçe ver, önemli noktaları madde işaretleriyle listele.
+        """.trimIndent()
+
+        val contentsArray = JSONArray()
+        history.takeLast(6).forEach { msg ->
+            contentsArray.put(JSONObject().apply {
+                put("role", if (msg.isUser) "user" else "model")
+                put("parts", JSONArray().apply {
+                    put(JSONObject().apply { put("text", msg.text) })
+                })
+            })
+        }
+        contentsArray.put(JSONObject().apply {
+            put("role", "user")
+            put("parts", JSONArray().apply {
+                put(JSONObject().apply { put("text", question) })
+            })
+        })
+
+        val requestJson = JSONObject().apply {
+            put("systemInstruction", JSONObject().apply {
+                put("parts", JSONArray().apply {
+                    put(JSONObject().apply { put("text", systemInstructionText) })
+                })
+            })
+            put("contents", contentsArray)
+            put("generationConfig", JSONObject().apply {
+                put("temperature", 0.6)
+            })
+        }
+
+        val body = requestJson.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey"
+        val request = Request.Builder()
+            .url(url)
+            .header("Content-Type", "application/json")
+            .post(body)
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                val err = response.body?.string() ?: ""
+                Log.e(TAG, "Gemini chat error (${response.code}): $err")
+                return null
+            }
+            val responseBody = response.body?.string() ?: return null
+            val respJson = JSONObject(responseBody)
+            val candidates = respJson.optJSONArray("candidates") ?: return null
+            if (candidates.length() == 0) return null
+            val contentObj = candidates.getJSONObject(0).optJSONObject("content") ?: return null
+            val parts = contentObj.optJSONArray("parts") ?: return null
+            if (parts.length() == 0) return null
+            return parts.getJSONObject(0).optString("text", "").trim()
+        }
+    }
+
+    private fun buildHomeworkContext(homeworks: List<HomeworkWithCourse>): String {
+        val now = System.currentTimeMillis()
+        val cal = Calendar.getInstance().apply { timeInMillis = now }
+        cal.set(Calendar.HOUR_OF_DAY, 0)
+        cal.set(Calendar.MINUTE, 0)
+        cal.set(Calendar.SECOND, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        val startOfToday = cal.timeInMillis
+
+        cal.set(Calendar.HOUR_OF_DAY, 23)
+        cal.set(Calendar.MINUTE, 59)
+        cal.set(Calendar.SECOND, 59)
+        val endOfToday = cal.timeInMillis
+
+        val pending = homeworks.filter { !it.homework.isCompleted }
+        val dueToday = pending.filter { it.homework.dueDateMillis in startOfToday..endOfToday }
+        val overdue = pending.filter { it.homework.dueDateMillis in 1 until startOfToday }
+
+        return buildString {
+            append("Öğrencinin anlık durumu: ")
+            append("Bugün teslim edilecek ${dueToday.size} ödev var")
+            if (dueToday.isNotEmpty()) {
+                append(" (${dueToday.joinToString { "${it.course?.name ?: "Ders"}: ${it.homework.title}" }})")
+            }
+            append(", geciken/eksik ${overdue.size} ödev var")
+            if (overdue.isNotEmpty()) {
+                append(" (${overdue.take(2).joinToString { "${it.course?.name ?: "Ders"}: ${it.homework.title}" }})")
+            }
+            append(", toplam bekleyen: ${pending.size}.")
+        }
+    }
+
     fun generateLocalChatAnswer(
         question: String,
         courses: List<Course>,
         homeworks: List<HomeworkWithCourse>
     ): String {
-        val q = question.lowercase(Locale("tr")).trim()
+        val q = question.lowercase(Locale.forLanguageTag("tr-TR")).trim()
 
         val now = System.currentTimeMillis()
         val cal = Calendar.getInstance().apply { timeInMillis = now }
         cal.set(Calendar.HOUR_OF_DAY, 0)
         cal.set(Calendar.MINUTE, 0)
         cal.set(Calendar.SECOND, 0)
+        cal.set(Calendar.MILLISECOND, 0)
         val startOfToday = cal.timeInMillis
         cal.set(Calendar.HOUR_OF_DAY, 23)
         cal.set(Calendar.MINUTE, 59)
@@ -280,7 +482,7 @@ object TufiAIService {
             }
             q.contains("eksik") || q.contains("gecik") || q.contains("yetiş") || q.contains("kaldı") -> {
                 if (overdue.isNotEmpty()) {
-                    "Şu an geciken veya eksik kalan ${overdue.size} ödevin var.\n\n📌 **Eritme Taktigi:**\n• Hepsini aynı günde bitirmeye çalışıp gözünde büyütme.\n• Günde sadece 1 eksik ödevi tamamla (yaklaşık 20-30 dk).\n• 2-3 gün içinde tüm eksiklerin tamamen temizlenmiş olacak!"
+                    "Şu an geciken veya eksik kalan ${overdue.size} ödevin var.\n\n📌 **Eritme Taktiği:**\n• Hepsini aynı günde bitirmeye çalışıp gözünde büyütme.\n• Günde sadece 1 eksik ödevi tamamla (yaklaşık 20-30 dk).\n• 2-3 gün içinde tüm eksiklerin tamamen temizlenmiş olacak!"
                 } else {
                     "Harika haber! Sistemde hiç geciken veya eksik ödevin yok. Düzenli temponu tebrik ederim! 👏"
                 }
@@ -342,7 +544,13 @@ object TufiAIService {
         val apiKey = getApiKey(context)
         if (apiKey.isNotBlank()) {
             try {
-                val apiAdvice = callDeepSeekAdviceApi(apiKey, homeworks)
+                val isGemini = apiKey.startsWith("AIzaSy")
+                val apiAdvice = if (isGemini) {
+                    callGeminiAdviceApi(apiKey, homeworks)
+                } else {
+                    callDeepSeekAdviceApi(apiKey, homeworks)
+                }
+
                 if (apiAdvice != null) {
                     try {
                         val serialized = serializeAdviceToJson(apiAdvice).toString()
@@ -352,24 +560,13 @@ object TufiAIService {
                             .putString(PREF_KEY_LAST_SAVED_MESSAGE, serialized)
                             .putString(PREF_KEY_LAST_SAVED_SIG, currentSignature)
                             .apply()
-
-                        try {
-                            val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                            val docData = hashMapOf(
-                                "todayKey" to todayKey,
-                                "signature" to currentSignature,
-                                "adviceJson" to serialized,
-                                "updatedAt" to System.currentTimeMillis()
-                            )
-                            db.collection("tufi_ai_cache").document(todayKey).set(docData)
-                        } catch (_: Exception) {}
                     } catch (e: Exception) {
                         Log.e(TAG, "Failed to cache advice", e)
                     }
                     return@withContext apiAdvice
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "DeepSeek API call failed, falling back to built-in guidance", e)
+                Log.e(TAG, "AI Advice API call failed, falling back to built-in guidance", e)
             }
         }
 
@@ -394,7 +591,7 @@ object TufiAIService {
             put(JSONObject().apply {
                 put("role", "system")
                 put("content", """
-                    Sen Tufi AI'sın. Öğrencinin karmaşık felsefi ders açıklamalarına değil; doğrudan bugünkü ödevlerine, eksik kalanlarına, haftalık temposuna ve bunları nasıl ilerletmesi gerektiğine odaklanan pratik, net ve samimi bir çalışma koçusun.
+                    Sen Tufi AI'sın. Öğrencinin doğrudan bugünkü ödevlerine, eksik kalanlarına, haftalık temposuna ve bunları nasıl ilerletmesi gerektiğine odaklanan pratik, net ve samimi bir çalışma koçusun.
                     
                     Görevin:
                     1. Bugünkü ödevler hakkında net durum ve öncelik tespiti yapmak.
@@ -447,6 +644,82 @@ object TufiAIService {
             if (choices.length() == 0) return null
             val message = choices.getJSONObject(0).optJSONObject("message") ?: return null
             val content = message.optString("content", "").trim()
+
+            val cleanJsonString = when {
+                content.startsWith("```json") -> content.removePrefix("```json").substringBeforeLast("```").trim()
+                content.startsWith("```") -> content.removePrefix("```").substringBeforeLast("```").trim()
+                else -> content
+            }
+
+            val adviceJson = JSONObject(cleanJsonString)
+            return parseAdviceFromJson(adviceJson, isFromApi = true)
+        }
+    }
+
+    private fun callGeminiAdviceApi(
+        apiKey: String,
+        homeworks: List<HomeworkWithCourse>
+    ): TufiAICoachAdvice? {
+        val prompt = buildAdvicePrompt(homeworks)
+
+        val systemInstructionText = """
+            Sen Tufi AI'sın. Öğrencinin doğrudan bugünkü ödevlerine, eksik kalanlarına ve bunları nasıl ilerletmesi gerektiğine odaklanan pratik, net ve samimi bir çalışma koçusun.
+            LÜTFEN SADECE VE DOĞRUDAN JSON FORMATINDA CEVAP VER. Markdown etiketi ekleme:
+            {
+              "headline": "Kısa ve motive edici başlık",
+              "summary": "1-2 cümlelik genel değerlendirme",
+              "todayTasksInsight": "Bugünkü ödevler hakkında net bilgi ve öneri",
+              "missingTasksInsight": "Eksik / bekleyen ödevlerin durumu ve toparlama tüyosu",
+              "weeklyInsight": "Bu hafta hakkında veri, tempo ve plan önerisi",
+              "stepByStepPlan": [
+                "1. Adım: ...",
+                "2. Adım: ...",
+                "3. Adım: ..."
+              ],
+              "studyMethodTip": "Bugünkü çalışmayı hızlandıracak pratik bir taktik"
+            }
+        """.trimIndent()
+
+        val contentsArray = JSONArray().apply {
+            put(JSONObject().apply {
+                put("role", "user")
+                put("parts", JSONArray().apply {
+                    put(JSONObject().apply { put("text", prompt) })
+                })
+            })
+        }
+
+        val requestJson = JSONObject().apply {
+            put("systemInstruction", JSONObject().apply {
+                put("parts", JSONArray().apply {
+                    put(JSONObject().apply { put("text", systemInstructionText) })
+                })
+            })
+            put("contents", contentsArray)
+            put("generationConfig", JSONObject().apply {
+                put("temperature", 0.4)
+                put("responseMimeType", "application/json")
+            })
+        }
+
+        val body = requestJson.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey"
+        val request = Request.Builder()
+            .url(url)
+            .header("Content-Type", "application/json")
+            .post(body)
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return null
+            val responseBody = response.body?.string() ?: return null
+            val respJson = JSONObject(responseBody)
+            val candidates = respJson.optJSONArray("candidates") ?: return null
+            if (candidates.length() == 0) return null
+            val contentObj = candidates.getJSONObject(0).optJSONObject("content") ?: return null
+            val parts = contentObj.optJSONArray("parts") ?: return null
+            if (parts.length() == 0) return null
+            val content = parts.getJSONObject(0).optString("text", "").trim()
 
             val cleanJsonString = when {
                 content.startsWith("```json") -> content.removePrefix("```json").substringBeforeLast("```").trim()
@@ -525,10 +798,11 @@ object TufiAIService {
                 weeklyInsight = weeklyInsight,
                 stepByStepPlan = steps,
                 studyMethodTip = studyMethodTip,
+                timestampMillis = System.currentTimeMillis(),
                 isFromApi = isFromApi
             )
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to parse advice json", e)
+            Log.e(TAG, "Advice parse error", e)
             return null
         }
     }
@@ -541,10 +815,11 @@ object TufiAIService {
             put("missingTasksInsight", advice.missingTasksInsight)
             put("weeklyInsight", advice.weeklyInsight)
             put("studyMethodTip", advice.studyMethodTip)
-
-            val stepsArray = JSONArray()
-            advice.stepByStepPlan.forEach { stepsArray.put(it) }
-            put("stepByStepPlan", stepsArray)
+            put("isFromApi", advice.isFromApi)
+            put("timestampMillis", advice.timestampMillis)
+            val stepsArr = JSONArray()
+            advice.stepByStepPlan.forEach { stepsArr.put(it) }
+            put("stepByStepPlan", stepsArr)
         }
     }
 
@@ -561,80 +836,60 @@ object TufiAIService {
         cal.set(Calendar.MINUTE, 59)
         cal.set(Calendar.SECOND, 59)
         val endOfToday = cal.timeInMillis
-        val endOfWeek = startOfToday + 7 * 86400000L
 
         val pending = homeworks.filter { !it.homework.isCompleted }
-        val completed = homeworks.filter { it.homework.isCompleted }
         val dueToday = pending.filter { it.homework.dueDateMillis in startOfToday..endOfToday }
         val overdue = pending.filter { it.homework.dueDateMillis in 1 until startOfToday }
-        val dueThisWeek = pending.filter { it.homework.dueDateMillis in (endOfToday + 1)..endOfWeek }
 
         val headline: String
         val summary: String
-
-        if (dueToday.isNotEmpty()) {
-            headline = "Bugünün Rotası: ${dueToday.size} Teslim Ödevi"
-            summary = "Bugün teslim edilecek ${dueToday.size} ödevin var. İlk odak noktan bunlar olmalı."
-        } else if (overdue.isNotEmpty()) {
-            headline = "Toparlama Günü: ${overdue.size} Eksik Ödev"
-            summary = "Bugün yeni teslim yok; bekleyen ${overdue.size} ödevi eritmek için harika bir fırsat."
-        } else if (pending.isNotEmpty()) {
-            headline = "Dengeli Tempo: ${pending.size} Bekleyen Ödev"
-            summary = "Günü rahat geçirebilir, haftalık ödevlerinden birini erkenden tamamlayabilirsin."
-        } else {
-            headline = "Tebrikler! Tüm Ödevler Tamam"
-            summary = "Şu anda bekleyen hiçbir ödevin yok. Konu tekrarı yapabilir veya dinlenebilirsin."
-        }
-
-        val todayTasksInsight = if (dueToday.isNotEmpty()) {
-            val names = dueToday.take(3).joinToString { "${it.course?.name ?: "Ders"} (${it.homework.title})" }
-            "Bugün teslim edilmesi gereken ${dueToday.size} ödevin var: $names. Bunları günün erken saatlerinde, zihnin tazeyken bitirmen hız kazandıracaktır."
-        } else {
-            "Bugün doğrudan teslim edilmesi gereken acil bir ödevin bulunmuyor. Bu zamanı yarınki derslere veya eksiklere ayırabilirsin."
-        }
-
-        val missingTasksInsight = if (overdue.isNotEmpty()) {
-            val names = overdue.take(2).joinToString { "${it.course?.name ?: "Ders"}: ${it.homework.title}" }
-            "Geciken veya tamamlanmamış ${overdue.size} ödevin bulunuyor ($names). Bunları ertelemek yerine bugün 20'şer dakikalık bloklarla hafifletebilirsin."
-        } else if (pending.isNotEmpty()) {
-            "Şu anda geciken hiçbir ödevin yok. Toplam ${pending.size} bekleyen ödevin planlanan takvimde ilerliyor."
-        } else {
-            "Sistemde hiç eksik ödevin yok! Zaman yönetimini harika şekilde sürdürüyorsun."
-        }
-
-        val weeklyTotal = dueToday.size + dueThisWeek.size
-        val weeklyInsight = if (weeklyTotal > 0) {
-            val pct = if (homeworks.isNotEmpty()) (completed.size * 100) / homeworks.size else 0
-            "Bu hafta toplam $weeklyTotal ödev teslimi bulunuyor (Genel başarı: %$pct). Günde ortalama 1-2 ödev bitirerek hafta sonunu tamamen boş bırakabilirsin."
-        } else {
-            "Bu hafta için planlanan tüm ödevler yolunda. Önümüzdeki günlerin yükü hafif."
-        }
-
+        val todayInsight: String
+        val missingInsight: String
+        val weeklyInsight: String
         val steps = mutableListOf<String>()
+        val tip: String
+
         if (dueToday.isNotEmpty()) {
-            steps.add("1. Adım: Teslim tarihi bugün olan ${dueToday.first().homework.title} ödevine 35 dk kesintisiz odaklan.")
-            steps.add("2. Adım: 10 dk mola ver; ardından kalan bugünkü çalışmaları tamamla.")
-            steps.add("3. Adım: Bitirdiğin ödevleri TufiDESK'te onaylayıp yarının listesini kontrol et.")
+            headline = "Bugünün Rotası: ${dueToday.size} Kritik Ödev"
+            summary = "Günün önceliği teslim tarihi bugün dolan ödevlerini temizleyerek kafanı rahatlatmak."
+            todayInsight = "Bugün ${dueToday.size} ödev teslim edilecek: ${dueToday.joinToString { "${it.course?.name ?: "Ders"}: ${it.homework.title}" }}."
+            steps.add("1. Adım: Teslim tarihi bugün olan ilk ödevine 35 dakika tam odaklan.")
+            steps.add("2. Adım: 10 dakikalık mola verip ikinci ödevin sorularını tamamla.")
+            steps.add("3. Adım: Tamamlanan ödevleri TufiDESK'te yeşil tikle işaretle.")
         } else if (overdue.isNotEmpty()) {
-            steps.add("1. Adım: Geciken ödevlerden ${overdue.first().homework.title} ödevini 25 dk içinde bitirmeyi hedefle.")
-            steps.add("2. Adım: Masanı toparlayıp 5 dk nefes al, ardından kalanları gözden geçir.")
-            steps.add("3. Adım: Listeni güncelleyip günün tamamlanma oranını yükselt.")
+            headline = "Fırsat Günü: Eksikleri Toparlama Zamanı"
+            summary = "Bugün yeni teslimin yok! Bekleyen eksik ödevlerini eritmek için ideal bir fırsat penceresi."
+            todayInsight = "Bugün teslim edilecek acil ödevin bulunmuyor. Temponu korumak için mükemmel bir gün."
+            steps.add("1. Adım: Geciken ödevlerden en kısa olanını seçip 25 dakikada bitir.")
+            steps.add("2. Adım: Kalan ödevler için yarın ve sonraki güne 1'er görev planla.")
+            steps.add("3. Adım: 15 dakika kitap oku veya zihnini dinlendir.")
         } else {
-            steps.add("1. Adım: Gelecek haftanın önemli ders konularına 20 dk göz at.")
-            steps.add("2. Adım: Eksik hissettiğin bir dersten 20 soru çözerek pratiğini koru.")
-            steps.add("3. Adım: TufiDESK ödev takvimine yeni haftalık hedeflerini ekle.")
+            headline = "Mükemmel İlerleme: Tüm Ödevler Kontrol Altında! 🌟"
+            summary = "Harika bir disiplin! Masanda acil veya geciken ödev baskısı olmadan rahatça ilerliyorsun."
+            todayInsight = "Bekleyen acil teslimin yok. Tüm süreç düzenli ilerliyor."
+            steps.add("1. Adım: Gelecek haftanın ders konularına 20 dakika göz gezdir.")
+            steps.add("2. Adım: TufiDESK Denemeler sekmesinden son denemenin net analizini incele.")
+            steps.add("3. Adım: Kendine kaliteli bir dinlenme vakti ayır.")
         }
 
-        val studyMethodTip = "💡 Pomodoro Kuralı: 25 dakika çalışıp 5 dakika tam mola ver. Çalışma esnasında bildirimleri kapatmak odaklanma süreni 2 katına çıkarır."
+        if (overdue.isNotEmpty()) {
+            missingInsight = "Sistemde ${overdue.size} adet eksik/gecikmiş ödev bekliyor. Bunları tek seferde bitirmeye çalışma; günde sadece 1 tanesini kapat."
+        } else {
+            missingInsight = "Tebrikler! Hiçbir eksik veya gecikmiş ödevin bulunmuyor."
+        }
+
+        weeklyInsight = "Haftalık planını sürdürürken günde ortalama 2 Pomodoro bloğu (50 dk) ayırmak tüm ödev yükünü rahatça eritmeni sağlar."
+        tip = "💡 Çalışırken telefonunu başka bir odaya bırak. Sadece 25 dakika tek bir derse odaklandığında hızının 2 katına çıktığını göreceksin."
 
         return TufiAICoachAdvice(
             headline = headline,
             summary = summary,
-            todayTasksInsight = todayTasksInsight,
-            missingTasksInsight = missingTasksInsight,
+            todayTasksInsight = todayInsight,
+            missingTasksInsight = missingInsight,
             weeklyInsight = weeklyInsight,
             stepByStepPlan = steps,
-            studyMethodTip = studyMethodTip,
+            studyMethodTip = tip,
+            timestampMillis = System.currentTimeMillis(),
             isFromApi = false
         )
     }

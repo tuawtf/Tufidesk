@@ -108,6 +108,8 @@ import com.example.data.model.UserAccount
 import com.example.ui.components.UserFlowerAvatar
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.OutlinedButton
+import com.example.data.ai.TufiAIService
+import com.example.ui.components.TufiAISettingsDialog
 import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -514,6 +516,62 @@ fun SettingsScreen(
                         )
                     }
                 }
+            }
+        }
+
+        // Section: Tufi AI & Yapay Zeka Ayarları
+        item {
+            var showAiSettingsDialog by remember { mutableStateOf(false) }
+            val isAiConfigured = remember { TufiAIService.isApiKeyConfigured(context) }
+
+            SettingsCategoryCard(title = "Yapay Zeka (Tufi AI)") {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { showAiSettingsDialog = true },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = if (isAiConfigured) Color(0xFF10B981).copy(alpha = 0.15f) else Color(0xFFF59E0B).copy(alpha = 0.18f),
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = if (isAiConfigured) Color(0xFF059669) else Color(0xFFD97706),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Tufi AI & API Anahtarı Ayarları",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                            )
+                            Text(
+                                text = if (isAiConfigured) "🟢 Canlı API Bağlantısı Aktif" else "⚠️ API Anahtarı Tanımlı Değil (Çevrimdışı Mod)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isAiConfigured) Color(0xFF065F46) else Color(0xFF92400E)
+                            )
+                        }
+                        Text(
+                            text = "Düzenle ❯",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+
+            if (showAiSettingsDialog) {
+                TufiAISettingsDialog(
+                    onDismiss = { showAiSettingsDialog = false }
+                )
             }
         }
 

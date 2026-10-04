@@ -817,13 +817,14 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                             .weight(1f),
                         snackbarHost = {},
                         topBar = {
-                            TopAppBar(
-                                title = {
-                                    Text(
-                                        text = screenTitle,
-                                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
-                                    )
-                                },
+                            if (!isTufiActive || isSettingsOpen) {
+                                TopAppBar(
+                                    title = {
+                                        Text(
+                                            text = screenTitle,
+                                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                                        )
+                                    },
                                 navigationIcon = {
                                     if (isSettingsOpen) {
                                         IconButton(onClick = { isSettingsOpen = false }) {
@@ -891,7 +892,8 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                                     containerColor = MaterialTheme.colorScheme.background
                                 )
                             )
-                        },
+                        }
+                    },
                         containerColor = MaterialTheme.colorScheme.background
                     ) { innerPadding ->
                         Box(
@@ -908,16 +910,17 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
             // PHONE MODE: Standard Top Bar + Bottom Navigation Bar
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
-                contentWindowInsets = WindowInsets.safeDrawing,
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 snackbarHost = {},
                 topBar = {
-                    TopAppBar(
-                        title = {
-                            Text(
-                                text = screenTitle,
-                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
-                            )
-                        },
+                    if (!isTufiActive || isSettingsOpen) {
+                        TopAppBar(
+                            title = {
+                                Text(
+                                    text = screenTitle,
+                                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                                )
+                            },
                         navigationIcon = {
                             if (isSettingsOpen) {
                                 IconButton(onClick = { isSettingsOpen = false }) {
@@ -992,7 +995,8 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                             containerColor = MaterialTheme.colorScheme.surface
                         )
                     )
-                },
+                }
+            },
                 bottomBar = {
                     if (!floatingBottomBar && !isSettingsOpen && !isSelectionActive && !isCustomBottomBarActive) {
                         FixedStandardBottomNavigation(
