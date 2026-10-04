@@ -350,7 +350,8 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
 
     val isTimerActive = (selectedScreen == Screen.Timer) || (selectedScreen == Screen.Tools && activeTool == "timer")
     val isNotesActive = (selectedScreen == Screen.Notes) || (selectedScreen == Screen.Tools && activeTool == "notes")
-    val isCustomBottomBarActive = isTimerActive || isNotesActive
+    val isTufiActive = (selectedScreen == Screen.TufiAI)
+    val isCustomBottomBarActive = isTimerActive || isNotesActive || isTufiActive
 
     // Handle back button on sub-tabs
     BackHandler(enabled = isSettingsOpen) {
@@ -524,6 +525,11 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     Screen.TufiAI -> TufiAIScreen(
                         courses = courses,
                         homeworks = filteredHomeworks,
+                        navItems = navItems,
+                        currentTab = currentTab,
+                        onTabSelected = { index ->
+                            navItems.getOrNull(index)?.let { currentRoute = it.route }
+                        },
                         onBack = { currentRoute = Screen.Home.route }
                     )
 
