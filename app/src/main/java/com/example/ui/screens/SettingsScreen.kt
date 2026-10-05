@@ -103,6 +103,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.ui.text.font.FontFamily
 import android.content.Intent
+import com.example.CrashActivity
 import com.example.data.firebase.SyncState
 import com.example.data.model.UserAccount
 import com.example.ui.components.UserFlowerAvatar
@@ -1039,6 +1040,23 @@ fun SettingsScreen(
                         }
                     }
 
+                    Button(
+                        onClick = {
+                            showDevOptionsDialog = false
+                            CrashActivity.start(
+                                context,
+                                RuntimeException("MANUEL GELİŞTİRİCİ ÇÖKME TESTİ:\nGeliştirici Teşhis Panelinden BSOD ekranı tetiklendi.\nHata Kodu: CRITICAL_PROCESS_DIED (0x000000EF)")
+                            )
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0078D7)),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.ErrorOutline, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("💥 Manuel Çökme & BSOD Testi", fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                    }
+
                     TextButton(
                         onClick = {
                             isDeveloperModeActive = false
@@ -1520,6 +1538,8 @@ fun DeveloperSettingsContent(
     onOpenDiagnosticsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -1756,6 +1776,45 @@ fun DeveloperSettingsContent(
                             Icon(imageVector = Icons.Default.BugReport, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Teşhis Raporunu Görüntüle", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
+            }
+
+            // 4. Manuel Çökme & BSOD Testi
+            item {
+                SettingsCategoryCard(title = "💥 Çökme & BSOD Ekranı Testi") {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = ":( Windows BSOD & Hata Ekranı",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            ),
+                            color = Color(0xFF0078D7)
+                        )
+                        Text(
+                            text = "Çökme ekranını ve Windows temalı log kopyalama arayüzünü görmek için manuel olarak çökme tetikleyebilirsiniz.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Button(
+                            onClick = {
+                                CrashActivity.start(
+                                    context,
+                                    RuntimeException("MANUEL GELİŞTİRİCİ ÇÖKME TESTİ:\nKullanıcı Geliştirici Ayarlarından BSOD ekranını test etmek için manuel çökme tetikledi.\nHata Kodu: STATUS_SYSTEM_PROCESS_TERMINATED (0xC000021A)\nModül: com.example.ui.screens.SettingsScreen")
+                                )
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0078D7)),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(imageVector = Icons.Default.ErrorOutline, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Manuel Çökmeyi Başlat (BSOD Test)", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

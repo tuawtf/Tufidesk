@@ -11,10 +11,14 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -33,11 +37,13 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
@@ -52,14 +58,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.outlined.ThumbDown
 import androidx.compose.material.icons.outlined.ThumbUp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -70,6 +81,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -104,22 +116,38 @@ import com.example.Screen
 import com.example.data.ai.TufiAICoachAdvice
 import com.example.data.ai.TufiAIService
 import com.example.data.ai.TufiChatMessage
+import com.example.data.ai.TufiChatSession
 import com.example.data.model.Course
 import com.example.data.model.HomeworkWithCourse
+import androidx.compose.material.icons.automirrored.filled.CompareArrows
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import com.example.ui.components.IslandNotificationType
 import com.example.ui.components.IslandBottomNavItem
 import com.example.ui.components.TufiAISettingsDialog
+import com.example.ui.components.TufiChatHistoryDrawer
+import com.example.ui.components.TufiMarkdownText
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 
 /**
- * Kullanıcının İstediği Özel Morfizasyon Aşamaları:
- * 1. TABS: Standart alt gezinme adası (Home, Calendar, Tufi AI, Stats, Tools).
- * 2. STAR_SPINNING: SADECE YILDIZ 720 derece yavaşça dönüp genişler. "Tufi AI" yazısı KESİNLİKLE DÖNMEZ, solarak kapanır.
- * 3. STAR_MOVING_LEFT: Diğer sekmeler küçülerek kapanır, yıldız doğal akışla en sola geçer ve 4'LÜ KARE formatını alır.
- * 4. EXPANDING_UP: Bar yukarı ve yana doğru genişler (ChatGPT kapsülü).
- * 5. TEXTBOX: "Tufi AI'a sor..." tam aktif.
- * 6. KAREYE TIKLAYINCA: Textbox solar, bar orijinal ada boyutuna daralır, 4'lü kare yıldıza dönüşüp ortaya kayar, "Tufi AI" yazısı ve sekmeler çakışmasız açılır.
+ * Uygulama Çalışma Döngüsü İçinde Tufi AI Oturum Yönetimi:
+ * - Uygulamaya yeni girildiyse (Cold Start) -> Yeni bir sohbet açılır.
+ * - Uygulama içinde kalınmışsa (sekmeler arası geçişte) -> Önceki sohbet korunur ve açılır.
+ */
+object TufiAISessionTracker {
+    var hasOpenedInThisAppRun: Boolean = false
+    val inMemoryMessages = mutableListOf<TufiChatMessage>()
+    var inMemorySessionId: String? = null
+}
+
+/**
+ * Morfizasyon Aşamaları
  */
 enum class TufiBarMorphState {
     TABS,
@@ -135,6 +163,19 @@ private fun lerpFloat(start: Float, stop: Float, fraction: Float): Float =
 private fun lerpDp(start: Dp, stop: Dp, fraction: Float): Dp =
     (start.value + fraction * (stop.value - start.value)).dp
 
+private fun formatSessionDate(millis: Long): String {
+    val now = Calendar.getInstance()
+    val sessionCal = Calendar.getInstance().apply { timeInMillis = millis }
+    val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(millis))
+    return when {
+        now.get(Calendar.YEAR) == sessionCal.get(Calendar.YEAR) &&
+        now.get(Calendar.DAY_OF_YEAR) == sessionCal.get(Calendar.DAY_OF_YEAR) -> "Bugün $timeStr"
+        now.get(Calendar.YEAR) == sessionCal.get(Calendar.YEAR) &&
+        now.get(Calendar.DAY_OF_YEAR) - sessionCal.get(Calendar.DAY_OF_YEAR) == 1 -> "Dün $timeStr"
+        else -> SimpleDateFormat("d MMMM HH:mm", Locale.forLanguageTag("tr-TR")).format(Date(millis))
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TufiAIScreen(
@@ -144,6 +185,7 @@ fun TufiAIScreen(
     currentTab: Int = 2,
     onTabSelected: (Int) -> Unit = {},
     onBack: () -> Unit = {},
+    onShowNotification: ((String, IslandNotificationType, String?) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -156,6 +198,11 @@ fun TufiAIScreen(
     var isGenerating by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
+    // Oturum & Geçmiş Sohbetler State
+    var activeSessionId by remember { mutableStateOf<String?>(null) }
+    var showLeftDrawer by remember { mutableStateOf(false) }
+    var pastSessions by remember { mutableStateOf<List<TufiChatSession>>(emptyList()) }
+
     // Menü ve Pencere Durumları
     var showTopMenu by remember { mutableStateOf(false) }
     var showApiKeyDialog by remember { mutableStateOf(false) }
@@ -167,109 +214,175 @@ fun TufiAIScreen(
     var isAdviceLoading by remember { mutableStateOf(false) }
 
     // =========================================================================
-    // SİNEMATİK ANİMASYON DURUMLARI (Çakışmasız Doğal Düzen Akışı)
+    // SİNEMATİK ANİMASYON DURUMLARI (Yavaş, Akıcı & Animasyon Bitene Kadar Ekran Gizli)
     // =========================================================================
     var morphState by remember { mutableStateOf(TufiBarMorphState.TABS) }
     val starRotation = remember { Animatable(0f) }
     val starScale = remember { Animatable(1f) }
     val starMorphProgress = remember { Animatable(0f) } // 0f = Yıldız, 1f = 4'lü Kare
-    val tabsShrinkProgress = remember { Animatable(0f) } // 0f = Sekmeler açık, 1f = Sekmeler kapalı (yıldız en solda)
+    val tabsShrinkProgress = remember { Animatable(0f) } // 0f = Sekmeler açık, 1f = Sekmeler kapalı
     val tufiTextProgress = remember { Animatable(1f) }   // 1f = "Tufi AI" yazısı açık, 0f = Kapalı
     val barExpandProgress = remember { Animatable(0f) }  // 0f = Ada boyutu, 1f = Tam genişlik
     val textboxAlpha = remember { Animatable(0f) }
+    val screenContentAlpha = remember { Animatable(0f) } // Animasyon bitene kadar 0 kalır!
 
-    // Geri Dönüş Fonksiyonu: 4'lü kareye tıklandığında bar eski boyutuna kusursuz döner
+    // =========================================================================
+    // GERİ DÖNÜŞ ANİMASYONU (Kareye basınca tersine sinematik animasyonla ada açılır)
+    // =========================================================================
     fun morphBackToTabs() {
         coroutineScope.launch {
-            // 1. Textbox içeriklerini soldur
+            // 1. Textbox içeriği hızla solar
+            launch { textboxAlpha.animateTo(0f, tween(120)) }
+            screenContentAlpha.snapTo(1f) // Kararma yok!
+
+            // 2. Bar tam genişlikten ada boyutuna küçülür
             morphState = TufiBarMorphState.EXPANDING_UP
-            textboxAlpha.animateTo(0f, tween(140))
+            launch { barExpandProgress.animateTo(0f, tween(300, easing = FastOutSlowInEasing)) }
+            delay(100)
 
-            // 2. Bar genişliğini ve yüksekliğini orijinal ada boyutuna daralt
-            launch {
-                barExpandProgress.animateTo(0f, tween(320, easing = FastOutSlowInEasing))
-            }
-            delay(140)
-
-            // 3. 4'lü kare yıldıza dönüşür ve diğer sekmeler açılarak yıldızı doğal olarak ortaya taşır
+            // 3. 4'lü kare yıldıza/sohbet ikonuna geri döner ve diğer sekmeler açılır
             morphState = TufiBarMorphState.STAR_MOVING_LEFT
-            launch {
-                starMorphProgress.animateTo(0f, tween(260))
-            }
-            launch {
-                tabsShrinkProgress.animateTo(0f, tween(400, easing = FastOutSlowInEasing))
-            }
-            delay(320)
+            launch { starMorphProgress.animateTo(0f, tween(260, easing = FastOutSlowInEasing)) }
+            launch { starRotation.animateTo(0f, tween(380, easing = FastOutSlowInEasing)) }
+            launch { starScale.animateTo(1f, tween(300, easing = FastOutSlowInEasing)) }
+            launch { tabsShrinkProgress.animateTo(0f, tween(340, easing = FastOutSlowInEasing)) }
 
-            // 4. "Tufi AI" yazısı yıldızın yanında çakışmasız genişler ve tam ada haline gelinir
-            morphState = TufiBarMorphState.TABS
-            starRotation.snapTo(0f)
-            starScale.snapTo(1f)
-            tufiTextProgress.animateTo(1f, tween(300, easing = FastOutSlowInEasing))
-        }
-    }
-
-    // İleri Animasyon: Yıldız döner -> Genişler -> Sola kayar -> 4'lü kare olur -> Textbox açılır
-    fun startForwardCinematicAnimation() {
-        coroutineScope.launch {
-            morphState = TufiBarMorphState.TABS
-            starRotation.snapTo(0f)
-            starScale.snapTo(1f)
-            starMorphProgress.snapTo(0f)
-            tabsShrinkProgress.snapTo(0f)
-            tufiTextProgress.snapTo(1f)
-            barExpandProgress.snapTo(0f)
-            textboxAlpha.snapTo(0f)
-
-            delay(120)
-
-            // 1. AŞAMA: SADECE YILDIZ DÖNER VE GENİŞLER ("Tufi AI" yazısı KESİNLİKLE dönmez, solarak kapanır)
-            morphState = TufiBarMorphState.STAR_SPINNING
-            launch {
-                tufiTextProgress.animateTo(0f, tween(350, easing = FastOutSlowInEasing))
-            }
-            launch {
-                starScale.animateTo(1.55f, tween(480, easing = FastOutSlowInEasing))
-                starScale.animateTo(1.20f, tween(420, easing = FastOutSlowInEasing))
-            }
-            // Yıldız 720 derece yavaş ve sinematik döner (900ms)
-            starRotation.animateTo(720f, tween(900, easing = FastOutSlowInEasing))
-
-            // 2. AŞAMA: DİĞER SEKMELELER DARALIR, YILDIZ EN SOLA KAYAR VE 4'LÜ KARE OLUR
-            morphState = TufiBarMorphState.STAR_MOVING_LEFT
-            launch {
-                tabsShrinkProgress.animateTo(1f, tween(500, easing = FastOutSlowInEasing))
-            }
-            launch {
-                delay(180)
-                starMorphProgress.animateTo(1f, tween(350, easing = FastOutSlowInEasing))
-                starScale.animateTo(1.0f, tween(300))
-            }
-            delay(480)
-
-            // 3. AŞAMA: BAR ÜSTE VE YANA DOĞRU GENİŞLER
-            morphState = TufiBarMorphState.EXPANDING_UP
-            launch {
-                barExpandProgress.animateTo(1f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
-            }
             delay(220)
 
-            // 4. AŞAMA: "TUFI AI'A SOR" TEXT BAR GÖRÜNÜR
-            morphState = TufiBarMorphState.TEXTBOX
-            textboxAlpha.animateTo(1f, tween(250))
+            // 4. Sohbet yazısı açılır ve normal TABS durumuna geçilir
+            morphState = TufiBarMorphState.TABS
+            tufiTextProgress.animateTo(1f, tween(180))
         }
     }
 
-    BackHandler(enabled = morphState == TufiBarMorphState.TEXTBOX || barExpandProgress.value > 0.1f) {
+    // =========================================================================
+    // İLERİ ANİMASYON (Tufi AI tuşuna ve Sohbet tuşuna basınca sinematik dönüşüm)
+    // =========================================================================
+    fun startForwardCinematicAnimation(fromColdStart: Boolean = false) {
+        coroutineScope.launch {
+            if (fromColdStart) {
+                // İlk açılışta sinematik animasyon
+                screenContentAlpha.snapTo(0f)
+                textboxAlpha.snapTo(0f)
+                morphState = TufiBarMorphState.TABS
+                starRotation.snapTo(0f)
+                starScale.snapTo(1f)
+                starMorphProgress.snapTo(0f)
+                tabsShrinkProgress.snapTo(0f)
+                tufiTextProgress.snapTo(1f)
+                barExpandProgress.snapTo(0f)
+
+                delay(120)
+
+                // 1. AŞAMA: SADECE YILDIZ YAVAŞÇA DÖNÜP GENİŞLER
+                morphState = TufiBarMorphState.STAR_SPINNING
+                launch {
+                    tufiTextProgress.animateTo(0f, tween(350, easing = FastOutSlowInEasing))
+                }
+                launch {
+                    starScale.animateTo(1.5f, tween(450, easing = FastOutSlowInEasing))
+                    starScale.animateTo(1.2f, tween(350, easing = FastOutSlowInEasing))
+                }
+                starRotation.animateTo(720f, tween(850, easing = FastOutSlowInEasing))
+
+                // 2. AŞAMA: DİĞER SEKMELELER KAPANIR, YILDIZ 4'LÜ KAREYE DÖNÜŞÜR
+                morphState = TufiBarMorphState.STAR_MOVING_LEFT
+                launch {
+                    tabsShrinkProgress.animateTo(1f, tween(500, easing = FastOutSlowInEasing))
+                }
+                launch {
+                    delay(180)
+                    starMorphProgress.animateTo(1f, tween(350, easing = FastOutSlowInEasing))
+                    starScale.animateTo(1.0f, tween(250))
+                }
+                delay(450)
+
+                // 3. AŞAMA: BAR ÜSTE VE YANA GENİŞLER
+                morphState = TufiBarMorphState.EXPANDING_UP
+                launch {
+                    barExpandProgress.animateTo(1f, tween(380, easing = FastOutSlowInEasing))
+                }
+                launch {
+                    delay(120)
+                    screenContentAlpha.animateTo(1f, tween(320, easing = FastOutSlowInEasing))
+                }
+                delay(320)
+
+                // 4. AŞAMA: METİN GİRİŞ KUTUSU BELİRİR
+                morphState = TufiBarMorphState.TEXTBOX
+                textboxAlpha.animateTo(1f, tween(200))
+            } else {
+                // Tufi AI içindeyken "Sohbet" butonuna basıldığında: Ekran kararmaz, aynı şık animasyonla metin kutusuna dönüşür!
+                screenContentAlpha.snapTo(1f)
+                textboxAlpha.snapTo(0f)
+
+                // 1. Sohbet yazısı kapanır, ikon döner
+                morphState = TufiBarMorphState.STAR_SPINNING
+                launch { tufiTextProgress.animateTo(0f, tween(200, easing = FastOutSlowInEasing)) }
+                launch {
+                    starScale.animateTo(1.4f, tween(280, easing = FastOutSlowInEasing))
+                    starScale.animateTo(1.1f, tween(180, easing = FastOutSlowInEasing))
+                }
+                starRotation.animateTo(720f, tween(550, easing = FastOutSlowInEasing))
+
+                // 2. Diğer sekmeler kapanır, ikon 4'lü kareye dönüşür
+                morphState = TufiBarMorphState.STAR_MOVING_LEFT
+                launch { tabsShrinkProgress.animateTo(1f, tween(340, easing = FastOutSlowInEasing)) }
+                launch {
+                    delay(90)
+                    starMorphProgress.animateTo(1f, tween(260, easing = FastOutSlowInEasing))
+                    starScale.animateTo(1.0f, tween(200))
+                }
+                delay(280)
+
+                // 3. Bar genişler
+                morphState = TufiBarMorphState.EXPANDING_UP
+                launch { barExpandProgress.animateTo(1f, tween(300, easing = FastOutSlowInEasing)) }
+                delay(220)
+
+                // 4. Metin kutusu açılır
+                morphState = TufiBarMorphState.TEXTBOX
+                textboxAlpha.animateTo(1f, tween(180))
+            }
+        }
+    }
+
+    BackHandler(enabled = showLeftDrawer) {
+        showLeftDrawer = false
+    }
+    BackHandler(enabled = !showLeftDrawer && (morphState == TufiBarMorphState.TEXTBOX || barExpandProgress.value > 0.1f)) {
         morphBackToTabs()
     }
-    BackHandler(enabled = morphState == TufiBarMorphState.TABS && barExpandProgress.value <= 0.1f) {
+    BackHandler(enabled = !showLeftDrawer && morphState == TufiBarMorphState.TABS && barExpandProgress.value <= 0.1f) {
         onBack()
     }
 
-    // Ekran açıldığında sinematik animasyonu başlat
+    // =========================================================================
+    // OTURUM YÖNETİMİ (Yeni Açılış vs. Aynı Oturumda Sekme Değiştirme)
+    // =========================================================================
     LaunchedEffect(Unit) {
-        startForwardCinematicAnimation()
+        if (!TufiAISessionTracker.hasOpenedInThisAppRun) {
+            // UYGULAMAYA YENİ GİRDİYSEK: Yeni bir sohbet açılır!
+            TufiAISessionTracker.hasOpenedInThisAppRun = true
+            chatMessages.clear()
+            activeSessionId = null
+            TufiAISessionTracker.inMemoryMessages.clear()
+            TufiAISessionTracker.inMemorySessionId = null
+        } else {
+            // DAHA ÖNCE UYGULAMAYA GİRİP ÇIKMADIYSAK: O eski sohbet açılır!
+            chatMessages.clear()
+            if (TufiAISessionTracker.inMemoryMessages.isNotEmpty()) {
+                chatMessages.addAll(TufiAISessionTracker.inMemoryMessages)
+                activeSessionId = TufiAISessionTracker.inMemorySessionId
+            } else {
+                val loaded = TufiAIService.loadChatHistory(context)
+                chatMessages.addAll(loaded)
+                activeSessionId = TufiAIService.getActiveSessionId(context)
+            }
+        }
+
+        // Sinematik yavaş açılış animasyonunu başlat
+        startForwardCinematicAnimation(fromColdStart = true)
     }
 
     // TTS (Metin Seslendirme)
@@ -319,17 +432,33 @@ fun TufiAIScreen(
         }
     }
 
-    // Sohbet Geçmişini Yükle
-    LaunchedEffect(Unit) {
-        val loaded = TufiAIService.loadChatHistory(context)
-        chatMessages.clear()
-        chatMessages.addAll(loaded)
-    }
-
     fun clearChat() {
         chatMessages.clear()
+        activeSessionId = null
+        TufiAISessionTracker.inMemoryMessages.clear()
+        TufiAISessionTracker.inMemorySessionId = null
         TufiAIService.clearChatHistory(context)
-        Toast.makeText(context, "Yeni sohbet başlatıldı. 🧹", Toast.LENGTH_SHORT).show()
+        if (onShowNotification != null) {
+            onShowNotification("Yeni sohbet başlatıldı", IslandNotificationType.SUCCESS, "Tufi AI")
+        } else {
+            Toast.makeText(context, "Yeni sohbet başlatıldı", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun loadSelectedSession(session: TufiChatSession) {
+        activeSessionId = session.id
+        TufiAIService.setActiveSessionId(context, session.id)
+        chatMessages.clear()
+        chatMessages.addAll(session.messages)
+        TufiAISessionTracker.inMemoryMessages.clear()
+        TufiAISessionTracker.inMemoryMessages.addAll(session.messages)
+        TufiAISessionTracker.inMemorySessionId = session.id
+        showLeftDrawer = false
+        if (onShowNotification != null) {
+            onShowNotification("Sohbet açıldı: ${session.title}", IslandNotificationType.INFO, "Tufi AI")
+        } else {
+            Toast.makeText(context, "Sohbet açıldı: ${session.title}", Toast.LENGTH_SHORT).show()
+        }
     }
 
     fun sendMessage(textToSend: String) {
@@ -363,7 +492,12 @@ fun TufiAIScreen(
 
             val aiMsg = TufiChatMessage(isUser = false, text = replyText)
             chatMessages.add(aiMsg)
-            TufiAIService.saveChatHistory(context, chatMessages)
+
+            // Oturuma ve hafızaya kaydet
+            activeSessionId = TufiAIService.saveChatHistory(context, chatMessages, activeSessionId)
+            TufiAISessionTracker.inMemoryMessages.clear()
+            TufiAISessionTracker.inMemoryMessages.addAll(chatMessages)
+            TufiAISessionTracker.inMemorySessionId = activeSessionId
             isGenerating = false
 
             delay(50)
@@ -402,13 +536,18 @@ fun TufiAIScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF000000)) // AMOLED Pitch Black ChatGPT Teması
+            .background(Color(0xFF000000).copy(alpha = screenContentAlpha.value)) // Animasyon bitene kadar saydam/geçişli!
             .testTag("tufi_ai_screen")
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // ==========================================
+        // ==========================================
+        // TUFİ AI EKRANI İÇERİĞİ (Animasyon tamamlanınca yumuşakça görünür)
+        // ==========================================
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = screenContentAlpha.value }
+        ) {
             // CHATGPT ÜST BAŞLIK (Header)
-            // ==========================================
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -416,7 +555,7 @@ fun TufiAIScreen(
                     .padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Sol: İki Çizgili Menü / Geri Butonu (=)
+                // Sol: 3 ÇİZGİ TUŞU -> ESKİ SOHBETLERİ GÖSTERİR!
                 Box(
                     modifier = Modifier
                         .size(42.dp)
@@ -426,11 +565,13 @@ fun TufiAIScreen(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
                             onClick = {
-                                if (morphState == TufiBarMorphState.TEXTBOX || barExpandProgress.value > 0.1f) {
-                                    morphBackToTabs()
-                                } else {
-                                    onBack()
+                                try {
+                                    pastSessions = TufiAIService.loadAllSessions(context)
+                                } catch (e: Exception) {
+                                    android.util.Log.e("TufiAIScreen", "Error loading history", e)
+                                    pastSessions = emptyList()
                                 }
+                                showLeftDrawer = true
                             }
                         ),
                     contentAlignment = Alignment.Center
@@ -482,6 +623,14 @@ fun TufiAIScreen(
                             modifier = Modifier.background(Color(0xFF262626))
                         ) {
                             DropdownMenuItem(
+                                text = { Text("💬 Eski Sohbetler", color = Color.White) },
+                                onClick = {
+                                    showTopMenu = false
+                                    pastSessions = TufiAIService.loadAllSessions(context)
+                                    showLeftDrawer = true
+                                }
+                            )
+                            DropdownMenuItem(
                                 text = { Text("Yeni Sohbet Başlat", color = Color.White) },
                                 onClick = {
                                     showTopMenu = false
@@ -512,11 +661,9 @@ fun TufiAIScreen(
                 }
             }
 
-            // ==========================================
             // SOHBET AKIŞI VEYA KARŞILAMA EKRANI
-            // ==========================================
             if (chatMessages.isEmpty()) {
-                // Karşılama Ekranı (ChatGPT Minimalist Tarzı)
+                // Claude Minimalist Karşılama Ekranı: Sadece "Let's noodle"
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -524,60 +671,16 @@ fun TufiAIScreen(
                         .padding(horizontal = 24.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text(
-                            text = "Nasılsın? Ne yapıyoruz bugün?",
-                            style = MaterialTheme.typography.headlineSmall.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.White,
-                                fontSize = 21.sp
-                            )
+                    Text(
+                        text = "Let's noodle",
+                        style = TextStyle(
+                            fontFamily = FontFamily.Serif,
+                            fontWeight = FontWeight.Normal,
+                            fontSize = 36.sp,
+                            color = Color(0xFFF3EFEA),
+                            letterSpacing = (-0.5).sp
                         )
-
-                        Text(
-                            text = "Ödevlerini, sınav hazırlığını ve çalışma planını birlikte yönetelim.",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = Color(0xFF8E8E93),
-                                fontSize = 14.sp
-                            )
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Hızlı Başlangıç Önerileri
-                        val quickPrompts = listOf(
-                            "🎯 Bugün hangi ödevle başlamalıyım?",
-                            "📋 Günlük çalışma planımı hazırla",
-                            "⏱️ 25 dakika Pomodoro çalışma taktiği ver",
-                            "⚠️ Eksik ve geciken ödevlerimi göster"
-                        )
-
-                        quickPrompts.forEach { prompt ->
-                            Surface(
-                                shape = RoundedCornerShape(18.dp),
-                                color = Color(0xFF1E1E1E),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { sendMessage(prompt) }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = prompt,
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            color = Color(0xFFECECEC),
-                                            fontSize = 14.5.sp
-                                        )
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    )
                 }
             } else {
                 // Mesaj Akışı
@@ -598,7 +701,7 @@ fun TufiAIScreen(
                             ) {
                                 Surface(
                                     shape = RoundedCornerShape(22.dp),
-                                    color = Color(0xFF1E3A8A), // ChatGPT derin lacivert/mavi hap baloncuk
+                                    color = Color(0xFF1E3A8A),
                                     modifier = Modifier.widthIn(max = 290.dp)
                                 ) {
                                     Text(
@@ -613,15 +716,11 @@ fun TufiAIScreen(
                                 }
                             }
                         } else {
-                            // Asistan (Tufi AI) Mesajı: Sola hizalı, kartsız, doğrudan zemin üstünde
+                            // Asistan (Tufi AI) Mesajı: Sola hizalı, kartsız, doğrudan zemin üstünde Markdown formatında
                             Column(modifier = Modifier.fillMaxWidth()) {
-                                Text(
-                                    text = msg.text,
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        color = Color(0xFFECECEC),
-                                        fontSize = 15.5.sp,
-                                        lineHeight = 24.sp
-                                    )
+                                TufiMarkdownText(
+                                    markdownText = msg.text,
+                                    textColor = Color(0xFFECECEC)
                                 )
 
                                 Spacer(modifier = Modifier.height(6.dp))
@@ -631,82 +730,23 @@ fun TufiAIScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
-                                    // 1. Kopyala
-                                    IconButton(
-                                        onClick = { copyToClipboard(msg.text) },
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.ContentCopy,
-                                            contentDescription = "Kopyala",
-                                            tint = Color(0xFF8E8E93),
-                                            modifier = Modifier.size(16.dp)
-                                        )
+                                    IconButton(onClick = { copyToClipboard(msg.text) }, modifier = Modifier.size(32.dp)) {
+                                        Icon(imageVector = Icons.Default.ContentCopy, contentDescription = "Kopyala", tint = Color(0xFF8E8E93), modifier = Modifier.size(16.dp))
                                     }
-
-                                    // 2. Beğen
-                                    IconButton(
-                                        onClick = { Toast.makeText(context, "Geri bildiriminiz için teşekkürler! 👍", Toast.LENGTH_SHORT).show() },
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.ThumbUp,
-                                            contentDescription = "Beğen",
-                                            tint = Color(0xFF8E8E93),
-                                            modifier = Modifier.size(16.dp)
-                                        )
+                                    IconButton(onClick = { Toast.makeText(context, "Geri bildiriminiz için teşekkürler! 👍", Toast.LENGTH_SHORT).show() }, modifier = Modifier.size(32.dp)) {
+                                        Icon(imageVector = Icons.Outlined.ThumbUp, contentDescription = "Beğen", tint = Color(0xFF8E8E93), modifier = Modifier.size(16.dp))
                                     }
-
-                                    // 3. Beğenme
-                                    IconButton(
-                                        onClick = { Toast.makeText(context, "Geri bildirim kaydedildi.", Toast.LENGTH_SHORT).show() },
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.ThumbDown,
-                                            contentDescription = "Beğenme",
-                                            tint = Color(0xFF8E8E93),
-                                            modifier = Modifier.size(16.dp)
-                                        )
+                                    IconButton(onClick = { Toast.makeText(context, "Geri bildirim kaydedildi.", Toast.LENGTH_SHORT).show() }, modifier = Modifier.size(32.dp)) {
+                                        Icon(imageVector = Icons.Outlined.ThumbDown, contentDescription = "Beğenme", tint = Color(0xFF8E8E93), modifier = Modifier.size(16.dp))
                                     }
-
-                                    // 4. Sesli Dinle (TTS)
-                                    IconButton(
-                                        onClick = { speakText(msg.text) },
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.VolumeUp,
-                                            contentDescription = "Dinle",
-                                            tint = Color(0xFF8E8E93),
-                                            modifier = Modifier.size(17.dp)
-                                        )
+                                    IconButton(onClick = { speakText(msg.text) }, modifier = Modifier.size(32.dp)) {
+                                        Icon(imageVector = Icons.Default.VolumeUp, contentDescription = "Dinle", tint = Color(0xFF8E8E93), modifier = Modifier.size(17.dp))
                                     }
-
-                                    // 5. Paylaş
-                                    IconButton(
-                                        onClick = { shareText(msg.text) },
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Share,
-                                            contentDescription = "Paylaş",
-                                            tint = Color(0xFF8E8E93),
-                                            modifier = Modifier.size(16.dp)
-                                        )
+                                    IconButton(onClick = { shareText(msg.text) }, modifier = Modifier.size(32.dp)) {
+                                        Icon(imageVector = Icons.Default.Share, contentDescription = "Paylaş", tint = Color(0xFF8E8E93), modifier = Modifier.size(16.dp))
                                     }
-
-                                    // 6. Daha Fazla
-                                    IconButton(
-                                        onClick = { copyToClipboard(msg.text) },
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.MoreVert,
-                                            contentDescription = "Daha Fazla",
-                                            tint = Color(0xFF8E8E93),
-                                            modifier = Modifier.size(16.dp)
-                                        )
+                                    IconButton(onClick = { copyToClipboard(msg.text) }, modifier = Modifier.size(32.dp)) {
+                                        Icon(imageVector = Icons.Default.MoreVert, contentDescription = "Daha Fazla", tint = Color(0xFF8E8E93), modifier = Modifier.size(16.dp))
                                     }
                                 }
                             }
@@ -720,15 +760,8 @@ fun TufiAIScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 modifier = Modifier.padding(vertical = 6.dp)
                             ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(14.dp),
-                                    strokeWidth = 2.dp,
-                                    color = Color(0xFF2563EB)
-                                )
-                                Text(
-                                    text = "Tufi AI yanıtlıyor...",
-                                    style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF8E8E93))
-                                )
+                                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = Color(0xFF2563EB))
+                                Text(text = "Tufi AI yanıtlıyor...", style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF8E8E93)))
                             }
                         }
                     }
@@ -737,7 +770,7 @@ fun TufiAIScreen(
         }
 
         // =========================================================================
-        // SİNEMATİK DÖNÜŞEN ALT BAR (Doğal Akış: Çakışmasız ve Kusursuz Geri Dönüşlü)
+        // SİNEMATİK DÖNÜŞEN ALT BAR (Yavaş, Akıcı & Doğal Düzen)
         // =========================================================================
         val isTextbox = morphState == TufiBarMorphState.TEXTBOX
         val barHeightDp = lerpDp(52.dp, 58.dp, barExpandProgress.value)
@@ -745,12 +778,12 @@ fun TufiAIScreen(
 
         val barBgColor by animateColorAsState(
             targetValue = if (isTextbox || barExpandProgress.value > 0.5f) Color(0xFF212121) else MaterialTheme.colorScheme.surface,
-            animationSpec = tween(250),
+            animationSpec = tween(280),
             label = "bar_bg_color"
         )
         val barBorderColor by animateColorAsState(
             targetValue = if (isTextbox || barExpandProgress.value > 0.5f) Color(0xFF383838) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
-            animationSpec = tween(250),
+            animationSpec = tween(280),
             label = "bar_border_color"
         )
 
@@ -786,9 +819,7 @@ fun TufiAIScreen(
                     .testTag("tufi_morphing_bottom_bar")
             ) {
                 if (isTextbox) {
-                    // =========================================================
-                    // 5. AŞAMA: "TUFI AI'A SOR" CHATGPT METİN GİRİŞ KAPSÜLÜ
-                    // =========================================================
+                    // "TUFI AI'A SOR" CHATGPT METİN GİRİŞ KAPSÜLÜ
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
@@ -796,7 +827,7 @@ fun TufiAIScreen(
                             .graphicsLayer { alpha = textboxAlpha.value },
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Sol: 4'lü Kare Butonu (Sekmelere Geri Dönme)
+                        // Sol: 4'lü Kare Butonu (Kareye basınca kare ortaya gelir, yıldıza/sohbete dönüşür!)
                         IconButton(
                             onClick = { morphBackToTabs() },
                             modifier = Modifier.size(38.dp)
@@ -812,22 +843,14 @@ fun TufiAIScreen(
                             onClick = { showActionsSheet = true },
                             modifier = Modifier.size(36.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "Öneriler & Ekle",
-                                tint = Color.White,
-                                modifier = Modifier.size(22.dp)
-                            )
+                            Icon(imageVector = Icons.Default.Add, contentDescription = "Öneriler & Ekle", tint = Color.White, modifier = Modifier.size(22.dp))
                         }
 
                         // Orta: Metin Giriş Alanı ("Tufi AI'a sor...")
                         BasicTextField(
                             value = inputText,
                             onValueChange = { inputText = it },
-                            textStyle = MaterialTheme.typography.bodyLarge.copy(
-                                color = Color.White,
-                                fontSize = 15.sp
-                            ),
+                            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White, fontSize = 15.sp),
                             cursorBrush = SolidColor(Color.White),
                             singleLine = false,
                             maxLines = 4,
@@ -842,10 +865,7 @@ fun TufiAIScreen(
                                 if (inputText.isBlank()) {
                                     Text(
                                         text = "Tufi AI'a sor...",
-                                        style = MaterialTheme.typography.bodyLarge.copy(
-                                            color = Color(0xFF8E8E93),
-                                            fontSize = 15.sp
-                                        )
+                                        style = MaterialTheme.typography.bodyLarge.copy(color = Color(0xFF8E8E93), fontSize = 15.sp)
                                     )
                                 }
                                 innerTextField()
@@ -854,34 +874,21 @@ fun TufiAIScreen(
 
                         // Sağ: Mikrofon ve Mavi Dalga Ses Modu Butonu (Metin girilince Gönder oku)
                         if (inputText.isBlank()) {
-                            // Mikrofon (Sesle Yazma)
-                            IconButton(
-                                onClick = { startSpeechToText() },
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Mic,
-                                    contentDescription = "Sesle Yaz",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(21.dp)
-                                )
+                            IconButton(onClick = { startSpeechToText() }, modifier = Modifier.size(36.dp)) {
+                                Icon(imageVector = Icons.Default.Mic, contentDescription = "Sesle Yaz", tint = Color.White, modifier = Modifier.size(21.dp))
                             }
-
                             Spacer(modifier = Modifier.width(2.dp))
-
-                            // Mavi Yuvarlak Ses Dalgası Butonu (Canlı Ses Modu)
                             Box(
                                 modifier = Modifier
                                     .size(36.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFF2563EB)) // ChatGPT ses modu mavisi
+                                    .background(Color(0xFF2563EB))
                                     .clickable { startSpeechToText() },
                                 contentAlignment = Alignment.Center
                             ) {
                                 ChatGptWaveformIcon()
                             }
                         } else {
-                            // Gönder Butonu (ChatGPT beyaz daire üstüne siyah ok)
                             Box(
                                 modifier = Modifier
                                     .size(36.dp)
@@ -890,19 +897,12 @@ fun TufiAIScreen(
                                     .clickable { sendMessage(inputText) },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.ArrowUpward,
-                                    contentDescription = "Gönder",
-                                    tint = Color.Black,
-                                    modifier = Modifier.size(19.dp)
-                                )
+                                Icon(imageVector = Icons.Default.ArrowUpward, contentDescription = "Gönder", tint = Color.Black, modifier = Modifier.size(19.dp))
                             }
                         }
                     }
                 } else {
-                    // =========================================================
-                    // 1, 2, 3 & 4. AŞAMALAR: STANDART ADA & ÇAKIŞMASIZ DOĞAL DÖNÜŞÜM
-                    // =========================================================
+                    // SİNEMATİK ANİMASYONLU TÜM SEKMELELERİN BULUNDUĞU BOTTOM BAR
                     Row(
                         modifier = Modifier
                             .padding(horizontal = 6.dp, vertical = 6.dp),
@@ -914,7 +914,8 @@ fun TufiAIScreen(
                             val isTufi = screen == Screen.TufiAI
 
                             if (isTufi) {
-                                // Tufi AI Sekme Kapsülü
+                                // Tufi AI Sekmesi -> Tufi AI ekranındayken "Sohbet" tuşu olarak görünür
+                                // Tufi AI ve Sohbet butonuna basınca ikon döner, 4'lü kareye dönüşür; kareye basınca geri döner
                                 Row(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(20.dp))
@@ -922,7 +923,7 @@ fun TufiAIScreen(
                                             if (morphState == TufiBarMorphState.TABS)
                                                 MaterialTheme.colorScheme.primaryContainer
                                             else
-                                                Color.Transparent
+                                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = (1f - tabsShrinkProgress.value).coerceIn(0f, 1f))
                                         )
                                         .padding(
                                             horizontal = (12f * (1f - tabsShrinkProgress.value) + 4f).dp,
@@ -930,13 +931,13 @@ fun TufiAIScreen(
                                         )
                                         .clickable {
                                             if (morphState == TufiBarMorphState.TABS) {
-                                                startForwardCinematicAnimation()
+                                                startForwardCinematicAnimation(fromColdStart = false)
                                             }
                                         },
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy((6f * tufiTextProgress.value).dp)
                                 ) {
-                                    // SADECE YILDIZ / 4'LÜ KARE İKONU (Yazıdan tamamen bağımsız döner!)
+                                    // Dönen, büyüyen ve Sohbet / Yıldız / 4'lü Kare arasında morph eden ikon
                                     Box(
                                         modifier = Modifier
                                             .size(24.dp)
@@ -949,52 +950,55 @@ fun TufiAIScreen(
                                     ) {
                                         if (starMorphProgress.value < 0.5f) {
                                             Icon(
-                                                imageVector = Icons.Default.AutoAwesome,
-                                                contentDescription = "Tufi AI Yıldızı",
-                                                tint = if (morphState == TufiBarMorphState.TABS)
-                                                    MaterialTheme.colorScheme.onPrimaryContainer
-                                                else
-                                                    Color(0xFF60A5FA),
-                                                modifier = Modifier.size(22.dp)
+                                                imageVector = if (morphState == TufiBarMorphState.TABS) Icons.Default.ChatBubbleOutline else Icons.Default.AutoAwesome,
+                                                contentDescription = "Sohbet",
+                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                modifier = Modifier.size(20.dp)
                                             )
                                         } else {
                                             FourSquaresIcon(
-                                                color = Color.White,
+                                                color = if (barBgColor == Color(0xFF212121)) Color.White else MaterialTheme.colorScheme.onPrimaryContainer,
                                                 sizeDp = 18.dp
                                             )
                                         }
                                     }
 
-                                    // TUFI AI YAZISI (Yazı KESİNLİKLE DÖNMEZ! Şeffaflığıyla kapanır/açılır)
-                                    if (tufiTextProgress.value > 0.02f) {
+                                    // "Sohbet" Yazısı (Animasyonla açılır ve kapanır)
+                                    val textAlpha = tufiTextProgress.value * (1f - tabsShrinkProgress.value)
+                                    if (textAlpha > 0.05f) {
                                         Text(
-                                            text = screen.title,
+                                            text = "Sohbet",
                                             style = MaterialTheme.typography.labelMedium.copy(
                                                 fontWeight = FontWeight.Bold,
                                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                                             ),
                                             maxLines = 1,
                                             modifier = Modifier.graphicsLayer {
-                                                alpha = tufiTextProgress.value
+                                                alpha = textAlpha
                                             }
                                         )
                                     }
                                 }
                             } else {
-                                // Diğer Sekmeler (Home, Calendar, Stats, Tools)
+                                // Diğer Sekmeler (Ödevler, Takvim, İstatistik, Notlar, Araçlar)
                                 val tabScale = (1f - tabsShrinkProgress.value)
                                 if (tabScale > 0.02f) {
                                     Box(
                                         modifier = Modifier.graphicsLayer {
                                             alpha = tabScale
                                             scaleX = tabScale
+                                            scaleY = tabScale
                                         }
                                     ) {
                                         IslandBottomNavItem(
                                             icon = if (isSelected) screen.selectedIcon else screen.unselectedIcon,
                                             label = screen.title,
                                             isSelected = isSelected,
-                                            onClick = { onTabSelected(index) },
+                                            onClick = {
+                                                if (morphState == TufiBarMorphState.TABS) {
+                                                    onTabSelected(index)
+                                                }
+                                            },
                                             testTag = "nav_tab_${screen.route}"
                                         )
                                     }
@@ -1006,9 +1010,47 @@ fun TufiAIScreen(
             }
         }
 
-        // ==========================================
+        // =========================================================================
+        // ESKİ SOHBETLER SOL ÇEKMECE MENÜSÜ (3 Çizgi Tuşuna Basınca Açılır)
+        // =========================================================================
+        TufiChatHistoryDrawer(
+            visible = showLeftDrawer,
+            sessions = pastSessions,
+            activeSessionId = activeSessionId,
+            onSessionSelected = { session ->
+                loadSelectedSession(session)
+            },
+            onNewChat = {
+                showLeftDrawer = false
+                clearChat()
+            },
+            onTasksClicked = {
+                showLeftDrawer = false
+                showAdviceReportSheet = true
+                coroutineScope.launch {
+                    isAdviceLoading = true
+                    advice = TufiAIService.getCoachingAdvice(context, courses, homeworks, forceRefresh = false)
+                    isAdviceLoading = false
+                }
+            },
+            onSettingsClicked = {
+                showLeftDrawer = false
+                showApiKeyDialog = true
+            },
+            onDeleteSession = { sessionId ->
+                TufiAIService.deleteSession(context, sessionId)
+                pastSessions = TufiAIService.loadAllSessions(context)
+                if (activeSessionId == sessionId) {
+                    clearChat()
+                }
+                if (onShowNotification != null) {
+                    onShowNotification("Sohbet silindi", IslandNotificationType.INFO, "Tufi AI")
+                }
+            },
+            onDismiss = { showLeftDrawer = false }
+        )
+
         // '+' BUTONU HIZLI AKSİYONLAR MODAL BOTTOM SHEET
-        // ==========================================
         if (showActionsSheet) {
             ModalBottomSheet(
                 onDismissRequest = { showActionsSheet = false },
@@ -1076,9 +1118,7 @@ fun TufiAIScreen(
             }
         }
 
-        // ==========================================
         // GÜNLÜK ÖDEV RAPORU MODAL BOTTOM SHEET
-        // ==========================================
         if (showAdviceReportSheet) {
             ModalBottomSheet(
                 onDismissRequest = { showAdviceReportSheet = false },
@@ -1161,9 +1201,7 @@ fun TufiAIScreen(
             }
         }
 
-        // ==========================================
         // API AYARLARI PENCERESİ
-        // ==========================================
         if (showApiKeyDialog) {
             TufiAISettingsDialog(
                 onDismiss = { showApiKeyDialog = false }
@@ -1186,62 +1224,28 @@ private fun FourSquaresIcon(
         val gap = size.width * 0.20f
         val corner = 2.dp.toPx()
 
-        // 1. Sol Üst Kare
-        drawRoundRect(
-            color = color,
-            topLeft = Offset(0f, 0f),
-            size = Size(squareWidth, squareWidth),
-            cornerRadius = CornerRadius(corner, corner)
-        )
-        // 2. Sağ Üst Kare
-        drawRoundRect(
-            color = color,
-            topLeft = Offset(squareWidth + gap, 0f),
-            size = Size(squareWidth, squareWidth),
-            cornerRadius = CornerRadius(corner, corner)
-        )
-        // 3. Sol Alt Kare
-        drawRoundRect(
-            color = color,
-            topLeft = Offset(0f, squareWidth + gap),
-            size = Size(squareWidth, squareWidth),
-            cornerRadius = CornerRadius(corner, corner)
-        )
-        // 4. Sağ Alt Kare
-        drawRoundRect(
-            color = color,
-            topLeft = Offset(squareWidth + gap, squareWidth + gap),
-            size = Size(squareWidth, squareWidth),
-            cornerRadius = CornerRadius(corner, corner)
-        )
+        drawRoundRect(color = color, topLeft = Offset(0f, 0f), size = Size(squareWidth, squareWidth), cornerRadius = CornerRadius(corner, corner))
+        drawRoundRect(color = color, topLeft = Offset(squareWidth + gap, 0f), size = Size(squareWidth, squareWidth), cornerRadius = CornerRadius(corner, corner))
+        drawRoundRect(color = color, topLeft = Offset(0f, squareWidth + gap), size = Size(squareWidth, squareWidth), cornerRadius = CornerRadius(corner, corner))
+        drawRoundRect(color = color, topLeft = Offset(squareWidth + gap, squareWidth + gap), size = Size(squareWidth, squareWidth), cornerRadius = CornerRadius(corner, corner))
     }
 }
 
 /**
- * ChatGPT Sol Üst 2 Çizgili Menü İkonu (=)
+ * ChatGPT Sol Üst 3 Çizgili Menü İkonu (Hamburger)
  */
 @Composable
 private fun ChatGptMenuIcon(modifier: Modifier = Modifier, color: Color = Color.White) {
-    Canvas(modifier = modifier.size(17.dp)) {
+    Canvas(modifier = modifier.size(18.dp)) {
         val stroke = 2.dp.toPx()
         val w = size.width
-        val y1 = size.height * 0.36f
-        val y2 = size.height * 0.64f
+        val y1 = size.height * 0.22f
+        val y2 = size.height * 0.50f
+        val y3 = size.height * 0.78f
 
-        drawLine(
-            color = color,
-            start = Offset(0f, y1),
-            end = Offset(w, y1),
-            strokeWidth = stroke,
-            cap = StrokeCap.Round
-        )
-        drawLine(
-            color = color,
-            start = Offset(0f, y2),
-            end = Offset(w, y2),
-            strokeWidth = stroke,
-            cap = StrokeCap.Round
-        )
+        drawLine(color = color, start = Offset(0f, y1), end = Offset(w, y1), strokeWidth = stroke, cap = StrokeCap.Round)
+        drawLine(color = color, start = Offset(0f, y2), end = Offset(w, y2), strokeWidth = stroke, cap = StrokeCap.Round)
+        drawLine(color = color, start = Offset(0f, y3), end = Offset(w, y3), strokeWidth = stroke, cap = StrokeCap.Round)
     }
 }
 

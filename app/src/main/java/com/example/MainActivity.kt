@@ -1,7 +1,15 @@
 package com.example
 
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.ContextWrapper
+import android.widget.Toast
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.ui.text.font.FontFamily
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -18,6 +26,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -58,6 +70,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.outlined.Assignment
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.CalendarMonth
@@ -201,6 +217,18 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
     val islandController = remember { DynamicIslandController() }
     val context = LocalContext.current
     val localView = LocalView.current
+
+    var crashReportToShow by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        try {
+            val crashPrefs = context.getSharedPreferences("crash_recovery_prefs", Context.MODE_PRIVATE)
+            if (crashPrefs.getBoolean("crash_unacknowledged", false)) {
+                val err = crashPrefs.getString("last_crash_error", "Bilinmeyen Hata")
+                val stack = crashPrefs.getString("last_crash_stacktrace", "")
+                crashReportToShow = "HATA MESAJI:\n$err\n\nDETAYLI STACK TRACE:\n$stack"
+            }
+        } catch (_: Exception) {}
+    }
 
     val showNotification: (String, IslandNotificationType, String?) -> Unit = { msg, type, title ->
         islandController.show(
@@ -530,7 +558,8 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                         onTabSelected = { index ->
                             navItems.getOrNull(index)?.let { currentRoute = it.route }
                         },
-                        onBack = { currentRoute = Screen.Home.route }
+                        onBack = { currentRoute = Screen.Home.route },
+                        onShowNotification = showNotification
                     )
 
                     Screen.Stats -> StatsScreen(
@@ -1134,6 +1163,88 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
             },
             onDismiss = {
                 showSwitchProfileDialog = false
+            }
+        )
+    }
+
+    // Uygulama Beklenmedik Şekilde Çökerse Çıkan Kurtarma ve Log Kopyalama Ekranı
+    if (crashReportToShow != null) {
+        AlertDialog(
+            onDismissRequest = {
+                try {
+                    val crashPrefs = context.getSharedPreferences("crash_recovery_prefs", Context.MODE_PRIVATE)
+                    crashPrefs.edit().putBoolean("crash_unacknowledged", false).apply()
+                } catch (_: Exception) {}
+                crashReportToShow = null
+            },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.ErrorOutline,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Uygulama Hata / Çökme Raporu")
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Uygulama önceki oturumda beklenmedik bir hatayla kapandı. Asistanın sorunu hızla çözebilmesi için aşağıdaki butondan logları kopyalayabilirsiniz:",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    SelectionContainer {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 240.dp)
+                                .verticalScroll(rememberScrollState())
+                                .padding(8.dp)
+                        ) {
+                            Text(
+                                text = crashReportToShow ?: "",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.Button(
+                    onClick = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("Crash Log", crashReportToShow ?: ""))
+                        Toast.makeText(context, "Loglar panoya kopyalandı! 📋", Toast.LENGTH_LONG).show()
+                        try {
+                            val crashPrefs = context.getSharedPreferences("crash_recovery_prefs", Context.MODE_PRIVATE)
+                            crashPrefs.edit().putBoolean("crash_unacknowledged", false).apply()
+                        } catch (_: Exception) {}
+                        crashReportToShow = null
+                    }
+                ) {
+                    Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Logları Kopyala")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        try {
+                            val crashPrefs = context.getSharedPreferences("crash_recovery_prefs", Context.MODE_PRIVATE)
+                            crashPrefs.edit().putBoolean("crash_unacknowledged", false).apply()
+                        } catch (_: Exception) {}
+                        crashReportToShow = null
+                    }
+                ) {
+                    Text("Kapat")
+                }
             }
         )
     }

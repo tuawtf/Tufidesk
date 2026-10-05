@@ -45,6 +45,17 @@ data class TufiChatMessage(
     val timestampMillis: Long = System.currentTimeMillis()
 )
 
+/**
+ * Tufi AI çoklu sohbet oturumu modeli (ChatGPT tarzı geçmiş sohbetler).
+ */
+data class TufiChatSession(
+    val id: String = UUID.randomUUID().toString(),
+    val title: String,
+    val createdAtMillis: Long = System.currentTimeMillis(),
+    val updatedAtMillis: Long = System.currentTimeMillis(),
+    val messages: List<TufiChatMessage> = emptyList()
+)
+
 object TufiAIService {
     private const val TAG = "TufiAIService"
     private const val PREFS_NAME = "tufiai_cache_prefs"
@@ -54,6 +65,8 @@ object TufiAIService {
     private const val PREF_KEY_LAST_SAVED_MESSAGE = "last_saved_advice_v2"
     private const val PREF_KEY_LAST_SAVED_SIG = "last_saved_sig_v2"
     private const val PREF_KEY_CHAT_HISTORY = "tufiai_chat_history_v1"
+    private const val PREF_KEY_CHAT_SESSIONS = "tufiai_chat_sessions_v2"
+    private const val PREF_KEY_ACTIVE_SESSION_ID = "tufiai_active_session_id_v2"
 
     private val client by lazy {
         OkHttpClient.Builder()
@@ -204,11 +217,10 @@ object TufiAIService {
         }
     }
 
-    fun saveChatHistory(context: Context, messages: List<TufiChatMessage>) {
+    fun saveChatHistory(context: Context, messages: List<TufiChatMessage>, activeSessionId: String? = null): String {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val array = JSONArray()
-        // En son 50 mesajı sakla
-        messages.takeLast(50).forEach { msg ->
+        messages.takeLast(60).forEach { msg ->
             val obj = JSONObject().apply {
                 put("id", msg.id)
                 put("isUser", msg.isUser)
@@ -218,11 +230,191 @@ object TufiAIService {
             array.put(obj)
         }
         prefs.edit().putString(PREF_KEY_CHAT_HISTORY, array.toString()).apply()
+
+        // Oturumu da güncelle veya oluştur
+        val targetSessionId = activeSessionId ?: getActiveSessionId(context) ?: UUID.randomUUID().toString()
+        val firstUserMsg = messages.firstOrNull { it.isUser }?.text?.take(40) ?: "Sohbet"
+        val session = TufiChatSession(
+            id = targetSessionId,
+            title = firstUserMsg,
+            createdAtMillis = messages.firstOrNull()?.timestampMillis ?: System.currentTimeMillis(),
+            updatedAtMillis = System.currentTimeMillis(),
+            messages = messages
+        )
+        saveSession(context, session)
+        setActiveSessionId(context, targetSessionId)
+        return targetSessionId
     }
 
     fun clearChatHistory(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().remove(PREF_KEY_CHAT_HISTORY).apply()
+        setActiveSessionId(context, null)
+    }
+
+    // ==========================================
+    // CHAT SESSIONS (Çoklu Oturum Yönetimi)
+    // ==========================================
+
+    fun loadAllSessions(context: Context): List<TufiChatSession> {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val jsonStr = prefs.getString(PREF_KEY_CHAT_SESSIONS, null)
+        if (jsonStr.isNullOrBlank()) {
+            val oldMsgs = loadChatHistory(context)
+            if (oldMsgs.isNotEmpty()) {
+                val firstUserMsg = oldMsgs.firstOrNull { it.isUser }?.text?.take(40) ?: "Önceki Sohbet"
+                val initialSession = TufiChatSession(
+                    id = UUID.randomUUID().toString(),
+                    title = firstUserMsg,
+                    createdAtMillis = oldMsgs.first().timestampMillis,
+                    updatedAtMillis = oldMsgs.last().timestampMillis,
+                    messages = oldMsgs
+                )
+                // Doğrudan SharedPreferences'a yaz, saveSession çağırma (StackOverflow / döngü engellenir)
+                val array = JSONArray()
+                val sObj = JSONObject().apply {
+                    put("id", initialSession.id)
+                    put("title", initialSession.title)
+                    put("createdAtMillis", initialSession.createdAtMillis)
+                    put("updatedAtMillis", initialSession.updatedAtMillis)
+                    val msgsArray = JSONArray()
+                    initialSession.messages.forEach { m ->
+                        msgsArray.put(JSONObject().apply {
+                            put("id", m.id)
+                            put("isUser", m.isUser)
+                            put("text", m.text)
+                            put("timestampMillis", m.timestampMillis)
+                        })
+                    }
+                    put("messages", msgsArray)
+                }
+                array.put(sObj)
+                prefs.edit()
+                    .putString(PREF_KEY_CHAT_SESSIONS, array.toString())
+                    .putString(PREF_KEY_ACTIVE_SESSION_ID, initialSession.id)
+                    .apply()
+                return listOf(initialSession)
+            }
+            return emptyList()
+        }
+
+        return try {
+            val array = JSONArray(jsonStr)
+            val list = mutableListOf<TufiChatSession>()
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                val msgsArray = obj.optJSONArray("messages") ?: JSONArray()
+                val msgs = mutableListOf<TufiChatMessage>()
+                for (j in 0 until msgsArray.length()) {
+                    val mObj = msgsArray.getJSONObject(j)
+                    msgs.add(
+                        TufiChatMessage(
+                            id = mObj.optString("id", UUID.randomUUID().toString()),
+                            isUser = mObj.optBoolean("isUser", false),
+                            text = mObj.optString("text", ""),
+                            timestampMillis = mObj.optLong("timestampMillis", System.currentTimeMillis())
+                        )
+                    )
+                }
+                val sessionId = obj.optString("id").ifBlank { UUID.randomUUID().toString() }
+                list.add(
+                    TufiChatSession(
+                        id = sessionId,
+                        title = obj.optString("title", "Sohbet").ifBlank { "Sohbet" },
+                        createdAtMillis = obj.optLong("createdAtMillis", System.currentTimeMillis()),
+                        updatedAtMillis = obj.optLong("updatedAtMillis", System.currentTimeMillis()),
+                        messages = msgs
+                    )
+                )
+            }
+            list.distinctBy { it.id }.sortedByDescending { it.updatedAtMillis }
+        } catch (e: Exception) {
+            Log.e(TAG, "Chat sessions parse error", e)
+            emptyList()
+        }
+    }
+
+    fun saveSession(context: Context, session: TufiChatSession) {
+        val currentSessions = loadAllSessions(context).toMutableList()
+        val index = currentSessions.indexOfFirst { it.id == session.id }
+        if (index >= 0) {
+            currentSessions[index] = session
+        } else {
+            currentSessions.add(0, session)
+        }
+
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val array = JSONArray()
+        currentSessions.take(40).forEach { s ->
+            val sObj = JSONObject().apply {
+                put("id", s.id)
+                put("title", s.title)
+                put("createdAtMillis", s.createdAtMillis)
+                put("updatedAtMillis", s.updatedAtMillis)
+                val msgsArray = JSONArray()
+                s.messages.takeLast(60).forEach { m ->
+                    msgsArray.put(JSONObject().apply {
+                        put("id", m.id)
+                        put("isUser", m.isUser)
+                        put("text", m.text)
+                        put("timestampMillis", m.timestampMillis)
+                    })
+                }
+                put("messages", msgsArray)
+            }
+            array.put(sObj)
+        }
+        prefs.edit().putString(PREF_KEY_CHAT_SESSIONS, array.toString()).apply()
+    }
+
+    fun deleteSession(context: Context, sessionId: String) {
+        val currentSessions = loadAllSessions(context).filterNot { it.id == sessionId }
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val array = JSONArray()
+        currentSessions.forEach { s ->
+            val sObj = JSONObject().apply {
+                put("id", s.id)
+                put("title", s.title)
+                put("createdAtMillis", s.createdAtMillis)
+                put("updatedAtMillis", s.updatedAtMillis)
+                val msgsArray = JSONArray()
+                s.messages.forEach { m ->
+                    msgsArray.put(JSONObject().apply {
+                        put("id", m.id)
+                        put("isUser", m.isUser)
+                        put("text", m.text)
+                        put("timestampMillis", m.timestampMillis)
+                    })
+                }
+                put("messages", msgsArray)
+            }
+            array.put(sObj)
+        }
+        prefs.edit().putString(PREF_KEY_CHAT_SESSIONS, array.toString()).apply()
+
+        if (getActiveSessionId(context) == sessionId) {
+            clearChatHistory(context)
+        }
+    }
+
+    fun clearAllSessions(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().remove(PREF_KEY_CHAT_SESSIONS).apply()
+        clearChatHistory(context)
+    }
+
+    fun getActiveSessionId(context: Context): String? {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(PREF_KEY_ACTIVE_SESSION_ID, null)
+    }
+
+    fun setActiveSessionId(context: Context, sessionId: String?) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (sessionId == null) {
+            prefs.edit().remove(PREF_KEY_ACTIVE_SESSION_ID).apply()
+        } else {
+            prefs.edit().putString(PREF_KEY_ACTIVE_SESSION_ID, sessionId).apply()
+        }
     }
 
     // ==========================================
@@ -296,7 +488,7 @@ object TufiAIService {
                     Sen Tufi AI'sın. TufiDESK ödev ve çalışma takip uygulamasında öğrencinin samimi, pratik, doğrudan ve motive edici yapay zeka koçusun.
                     ChatGPT, Gemini ve Claude gibi doğrudan, sade, gereksiz laf kalabalığı yapmadan, net ve uygulanabilir yanıtlar ver.
                     $contextInfo
-                    Cevaplarını Türkçe ver, önemli noktaları madde işaretleriyle listele.
+                    Cevaplarını Türkçe ver. Her zaman anlaşılır ve düzenli Markdown formatında yaz (başlıklar için ## veya ###, önemli yerler için **kalın**, maddeler için • veya -, kodlar için ``` kod blokları kullan).
                 """.trimIndent())
             })
 
@@ -357,7 +549,7 @@ object TufiAIService {
             Sen Tufi AI'sın. TufiDESK ödev ve çalışma takip uygulamasında öğrencinin samimi, pratik, doğrudan ve motive edici yapay zeka koçusun.
             Doğrudan, sade, gereksiz laf kalabalığı yapmadan, net ve uygulanabilir yanıtlar ver.
             $contextInfo
-            Cevaplarını Türkçe ver, önemli noktaları madde işaretleriyle listele.
+            Cevaplarını Türkçe ver. Her zaman anlaşılır ve düzenli Markdown formatında yaz (başlıklar için ## veya ###, önemli yerler için **kalın**, maddeler için • veya -, kod ve formüller için ``` kod blokları kullan).
         """.trimIndent()
 
         val contentsArray = JSONArray()
