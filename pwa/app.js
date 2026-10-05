@@ -1,255 +1,401 @@
 /* ==========================================================================
-   TufiDESK PWA - Application Logic & State Management
+   TufiDESK PWA - Application Logic (1:1 Android Jetpack Compose Replica)
    ========================================================================== */
 
-// --- Initial Demo Data ---
-const DEFAULT_HOMEWORKS = [
-  { id: '1', title: 'Türev ve İntegral Uygulamaları Test 4', course: 'Matematik', date: '2026-10-06', priority: 'high', completed: false },
-  { id: '2', title: 'Elektromanyetik İndüksiyon Soru Çözümü', course: 'Fizik', date: '2026-10-07', priority: 'normal', completed: false },
-  { id: '3', title: 'Organik Kimya Fonksiyonel Gruplar Özeti', course: 'Kimya', date: '2026-10-08', priority: 'normal', completed: true },
-  { id: '4', title: 'Divan Edebiyatı Nazım Şekilleri Tablosu', course: 'Edebiyat', date: '2026-10-09', priority: 'low', completed: false }
+// --- Initial Realistic Homeworks ---
+const INITIAL_HOMEWORKS = [
+  {
+    id: 'hw-1',
+    title: 'Türev ve İntegral Uygulamaları Test 4',
+    course: 'Matematik',
+    date: '2026-10-05', // Today
+    priority: 'high',
+    desc: 'Sayfa 142-146 arasındaki tüm sorular bitirilecek.',
+    completed: false
+  },
+  {
+    id: 'hw-2',
+    title: 'Elektromanyetik İndüksiyon Soru Çözümü',
+    course: 'Fizik',
+    date: '2026-10-06', // Tomorrow
+    priority: 'normal',
+    desc: 'Manyetik akı ve Faraday yasası örnekleri.',
+    completed: false
+  },
+  {
+    id: 'hw-3',
+    title: 'Organik Kimya Fonksiyonel Gruplar Tablosu',
+    course: 'Kimya',
+    date: '2026-10-09',
+    priority: 'normal',
+    desc: 'Alkoller ve Eterler reaksiyon mekanizmaları.',
+    completed: false
+  },
+  {
+    id: 'hw-4',
+    title: 'Divan Edebiyatı Nazım Şekilleri Özeti',
+    course: 'Edebiyat',
+    date: '2026-10-04', // Overdue
+    priority: 'high',
+    desc: 'Gazel, kaside ve mesnevi özellikleri.',
+    completed: true
+  }
 ];
 
-const DEFAULT_NOTES = [
+const INITIAL_NOTES = [
   { id: '1', title: 'Matematik Formülleri', content: 'Türev: (x^n)\' = n*x^(n-1)\nİntegral: ∫x^n dx = (x^(n+1))/(n+1) + C', color: '#DBEAFE' },
-  { id: '2', title: 'Haftalık Hedef', content: 'Her gün en az 50 soru ve 2 Pomodoro odak çalışması tamamlanacak.', color: '#FEF3C7' },
-  { id: '3', title: 'Fizik İpuçları', content: 'Sağ el kuralı: Başparmak akım yönü, dört parmak manyetik alan.', color: '#D1FAE5' }
+  { id: '2', title: 'Haftalık Çalışma Hedefi', content: 'Her gün en az 60 soru ve 2 Pomodoro odak çalışması.', color: '#FEF3C7' },
+  { id: '3', title: 'Fizik Sağ El Kuralı', content: 'Başparmak: Akım (I)\nDört parmak: Manyetik Alan (B)\nAvuç içi: Manyetik Kuvvet (F)', color: '#D1FAE5' }
 ];
 
-// --- State Variables ---
-let homeworks = JSON.parse(localStorage.getItem('tufidesk_hw')) || DEFAULT_HOMEWORKS;
-let notes = JSON.parse(localStorage.getItem('tufidesk_notes')) || DEFAULT_NOTES;
+// --- Course Metadata (Color & Icon matching Android CourseIconHelper.kt) ---
+const COURSE_META = {
+  'Matematik': { color: '#2563EB', icon: '📐' },
+  'Fizik':     { color: '#0284C7', icon: '⚡' },
+  'Kimya':     { color: '#7C3AED', icon: '🧪' },
+  'Biyoloji':  { color: '#059669', icon: '🧬' },
+  'Edebiyat':  { color: '#E11D48', icon: '📖' },
+  'Tarih':     { color: '#D97706', icon: '🏛️' },
+  'Coğrafya':  { color: '#0D9488', icon: '🌍' },
+  'İngilizce': { color: '#4F46E5', icon: '🇬🇧' },
+  'Genel':     { color: '#2563EB', icon: '📚' }
+};
+
+// --- State ---
+let homeworks = JSON.parse(localStorage.getItem('tufidesk_hw')) || INITIAL_HOMEWORKS;
+let notes = JSON.parse(localStorage.getItem('tufidesk_notes')) || INITIAL_NOTES;
 let currentTab = 'home';
-let currentFilter = 'all';
-let searchQuery = '';
-let selectedCalendarDate = new Date();
-let deferredPrompt = null;
+let currentTimeFilter = 'all';
+let currentSearchQuery = '';
+let isCompletedExpanded = true;
+let selectedDate = new Date();
+let deferredInstallPrompt = null;
+let respectCount = 0;
 
 // Timer State
-let timerInterval = null;
-let timerTotalSeconds = 25 * 60;
-let timerRemainingSeconds = 25 * 60;
-let isTimerRunning = false;
-
-// --- DOM References ---
-const screenTitle = document.getElementById('screenTitle');
-const screenSubtitle = document.getElementById('screenSubtitle');
-const homeworkList = document.getElementById('homeworkList');
-const emptyHomeworks = document.getElementById('emptyHomeworks');
-const searchBarRow = document.getElementById('searchBarRow');
-const searchInput = document.getElementById('searchInput');
-const fabAddHomework = document.getElementById('fabAddHomework');
-const addHwModal = document.getElementById('addHwModal');
-const islandNav = document.getElementById('islandNav');
-const tufiMorphBar = document.getElementById('tufiMorphBar');
-const navTabTufi = document.getElementById('navTabTufi');
-const navIconTufi = document.getElementById('navIconTufi');
-const navLabelTufi = document.getElementById('navLabelTufi');
-const themeToggle = document.getElementById('themeToggle');
+let timerTotalSec = 25 * 60;
+let timerRemainSec = 25 * 60;
+let timerActive = false;
+let timerHandle = null;
 
 // ==========================================================================
-// 1. Navigation & Morphing Bottom Bar
+// 1. Dynamic Island Top Notch Overlay (Exact spring pill notification)
 // ==========================================================================
-const screenTitles = {
-  home: { title: 'TufiDESK', subtitle: 'Ödevler & Görevler' },
-  calendar: { title: 'Ödev Takvimi', subtitle: 'Haftalık ve Aylık Plan' },
-  tufiai: { title: 'Tufi AI Asistan', subtitle: 'Yapay Zeka Çalışma Koçu' },
-  stats: { title: 'İstatistikler', subtitle: 'Başarı & Odak Analizi' },
-  notes: { title: 'Ders Notları', subtitle: 'Hızlı Hatırlatıcılar' },
-  tools: { title: 'Öğrenci Araçları', subtitle: 'Yardımcı Gereçler' },
+const dynamicIslandNotch = document.getElementById('dynamicIslandNotch');
+const islandIcon = document.getElementById('islandIcon');
+const islandTitle = document.getElementById('islandTitle');
+const islandMsg = document.getElementById('islandMsg');
+let islandTimeout = null;
+
+function triggerDynamicIsland(icon, title, message, durationMs = 2800) {
+  if (islandTimeout) clearTimeout(islandTimeout);
+  
+  islandIcon.textContent = icon;
+  islandTitle.textContent = title;
+  islandMsg.textContent = message;
+  
+  dynamicIslandNotch.classList.add('expanded');
+  if (navigator.vibrate) navigator.vibrate([20, 40, 20]);
+
+  islandTimeout = setTimeout(() => {
+    dynamicIslandNotch.classList.remove('expanded');
+  }, durationMs);
+}
+
+// Live Status Bar Clock
+function updateClock() {
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+  const timeEl = document.getElementById('deviceTime');
+  if (timeEl) timeEl.textContent = timeStr;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ==========================================================================
+// 2. Navigation & Morphing Island Bottom Bar (1:1 Android)
+// ==========================================================================
+const screenTitlesMap = {
+  home:     { title: 'TufiDESK', subtitle: 'Ödevler & Görevler' },
+  calendar: { title: 'Ödev Takvimi', subtitle: 'Aylık & Haftalık Görünüm' },
+  tufiai:   { title: 'Tufi AI Asistan', subtitle: 'Yapay Zeka Çalışma Koçu' },
+  stats:    { title: 'İstatistikler', subtitle: 'Başarı & Odak Analizi' },
+  notes:    { title: 'Ders Notları', subtitle: 'Hızlı Hatırlatıcılar' },
+  tools:    { title: 'Öğrenci Araçları', subtitle: 'Yardımcı Gereçler' },
   settings: { title: 'Ayarlar', subtitle: 'Görünüm & Sistem' }
 };
 
-function openTab(tabId) {
+const dockNormalIsland = document.getElementById('dockNormalIsland');
+const dockExpandedTextbox = document.getElementById('dockExpandedTextbox');
+const dockTufiTab = document.getElementById('dockTufiTab');
+const dockTufiIcon = document.getElementById('dockTufiIcon');
+const dockTufiLabel = document.getElementById('dockTufiLabel');
+const fabAddHwBtn = document.getElementById('fabAddHwBtn');
+
+function openScreenTab(tabId) {
   currentTab = tabId;
 
-  // Hide all screens
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  const targetScreen = document.getElementById(`screen-${tabId}`);
-  if (targetScreen) targetScreen.classList.add('active');
+  // Switch active screen
+  document.querySelectorAll('.app-screen').forEach(s => s.classList.remove('active'));
+  const target = document.getElementById(`screen-${tabId}`);
+  if (target) target.classList.add('active');
 
   // Update Top Bar Titles
-  const meta = screenTitles[tabId] || { title: 'TufiDESK', subtitle: '' };
-  screenTitle.textContent = meta.title;
-  screenSubtitle.textContent = meta.subtitle;
+  const meta = screenTitlesMap[tabId] || { title: 'TufiDESK', subtitle: '' };
+  document.getElementById('screenMainTitle').textContent = meta.title;
+  document.getElementById('screenSubTitle').textContent = meta.subtitle;
 
-  // Toggle FAB
-  fabAddHomework.style.display = (tabId === 'home') ? 'flex' : 'none';
+  // Toggle FAB (only on Home)
+  fabAddHwBtn.style.display = (tabId === 'home') ? 'flex' : 'none';
 
-  // Toggle Search Bar Row
-  if (tabId !== 'home') searchBarRow.style.display = 'none';
-
-  // Handle Morphing Bottom Bar logic:
-  // When inside Tufi AI screen:
-  // Center tab changes to "Sohbet" with ChatBubble icon
+  // Morphing Bottom Bar:
+  // When inside Tufi AI: middle button says "Sohbet" with ChatBubble icon
   if (tabId === 'tufiai') {
-    navLabelTufi.textContent = 'Sohbet';
-    navIconTufi.innerHTML = '<path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>';
+    dockTufiLabel.textContent = 'Sohbet';
+    dockTufiIcon.innerHTML = '<path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>';
   } else {
-    // Other tabs: resets to "Tufi AI" with Star icon
-    navLabelTufi.textContent = 'Tufi AI';
-    navIconTufi.innerHTML = '<path d="m19 9 1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12z"/>';
-    // Collapse any open input bar
-    collapseTufiBar();
+    // When on any other menu: resets to "Tufi AI" with star icon
+    dockTufiLabel.textContent = 'Tufi AI';
+    dockTufiIcon.innerHTML = '<path d="m19 9 1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12z"/>';
+    // Collapse any open textbox
+    collapseToIslandDock();
   }
 
-  // Highlight active nav item
-  document.querySelectorAll('.island-nav-item').forEach(item => {
-    item.classList.toggle('active', item.dataset.tab === tabId);
+  // Active tab pill highlighting
+  document.querySelectorAll('.dock-tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tabId === tabId);
   });
 
-  // Haptic feedback
-  if (navigator.vibrate) navigator.vibrate(10);
+  if (navigator.vibrate) navigator.vibrate(8);
 
-  // Refresh tab-specific views
+  // Tab refreshers
   if (tabId === 'calendar') renderCalendar();
-  if (tabId === 'stats') updateStats();
+  if (tabId === 'stats') updateStatsUI();
   if (tabId === 'notes') renderNotes();
 }
 
-// Bind Bottom Nav Tabs
-document.querySelectorAll('.island-nav-item').forEach(btn => {
+// Bind Dock Buttons
+document.querySelectorAll('.dock-tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    const target = btn.dataset.tab;
-    // If user is already on Tufi AI and clicks "Sohbet", expand the chat input box!
+    const target = btn.dataset.tabId;
     if (target === 'tufiai' && currentTab === 'tufiai') {
-      expandTufiBar();
+      // If already in Tufi AI and user taps "Sohbet", expand to the text input bar!
+      expandToTufiTextbox();
     } else {
-      openTab(target);
+      openScreenTab(target);
     }
   });
 });
 
-// Morphing Bar Controls
-function expandTufiBar() {
-  islandNav.style.display = 'none';
-  tufiMorphBar.classList.add('active');
-  const input = document.getElementById('tufiTextInput');
-  setTimeout(() => input.focus(), 150);
+function expandToTufiTextbox() {
+  dockNormalIsland.style.display = 'none';
+  dockExpandedTextbox.classList.add('active');
+  const input = document.getElementById('tufiScreenInput');
+  setTimeout(() => input.focus(), 120);
 }
 
-function collapseTufiBar() {
-  tufiMorphBar.classList.remove('active');
-  islandNav.style.display = 'flex';
+function collapseToIslandDock() {
+  dockExpandedTextbox.classList.remove('active');
+  dockNormalIsland.style.display = 'flex';
 }
 
-document.getElementById('btnCollapseTufi').addEventListener('click', collapseTufiBar);
+document.getElementById('btnCollapseToIsland').addEventListener('click', collapseToIslandDock);
 
 // ==========================================================================
-// 2. Homeworks Management
+// 3. Homeworks Engine & UI (1:1 Android HomeworkItemCard.kt)
 // ==========================================================================
 function saveHomeworks() {
   localStorage.setItem('tufidesk_hw', JSON.stringify(homeworks));
   renderHomeworks();
 }
 
-function renderHomeworks() {
-  homeworkList.innerHTML = '';
+function getRelativeDateLabel(dateStr) {
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const target = new Date(dateStr);
+  target.setHours(0,0,0,0);
   
-  const filtered = homeworks.filter(hw => {
-    const matchesSearch = hw.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          hw.course.toLowerCase().includes(searchQuery.toLowerCase());
+  const diffDays = Math.round((target - today) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return { text: 'Gecikti 🔥', class: 'due-urgent' };
+  if (diffDays === 0) return { text: 'Bugün Teslim', class: 'due-urgent' };
+  if (diffDays === 1) return { text: 'Yarın Teslim', class: 'due-normal' };
+  return { text: `${diffDays} gün kaldı`, class: 'due-normal' };
+}
+
+function renderHomeworks() {
+  const activeContainer = document.getElementById('activeHomeworkList');
+  const completedContainer = document.getElementById('completedHomeworkList');
+  activeContainer.innerHTML = '';
+  completedContainer.innerHTML = '';
+
+  const active = homeworks.filter(h => !h.completed);
+  const completed = homeworks.filter(h => h.completed);
+
+  // Filter Active
+  const filteredActive = active.filter(h => {
+    const matchesSearch = h.title.toLowerCase().includes(currentSearchQuery.toLowerCase()) || 
+                          h.course.toLowerCase().includes(currentSearchQuery.toLowerCase());
     if (!matchesSearch) return false;
-    
-    if (currentFilter === 'pending') return !hw.completed;
-    if (currentFilter === 'completed') return hw.completed;
-    if (currentFilter === 'math') return hw.course === 'Matematik';
-    if (currentFilter === 'phys') return hw.course === 'Fizik';
-    if (currentFilter === 'lit') return hw.course === 'Edebiyat';
+
+    if (currentTimeFilter === 'today') {
+      const todayStr = new Date().toISOString().split('T')[0];
+      return h.date === todayStr;
+    }
+    if (currentTimeFilter === 'overdue') {
+      const todayStr = new Date().toISOString().split('T')[0];
+      return h.date < todayStr;
+    }
     return true;
   });
 
-  // Update counts
-  document.getElementById('countAll').textContent = homeworks.length;
-  document.getElementById('countPending').textContent = homeworks.filter(h => !h.completed).length;
-  document.getElementById('countCompleted').textContent = homeworks.filter(h => h.completed).length;
+  // Update Counters
+  document.getElementById('statAllCount').textContent = homeworks.length;
+  document.getElementById('statPendingCount').textContent = active.length;
+  document.getElementById('statUrgentCount').textContent = active.filter(h => h.priority === 'high').length;
+  document.getElementById('statDoneCount').textContent = completed.length;
+  document.getElementById('activeCountBadge').textContent = `${filteredActive.length} ödev`;
+  document.getElementById('completedCountBadge').textContent = completed.length;
 
-  if (filtered.length === 0) {
-    emptyHomeworks.style.display = 'block';
-  } else {
-    emptyHomeworks.style.display = 'none';
-  }
+  // Hero Progress Ring
+  const total = homeworks.length;
+  const pct = total > 0 ? Math.round((completed.length / total) * 100) : 100;
+  document.getElementById('heroProgressText').textContent = `%${pct}`;
+  const strokeOffset = 150.7 - (150.7 * (pct / 100));
+  document.getElementById('heroProgressCircle').style.strokeDashoffset = strokeOffset;
 
-  filtered.forEach(hw => {
-    const card = document.createElement('div');
-    card.className = 'card';
-    card.innerHTML = `
-      <div class="card-header">
-        <span class="badge ${hw.priority === 'high' ? 'badge-danger' : (hw.priority === 'low' ? 'badge-warning' : 'badge-primary')}">
-          ${hw.course}
-        </span>
-        <span style="font-size: 0.75rem; color: var(--text-muted);">📅 ${hw.date}</span>
-      </div>
-      <div style="display: flex; align-items: center; gap: 12px;">
-        <div class="checkbox-round ${hw.completed ? 'checked' : ''}" onclick="toggleHwCompletion('${hw.id}')">
-          ${hw.completed ? '✓' : ''}
-        </div>
-        <div style="flex: 1; ${hw.completed ? 'text-decoration: line-through; opacity: 0.6;' : ''}">
-          <div style="font-weight: 600; font-size: 0.95rem;">${hw.title}</div>
-        </div>
-        <button class="icon-btn" onclick="deleteHomework('${hw.id}')" title="Sil" style="color: var(--danger); width: 32px; height: 32px;">
-          🗑️
-        </button>
+  // Render Active Cards
+  if (filteredActive.length === 0) {
+    activeContainer.innerHTML = `
+      <div class="homework-card" style="text-align: center; padding: 28px 16px;">
+        <span style="font-size: 2.5rem;">🎉</span>
+        <strong style="margin-top: 6px;">Harika! Bekleyen Ödev Yok</strong>
+        <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">Tüm ödevlerinizi tamamladınız veya filtreye uygun ödev bulunamadı.</p>
       </div>
     `;
-    homeworkList.appendChild(card);
+  } else {
+    filteredActive.forEach(hw => {
+      activeContainer.appendChild(createHomeworkCard(hw));
+    });
+  }
+
+  // Render Completed Cards
+  completed.forEach(hw => {
+    completedContainer.appendChild(createHomeworkCard(hw));
   });
 }
 
-window.toggleHwCompletion = function(id) {
+function createHomeworkCard(hw) {
+  const meta = COURSE_META[hw.course] || COURSE_META['Genel'];
+  const due = getRelativeDateLabel(hw.date);
+
+  const card = document.createElement('div');
+  card.className = `homework-card ${hw.completed ? 'completed' : ''}`;
+  card.innerHTML = `
+    <div class="homework-card-header">
+      <div class="course-badge-box" style="background-color: ${meta.color};">
+        <span>${meta.icon}</span>
+        <span>${hw.course}</span>
+      </div>
+      <span class="due-date-pill ${due.class}">📅 ${due.text}</span>
+    </div>
+
+    <div class="homework-card-body">
+      <div class="m3-round-checkbox ${hw.completed ? 'checked' : ''}" onclick="toggleHomeworkStatus('${hw.id}')">
+        ${hw.completed ? '✓' : ''}
+      </div>
+      <div style="flex: 1;">
+        <div class="homework-title-text" style="${hw.completed ? 'text-decoration: line-through;' : ''}">${hw.title}</div>
+        ${hw.desc ? `<div class="homework-desc-text">${hw.desc}</div>` : ''}
+      </div>
+    </div>
+
+    <div class="homework-card-footer">
+      <div class="homework-tags-group">
+        <span class="tag-badge" style="background: ${hw.priority === 'high' ? 'rgba(239, 68, 68, 0.2)' : 'var(--surface-variant)'}; color: ${hw.priority === 'high' ? '#EF4444' : 'var(--text-muted)'};">
+          ${hw.priority === 'high' ? '🔥 Acil' : 'Normal'}
+        </span>
+        <span class="tag-badge">⏱️ 45 dk</span>
+      </div>
+      <button class="delete-hw-btn" onclick="deleteHomeworkItem('${hw.id}')" title="Ödevi Sil">🗑️</button>
+    </div>
+  `;
+  return card;
+}
+
+window.toggleHomeworkStatus = function(id) {
   const hw = homeworks.find(h => h.id === id);
   if (hw) {
     hw.completed = !hw.completed;
     saveHomeworks();
-    if (navigator.vibrate) navigator.vibrate(15);
+    if (hw.completed) {
+      triggerDynamicIsland('🎉', 'Tebrikler!', `"${hw.title}" tamamlandı!`);
+    } else {
+      triggerDynamicIsland('⏳', 'Geri Alındı', `"${hw.title}" yapılacaklara alındı.`);
+    }
   }
 };
 
-window.deleteHomework = function(id) {
+window.deleteHomeworkItem = function(id) {
   if (confirm('Bu ödevi silmek istediğinize emin misiniz?')) {
     homeworks = homeworks.filter(h => h.id !== id);
     saveHomeworks();
+    triggerDynamicIsland('🗑️', 'Silindi', 'Ödev listeden kaldırıldı.');
   }
 };
 
-// Filter Buttons
-document.querySelectorAll('.filter-pill').forEach(pill => {
-  pill.addEventListener('click', (e) => {
-    if (!pill.dataset.filter) return;
-    document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+// Filter Bar
+document.querySelectorAll('.m3-filter-pill[data-time-filter]').forEach(pill => {
+  pill.addEventListener('click', () => {
+    document.querySelectorAll('.m3-filter-pill[data-time-filter]').forEach(p => p.classList.remove('active'));
     pill.classList.add('active');
-    currentFilter = pill.dataset.filter;
+    currentTimeFilter = pill.dataset.timeFilter;
     renderHomeworks();
   });
 });
 
-// Search
-document.getElementById('btnSearch').addEventListener('click', () => {
-  searchBarRow.style.display = searchBarRow.style.display === 'none' ? 'block' : 'none';
-  if (searchBarRow.style.display === 'block') searchInput.focus();
+window.setQuickFilter = function(type) {
+  if (type === 'all') currentTimeFilter = 'all';
+  if (type === 'pending') currentTimeFilter = 'all';
+  if (type === 'urgent') currentTimeFilter = 'all';
+  if (type === 'completed') {
+    isCompletedExpanded = true;
+    document.getElementById('completedHomeworkList').style.display = 'flex';
+  }
+  renderHomeworks();
+};
+
+// Toggle Completed Accordion
+document.getElementById('btnToggleCompleted').addEventListener('click', () => {
+  isCompletedExpanded = !isCompletedExpanded;
+  document.getElementById('completedHomeworkList').style.display = isCompletedExpanded ? 'flex' : 'none';
+  document.getElementById('completedArrow').textContent = isCompletedExpanded ? '▼' : '▶';
 });
-searchInput.addEventListener('input', (e) => {
-  searchQuery = e.target.value;
+
+// Search
+document.getElementById('btnToggleSearch').addEventListener('click', () => {
+  const box = document.getElementById('searchBoxContainer');
+  box.style.display = (box.style.display === 'none') ? 'flex' : 'none';
+  if (box.style.display === 'flex') document.getElementById('homeSearchInput').focus();
+});
+document.getElementById('homeSearchInput').addEventListener('input', (e) => {
+  currentSearchQuery = e.target.value;
   renderHomeworks();
 });
 
-// Modal: Add Homework
-fabAddHomework.addEventListener('click', () => {
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('hwDate').value = today;
-  document.getElementById('hwTitle').value = '';
-  addHwModal.classList.add('active');
+// Add Homework Modal
+const addHomeworkModal = document.getElementById('addHomeworkModal');
+fabAddHwBtn.addEventListener('click', () => {
+  document.getElementById('inputHwDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('inputHwTitle').value = '';
+  addHomeworkModal.classList.add('active');
 });
+document.getElementById('btnCancelHomework').addEventListener('click', () => addHomeworkModal.classList.remove('active'));
 
-document.getElementById('btnCancelHw').addEventListener('click', () => {
-  addHwModal.classList.remove('active');
-});
-
-document.getElementById('btnSaveHw').addEventListener('click', () => {
-  const title = document.getElementById('hwTitle').value.trim();
-  const course = document.getElementById('hwCourse').value;
-  const date = document.getElementById('hwDate').value;
-  const priority = document.getElementById('hwPriority').value;
+document.getElementById('btnSaveHomework').addEventListener('click', () => {
+  const title = document.getElementById('inputHwTitle').value.trim();
+  const course = document.getElementById('selectHwCourse').value;
+  const date = document.getElementById('inputHwDate').value;
+  const priority = document.getElementById('selectHwPriority').value;
 
   if (!title) {
     alert('Lütfen bir ödev başlığı girin.');
@@ -257,411 +403,411 @@ document.getElementById('btnSaveHw').addEventListener('click', () => {
   }
 
   homeworks.unshift({
-    id: Date.now().toString(),
+    id: `hw-${Date.now()}`,
     title,
     course,
     date,
     priority,
+    desc: '',
     completed: false
   });
 
   saveHomeworks();
-  addHwModal.classList.remove('active');
+  addHomeworkModal.classList.remove('active');
+  triggerDynamicIsland('✨', 'Yeni Ödev Eklendi', `"${title}" kaydedildi!`);
 });
 
 // ==========================================================================
-// 3. Tufi AI Chatbot
+// 4. Tufi AI Engine (1:1 Android TufiAIScreen.kt)
 // ==========================================================================
-const chatStream = document.getElementById('chatStream');
-const tufiTextInput = document.getElementById('tufiTextInput');
-const btnSendTufi = document.getElementById('btnSendTufi');
+const tufiChatStream = document.getElementById('tufiChatStream');
+const tufiScreenInput = document.getElementById('tufiScreenInput');
+const btnSendAiMsg = document.getElementById('btnSendAiMsg');
 
-function appendChatMessage(sender, text) {
-  const isUser = sender === 'user';
-  const msg = document.createElement('div');
-  msg.style.display = 'flex';
-  msg.style.justifyContent = isUser ? 'flex-end' : 'flex-start';
+function appendTufiMsg(role, text) {
+  const isUser = (role === 'user');
+  const bubble = document.createElement('div');
+  bubble.className = `tufi-msg-bubble ${isUser ? 'tufi-msg-user' : 'tufi-msg-ai'}`;
   
-  msg.innerHTML = `
-    <div style="max-width: 82%; padding: 12px 16px; border-radius: 18px; font-size: 0.9rem; line-height: 1.5; 
-      ${isUser ? 'background: var(--primary); color: white; border-bottom-right-radius: 4px;' : 'background: var(--surface-color); color: var(--text-main); border: 1px solid var(--border-color); border-bottom-left-radius: 4px;'}">
-      ${!isUser ? '<div style="font-weight: 700; color: #38BDF8; font-size: 0.78rem; margin-bottom: 4px;">✨ Tufi AI</div>' : ''}
+  if (!isUser) {
+    bubble.innerHTML = `
+      <div class="tufi-ai-header-badge">
+        <span>✨</span> Tufi AI • Öğrenci Koçu
+      </div>
       <div>${text}</div>
-    </div>
-  `;
-  chatStream.appendChild(msg);
-  chatStream.scrollTop = chatStream.scrollHeight;
+    `;
+  } else {
+    bubble.textContent = text;
+  }
+  
+  tufiChatStream.appendChild(bubble);
+  tufiChatStream.scrollTop = tufiChatStream.scrollHeight;
 }
 
-function handleUserSend() {
-  const text = tufiTextInput.value.trim();
+function handleAiSend() {
+  const text = tufiScreenInput.value.trim();
   if (!text) return;
-  tufiTextInput.value = '';
+  tufiScreenInput.value = '';
 
-  appendChatMessage('user', text);
+  appendTufiMsg('user', text);
 
-  // Generate Smart Response based on user homeworks & input
+  // Smart Response
   setTimeout(() => {
-    let reply = "Sorunuzu inceledim. ";
+    let reply = "";
     const lower = text.toLowerCase();
-    
-    if (lower.includes('acil') || lower.includes('ödev')) {
-      const urgent = homeworks.filter(h => !h.completed && h.priority === 'high');
-      if (urgent.length > 0) {
-        reply += `Şu an en acil ödeviniz: **${urgent[0].course} - ${urgent[0].title}** (Teslim: ${urgent[0].date}). Hemen başlamanızı öneririm!`;
+    if (lower.includes('acil') || lower.includes('hangi')) {
+      const urgentHw = homeworks.filter(h => !h.completed && h.priority === 'high');
+      if (urgentHw.length > 0) {
+        reply = `Şu an en acil ödeviniz: **${urgentHw[0].course} - ${urgentHw[0].title}** (Teslim: ${urgentHw[0].date}). Hemen başlamanızı tavsiye ederim!`;
       } else {
-        const anyPending = homeworks.filter(h => !h.completed);
-        if (anyPending.length > 0) {
-          reply += `Şu an ${anyPending.length} adet bekleyen ödeviniz var. En yakını: **${anyPending[0].title}**.`;
-        } else {
-          reply += "Tüm ödevleriniz tamamlanmış görünüyor! Harikasınız 🎉";
-        }
+        reply = "Harika! Yüksek öncelikli acil bir ödeviniz bulunmuyor. Normal sıradaki görevlerinizle devam edebilirsiniz.";
       }
     } else if (lower.includes('plan')) {
-      reply += "Bugün için önerim:\n1. 25 dk Pomodoro ile en zorlandığınız derse odaklanın.\n2. 5 dk mola verin.\n3. Ödev listenizdeki ilk görevi bitirip işaretleyin!";
-    } else if (lower.includes('türev') || lower.includes('matematik')) {
-      reply += "Türev formülleri:\n• f(x) = x^n => f'(x) = n*x^(n-1)\n• (u*v)' = u'v + uv'\n• Zincir Kuralı: [f(g(x))]' = f'(g(x)) * g'(x)";
+      reply = "İşte bugünkü çalışma planınız:\n1. 25 dakika: Matematik testine odaklanın.\n2. 5 dakika: Mola verin.\n3. 25 dakika: Fizik sorularını çözün.\n4. Gün sonunda tamamlananları işaretleyin!";
+    } else if (lower.includes('türev')) {
+      reply = "Türev Alma Kuralları:\n• [x^n]' = n * x^(n-1)\n• [c]' = 0 (Sabit sayı)\n• [u * v]' = u'v + uv' (Çarpım)\n• [u / v]' = (u'v - uv') / v^2 (Bölüm)";
     } else {
-      reply += `"${text}" konusunda size yardımcı olmaktan mutluluk duyarım. Pomodoro sayacını başlatıp odaklanarak çalışmaya ne dersiniz?`;
+      reply = `"${text}" sorunuzu not aldım. Bu konuyu verimli çalışmak için 25 dakikalık Pomodoro sayacını başlatabilir ve odaklanabilirsiniz!`;
     }
-
-    appendChatMessage('ai', reply);
+    appendTufiMsg('ai', reply);
+    triggerDynamicIsland('✨', 'Tufi AI Yanıtladı', 'Yeni bir tavsiye aldınız.');
   }, 600);
 }
 
-btnSendTufi.addEventListener('click', handleUserSend);
-tufiTextInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') handleUserSend();
+btnSendAiMsg.addEventListener('click', handleAiSend);
+tufiScreenInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') handleAiSend();
 });
 
-window.sendSuggestion = function(text) {
-  openTab('tufiai');
-  tufiTextInput.value = text;
-  handleUserSend();
+window.sendAiPrompt = function(promptText) {
+  openScreenTab('tufiai');
+  tufiScreenInput.value = promptText;
+  handleAiSend();
 };
 
 // ==========================================================================
-// 4. Calendar Logic
+// 5. Calendar Engine (1:1 Android CalendarScreen.kt)
 // ==========================================================================
 function renderCalendar() {
-  const calendarGrid = document.getElementById('calendarGrid');
-  const monthTitle = document.getElementById('calendarMonthTitle');
-  calendarGrid.innerHTML = '';
+  const grid = document.getElementById('calendarDaysGrid');
+  const header = document.getElementById('calendarMonthHeader');
+  grid.innerHTML = '';
 
-  const dayNames = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
-  dayNames.forEach(d => {
-    const header = document.createElement('div');
-    header.style.fontSize = '0.72rem';
-    header.style.color = 'var(--text-muted)';
-    header.style.fontWeight = '700';
-    header.style.padding = '4px 0';
-    header.textContent = d;
-    calendarGrid.appendChild(header);
+  const dayHeaders = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+  dayHeaders.forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'calendar-day-header';
+    el.textContent = d;
+    grid.appendChild(el);
   });
 
-  const year = selectedCalendarDate.getFullYear();
-  const month = selectedCalendarDate.getMonth();
+  const year = selectedDate.getFullYear();
+  const month = selectedDate.getMonth();
   const monthNames = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
-  monthTitle.textContent = `${monthNames[month]} ${year}`;
+  header.textContent = `${monthNames[month]} ${year}`;
 
-  const firstDay = new Date(year, month, 1).getDay(); // 0 is Sunday
+  const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const shift = (firstDay === 0 ? 6 : firstDay - 1);
 
-  // Empty leading days
   for (let i = 0; i < shift; i++) {
     const empty = document.createElement('div');
-    calendarGrid.appendChild(empty);
+    grid.appendChild(empty);
   }
 
-  // Days of Month
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    const hasHomework = homeworks.some(h => h.date === dateStr);
-    
-    const dayBtn = document.createElement('div');
-    dayBtn.style.padding = '8px 0';
-    dayBtn.style.borderRadius = '8px';
-    dayBtn.style.cursor = 'pointer';
-    dayBtn.style.fontSize = '0.85rem';
-    dayBtn.style.position = 'relative';
-    dayBtn.style.backgroundColor = (d === selectedCalendarDate.getDate()) ? 'var(--primary)' : 'transparent';
-    dayBtn.style.color = (d === selectedCalendarDate.getDate()) ? 'white' : 'var(--text-main)';
-    dayBtn.textContent = d;
+    const hasHw = homeworks.some(h => h.date === dateStr);
+    const isSelected = (d === selectedDate.getDate());
 
-    if (hasHomework) {
+    const cell = document.createElement('div');
+    cell.className = `calendar-day-cell ${isSelected ? 'selected' : ''}`;
+    cell.textContent = d;
+
+    if (hasHw && !isSelected) {
       const dot = document.createElement('div');
-      dot.style.width = '4px';
-      dot.style.height = '4px';
-      dot.style.borderRadius = '50%';
-      dot.style.backgroundColor = (d === selectedCalendarDate.getDate()) ? 'white' : '#F59E0B';
-      dot.style.position = 'absolute';
-      dot.style.bottom = '3px';
-      dot.style.left = '50%';
-      dot.style.transform = 'translateX(-50%)';
-      dayBtn.appendChild(dot);
+      dot.className = 'dot-indicator';
+      cell.appendChild(dot);
     }
 
-    dayBtn.addEventListener('click', () => {
-      selectedCalendarDate = new Date(year, month, d);
+    cell.addEventListener('click', () => {
+      selectedDate = new Date(year, month, d);
       renderCalendar();
-      renderCalendarDateTasks(dateStr);
     });
 
-    calendarGrid.appendChild(dayBtn);
+    grid.appendChild(cell);
   }
 
-  const currentDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedCalendarDate.getDate()).padStart(2, '0')}`;
-  renderCalendarDateTasks(currentDateStr);
-}
-
-function renderCalendarDateTasks(dateStr) {
-  const container = document.getElementById('calendarDateTasks');
-  const title = document.getElementById('selectedDateTitle');
-  title.textContent = `${dateStr} Tarihli Ödevler`;
+  // Render Selected Date Tasks
+  const currentDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+  document.getElementById('selectedDateHeader').textContent = `${currentDateStr} Tarihli Ödevler`;
+  const container = document.getElementById('selectedDateTaskList');
   container.innerHTML = '';
 
-  const dayTasks = homeworks.filter(h => h.date === dateStr);
+  const dayTasks = homeworks.filter(h => h.date === currentDateStr);
   if (dayTasks.length === 0) {
-    container.innerHTML = '<span style="font-size: 0.8rem; color: var(--text-muted);">Bu tarihe ait ödev bulunmuyor.</span>';
-    return;
+    container.innerHTML = '<span style="font-size: 0.8rem; color: var(--text-muted);">Bu tarihte teslim edilecek ödev yok.</span>';
+  } else {
+    dayTasks.forEach(h => {
+      const meta = COURSE_META[h.course] || COURSE_META['Genel'];
+      const item = document.createElement('div');
+      item.className = 'homework-card';
+      item.style.padding = '10px 14px';
+      item.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span>${meta.icon}</span>
+            <strong>${h.course}: ${h.title}</strong>
+          </div>
+          <span style="font-size: 0.72rem; color: ${h.completed ? 'var(--success)' : '#F59E0B'}; font-weight: 700;">
+            ${h.completed ? 'Tamamlandı' : 'Bekliyor'}
+          </span>
+        </div>
+      `;
+      container.appendChild(item);
+    });
   }
-
-  dayTasks.forEach(h => {
-    const item = document.createElement('div');
-    item.style.padding = '10px 12px';
-    item.style.background = 'var(--surface-variant)';
-    item.style.borderRadius = '8px';
-    item.style.fontSize = '0.85rem';
-    item.style.display = 'flex';
-    item.style.justifyContent = 'space-between';
-    item.innerHTML = `<strong>${h.course}:</strong> <span>${h.title}</span>`;
-    container.appendChild(item);
-  });
 }
 
 document.getElementById('btnPrevMonth').addEventListener('click', () => {
-  selectedCalendarDate.setMonth(selectedCalendarDate.getMonth() - 1);
+  selectedDate.setMonth(selectedDate.getMonth() - 1);
   renderCalendar();
 });
 document.getElementById('btnNextMonth').addEventListener('click', () => {
-  selectedCalendarDate.setMonth(selectedCalendarDate.getMonth() + 1);
+  selectedDate.setMonth(selectedDate.getMonth() + 1);
   renderCalendar();
+});
+document.getElementById('btnAddHwToSelectedDate').addEventListener('click', () => {
+  const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+  document.getElementById('inputHwDate').value = dateStr;
+  document.getElementById('inputHwTitle').value = '';
+  addHomeworkModal.classList.add('active');
 });
 
 // ==========================================================================
-// 5. Notes Management
+// 6. Notes Engine (1:1 Android NotesScreen.kt)
 // ==========================================================================
 function renderNotes() {
-  const grid = document.getElementById('notesGrid');
+  const grid = document.getElementById('notesCardsGrid');
   grid.innerHTML = '';
 
   notes.forEach(note => {
     const card = document.createElement('div');
-    card.className = 'card';
-    card.style.backgroundColor = note.color || 'var(--card-bg)';
-    card.style.color = '#0F172A'; // readable dark text on pastel notes
+    card.className = 'homework-card';
+    card.style.backgroundColor = note.color || 'var(--surface-color)';
+    card.style.color = '#0F172A';
     card.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center;">
-        <strong style="font-size: 0.9rem;">${note.title}</strong>
-        <button onclick="deleteNote('${note.id}')" style="background: none; border: none; cursor: pointer; color: #DC2626;">✕</button>
+        <strong style="font-size: 0.88rem;">${note.title}</strong>
+        <button onclick="deleteNoteItem('${note.id}')" style="background: none; border: none; cursor: pointer; color: #DC2626; font-size: 0.85rem;">✕</button>
       </div>
-      <p style="font-size: 0.8rem; line-height: 1.4; white-space: pre-wrap; margin-top: 4px;">${note.content}</p>
+      <p style="font-size: 0.78rem; line-height: 1.4; white-space: pre-wrap; margin-top: 6px;">${note.content}</p>
     `;
     grid.appendChild(card);
   });
 }
 
-window.deleteNote = function(id) {
+window.deleteNoteItem = function(id) {
   notes = notes.filter(n => n.id !== id);
   localStorage.setItem('tufidesk_notes', JSON.stringify(notes));
   renderNotes();
+  triggerDynamicIsland('🗑️', 'Not Silindi', 'Seçilen ders notu kaldırıldı.');
 };
 
-document.getElementById('btnNewNote').addEventListener('click', () => {
+document.getElementById('btnCreateNote').addEventListener('click', () => {
   const title = prompt('Not Başlığı:');
   if (!title) return;
   const content = prompt('Not İçeriği:');
   if (!content) return;
   const colors = ['#DBEAFE', '#FEF3C7', '#D1FAE5', '#EDE9FE', '#FCE7F3'];
-  const randomColor = colors[Math.floor(Math.random() * colors.length)];
+  const color = colors[Math.floor(Math.random() * colors.length)];
 
-  notes.unshift({ id: Date.now().toString(), title, content, color: randomColor });
+  notes.unshift({ id: `note-${Date.now()}`, title, content, color });
   localStorage.setItem('tufidesk_notes', JSON.stringify(notes));
   renderNotes();
+  triggerDynamicIsland('📝', 'Not Eklendi', `"${title}" kaydedildi.`);
 });
 
 // ==========================================================================
-// 6. Pomodoro Focus Timer
+// 7. Pomodoro Focus Timer (1:1 FocusTimerScreen.kt)
 // ==========================================================================
-const timerDisplay = document.getElementById('timerDisplay');
-const btnTimerToggle = document.getElementById('btnTimerToggle');
+const timerDisplayNumber = document.getElementById('timerDisplayNumber');
+const timerProgressCircle = document.getElementById('timerProgressCircle');
+const btnTimerStartStop = document.getElementById('btnTimerStartStop');
 const btnTimerReset = document.getElementById('btnTimerReset');
 
-function updateTimerDisplay() {
-  const mins = Math.floor(timerRemainingSeconds / 60);
-  const secs = timerRemainingSeconds % 60;
-  timerDisplay.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+function renderTimer() {
+  const m = Math.floor(timerRemainSec / 60);
+  const s = timerRemainSec % 60;
+  timerDisplayNumber.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+
+  const pct = (timerTotalSec - timerRemainSec) / timerTotalSec;
+  const offset = 552.9 * (1 - pct);
+  timerProgressCircle.style.strokeDashoffset = offset;
 }
 
-function playChime() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15); // A5
-    gain.gain.setValueAtTime(0.2, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.6);
-  } catch(e) {}
-}
-
-btnTimerToggle.addEventListener('click', () => {
-  if (isTimerRunning) {
-    clearInterval(timerInterval);
-    isTimerRunning = false;
-    btnTimerToggle.textContent = 'Devam Et';
+btnTimerStartStop.addEventListener('click', () => {
+  if (timerActive) {
+    clearInterval(timerHandle);
+    timerActive = false;
+    btnTimerStartStop.textContent = 'Devam Et';
+    triggerDynamicIsland('⏸️', 'Sayaç Duraklatıldı', 'Odak sayacı bekletiliyor.');
   } else {
-    isTimerRunning = true;
-    btnTimerToggle.textContent = 'Durdur';
-    timerInterval = setInterval(() => {
-      if (timerRemainingSeconds > 0) {
-        timerRemainingSeconds--;
-        updateTimerDisplay();
+    timerActive = true;
+    btnTimerStartStop.textContent = 'Durdur';
+    triggerDynamicIsland('⏱️', 'Sayaç Başladı', 'İyi çalışmalar dileriz!');
+    timerHandle = setInterval(() => {
+      if (timerRemainSec > 0) {
+        timerRemainSec--;
+        renderTimer();
       } else {
-        clearInterval(timerInterval);
-        isTimerRunning = false;
-        btnTimerToggle.textContent = 'Başlat';
-        playChime();
-        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-        alert('🎉 Tebrikler! Odaklanma süreniz tamamlandı.');
+        clearInterval(timerHandle);
+        timerActive = false;
+        btnTimerStartStop.textContent = 'Başlat';
+        playAlertTone();
+        triggerDynamicIsland('🎉', 'Tebrikler!', 'Odaklanma seansınız bitti!');
+        alert('🎉 Odaklanma süreniz tamamlandı! Harika çalıştınız.');
       }
     }, 1000);
   }
 });
 
 btnTimerReset.addEventListener('click', () => {
-  clearInterval(timerInterval);
-  isTimerRunning = false;
-  timerRemainingSeconds = timerTotalSeconds;
-  btnTimerToggle.textContent = 'Başlat';
-  updateTimerDisplay();
+  clearInterval(timerHandle);
+  timerActive = false;
+  timerRemainSec = timerTotalSec;
+  btnTimerStartStop.textContent = 'Başlat';
+  renderTimer();
 });
 
-window.setTimerPreset = function(minutes, label) {
-  clearInterval(timerInterval);
-  isTimerRunning = false;
-  timerTotalSeconds = minutes * 60;
-  timerRemainingSeconds = timerTotalSeconds;
-  document.getElementById('timerLabel').textContent = label;
-  btnTimerToggle.textContent = 'Başlat';
-  updateTimerDisplay();
+window.setTimerDuration = function(mins, label) {
+  clearInterval(timerHandle);
+  timerActive = false;
+  timerTotalSec = mins * 60;
+  timerRemainSec = timerTotalSec;
+  document.getElementById('timerModeLabel').textContent = `${label} Modu`;
+  btnTimerStartStop.textContent = 'Başlat';
+  renderTimer();
 };
 
-// ==========================================================================
-// 7. Stats
-// ==========================================================================
-function updateStats() {
-  const total = homeworks.length;
-  const completed = homeworks.filter(h => h.completed).length;
-  const rate = total > 0 ? Math.round((completed / total) * 100) : 100;
-  document.getElementById('statRate').textContent = `%${rate}`;
+function playAlertTone() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
+    g.gain.setValueAtTime(0.2, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
+    osc.connect(g);
+    g.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.6);
+  } catch(e) {}
 }
 
 // ==========================================================================
-// 8. Theming & Palettes
+// 8. Stats Calculation (1:1 StatsScreen.kt)
 // ==========================================================================
-themeToggle.addEventListener('change', (e) => {
-  const theme = e.target.checked ? 'dark' : 'light';
-  document.documentElement.setAttribute('data-theme', theme);
-  localStorage.setItem('tufidesk_theme', theme);
+function updateStatsUI() {
+  const total = homeworks.length;
+  const done = homeworks.filter(h => h.completed).length;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 100;
+  document.getElementById('statCompletionPct').textContent = `%${pct}`;
+}
+
+// ==========================================================================
+// 9. Theming & Palettes
+// ==========================================================================
+const themeCheckbox = document.getElementById('themeCheckbox');
+themeCheckbox.addEventListener('change', (e) => {
+  const t = e.target.checked ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('tufidesk_theme', t);
+  triggerDynamicIsland('🎨', 'Tema Güncellendi', `${t === 'dark' ? 'Karanlık' : 'Aydınlık'} mod devrede.`);
 });
 
-window.setPalette = function(palette) {
-  document.documentElement.setAttribute('data-palette', palette);
-  localStorage.setItem('tufidesk_palette', palette);
+window.changePalette = function(p) {
+  document.documentElement.setAttribute('data-palette', p);
+  localStorage.setItem('tufidesk_palette', p);
+  triggerDynamicIsland('🎨', 'Renk Paleti', `${p} teması seçildi.`);
 };
 
-// Load saved theme
-const savedTheme = localStorage.getItem('tufidesk_theme') || 'dark';
-document.documentElement.setAttribute('data-theme', savedTheme);
-themeToggle.checked = (savedTheme === 'dark');
-
-const savedPalette = localStorage.getItem('tufidesk_palette') || 'blue';
-document.documentElement.setAttribute('data-palette', savedPalette);
-
 // ==========================================================================
-// 9. Windows BSOD (Blue Screen of Death) Easter Egg
+// 10. Windows BSOD (Blue Screen of Death) Easter Egg (1:1 CrashActivity.kt)
 // ==========================================================================
-const bsodScreen = document.getElementById('bsodScreen');
-const bsodPercent = document.getElementById('bsodPercent');
-const btnTriggerBsod = document.getElementById('btnTriggerBsod');
-const btnBsodCopy = document.getElementById('btnBsodCopy');
-const btnBsodRestart = document.getElementById('btnBsodRestart');
+const bsodScreenOverlay = document.getElementById('bsodScreenOverlay');
+const bsodCounterText = document.getElementById('bsodCounterText');
+const btnTriggerBsodEasterEgg = document.getElementById('btnTriggerBsodEasterEgg');
+const btnCopyBsodLog = document.getElementById('btnCopyBsodLog');
+const btnRestartFromBsod = document.getElementById('btnRestartFromBsod');
+const btnFRespect = document.getElementById('btnFRespect');
+const respectsBadge = document.getElementById('respectsBadge');
 
-btnTriggerBsod.addEventListener('click', () => {
-  bsodScreen.classList.add('active');
+btnTriggerBsodEasterEgg.addEventListener('click', () => {
+  bsodScreenOverlay.classList.add('active');
   let pct = 1;
-  const interval = setInterval(() => {
+  const intv = setInterval(() => {
     if (pct < 100) {
-      pct += Math.floor(Math.random() * 8) + 3;
+      pct += Math.floor(Math.random() * 9) + 4;
       if (pct > 100) pct = 100;
-      bsodPercent.textContent = `${pct}% compelete`;
+      bsodCounterText.textContent = `${pct}% compelete`;
     } else {
-      clearInterval(interval);
+      clearInterval(intv);
     }
-  }, 120);
+  }, 130);
 });
 
-btnBsodRestart.addEventListener('click', () => {
-  bsodScreen.classList.remove('active');
+btnRestartFromBsod.addEventListener('click', () => {
+  bsodScreenOverlay.classList.remove('active');
+  triggerDynamicIsland('🔄', 'Sistem Yeniden Başlatıldı', 'TufiDESK normal çalışıyor.');
 });
 
-btnBsodCopy.addEventListener('click', () => {
+btnCopyBsodLog.addEventListener('click', () => {
   const dump = `=== TUFIDESK WINDOWS BSOD CRASH DUMP ===
 Stop Code: STATUS_SYSTEM_PROCESS_TERMINATED (0xC000021A)
 Timestamp: ${new Date().toLocaleString('tr-TR')}
-Platform: Progressive Web App (PWA) / Webkit
-What Failed: SettingsScreen.ManualCrashTrigger()
+Platform: Progressive Web App (PWA) / HTML5
+What Failed: SettingsScreen.DeveloperBsodTrigger()
 ========================================`;
   navigator.clipboard.writeText(dump).then(() => {
     alert('Loglar panoya kopyalandı! 📋');
   });
 });
 
+btnFRespect.addEventListener('click', () => {
+  respectCount++;
+  respectsBadge.textContent = `+${respectCount} 🫡`;
+  if (navigator.vibrate) navigator.vibrate(15);
+});
+
 // ==========================================================================
-// 10. PWA Installation Prompt (beforeinstallprompt)
+// 11. PWA Installation Handler
 // ==========================================================================
-const btnInstallPwa = document.getElementById('btnInstallPwa');
-const pwaInstallCard = document.getElementById('pwaInstallCard');
+const btnInstallPwaDirect = document.getElementById('btnInstallPwaDirect');
+const pwaBannerCard = document.getElementById('pwaBannerCard');
 
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
-  deferredPrompt = e;
-  pwaInstallCard.style.display = 'block';
+  deferredInstallPrompt = e;
+  pwaBannerCard.style.display = 'flex';
 });
 
-btnInstallPwa.addEventListener('click', async () => {
-  if (deferredPrompt) {
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    console.log('[PWA] User choice:', outcome);
-    deferredPrompt = null;
-    pwaInstallCard.style.display = 'none';
+btnInstallPwaDirect.addEventListener('click', async () => {
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    const { outcome } = await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    pwaBannerCard.style.display = 'none';
   } else {
-    alert('PWA yüklemek için tarayıcınızın menüsünden (⋮ veya Paylaş) "Ana Ekrana Ekle" seçeneğine dokunun.');
+    alert('TufiDESK uygulamasını yüklemek için tarayıcınızın menüsünden "Ana Ekrana Ekle" veya "Uygulamayı Yükle" seçeneğine dokunun.');
   }
 });
 
-// Quick navigation to Settings from top bar
-document.getElementById('btnSettingsTop').addEventListener('click', () => openTab('settings'));
-document.getElementById('btnProfile').addEventListener('click', () => openTab('settings'));
+// Shortcuts from header
+document.getElementById('btnSettingsShortcut').addEventListener('click', () => openScreenTab('settings'));
+document.getElementById('btnProfileBadge').addEventListener('click', () => openScreenTab('settings'));
 
-// Initialize Home Screen
+// Initialize
 renderHomeworks();
-updateTimerDisplay();
+renderTimer();

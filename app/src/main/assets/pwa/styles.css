@@ -1,32 +1,44 @@
 /* ==========================================================================
-   TufiDESK PWA - Material 3 Modern Design System & Styles
+   TufiDESK PWA - 1:1 Android Jetpack Compose Replica Design System
    ========================================================================== */
 
 :root {
-  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   
-  /* Primary Theme Palette (Default: Blue) */
+  /* Primary Theme (Default Blue) */
   --primary: #2563EB;
   --primary-hover: #1D4ED8;
   --primary-container: #DBEAFE;
   --on-primary-container: #1E40AF;
+  --primary-gradient: linear-gradient(135deg, #1E40AF, #2563EB, #38BDF8);
   
-  /* Surface & Backgrounds (Dark Mode Default) */
-  --bg-color: #0F172A;
-  --surface-color: #1E293B;
-  --surface-variant: #334155;
-  --surface-hover: #475569;
-  --card-bg: rgba(30, 41, 59, 0.75);
+  /* Dark Theme (Default) */
+  --bg-color: #0B1120;
+  --surface-color: #131E32;
+  --surface-variant: #1E293B;
+  --surface-hover: #334155;
+  --card-bg: rgba(19, 30, 50, 0.85);
   --border-color: rgba(255, 255, 255, 0.08);
-  --border-focus: #38BDF8;
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --divider: rgba(255, 255, 255, 0.06);
   
   /* Text */
   --text-main: #F8FAFC;
   --text-muted: #94A3B8;
   --text-dim: #64748B;
   
-  /* Status */
+  /* Course Palette */
+  --course-mat: #2563EB;
+  --course-fiz: #0284C7;
+  --course-kim: #7C3AED;
+  --course-biy: #059669;
+  --course-ede: #E11D48;
+  --course-tar: #D97706;
+  --course-cog: #0D9488;
+  --course-ing: #4F46E5;
+  
+  /* Status Colors */
   --success: #10B981;
   --success-bg: rgba(16, 185, 129, 0.15);
   --warning: #F59E0B;
@@ -35,55 +47,61 @@
   --danger-bg: rgba(239, 68, 68, 0.15);
   --info: #0EA5E9;
   
-  /* Radius & Shadows */
-  --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
+  /* Elevation & Radius */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
   --radius-pill: 9999px;
   
-  --shadow-sm: 0 2px 4px rgba(0,0,0,0.1);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.25);
-  --shadow-lg: 0 12px 32px rgba(0,0,0,0.4);
-  --shadow-island: 0 10px 30px rgba(0,0,0,0.5);
+  --shadow-sm: 0 2px 6px rgba(0,0,0,0.15);
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.25);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,0.35);
+  --shadow-island: 0 12px 36px rgba(0,0,0,0.55);
 }
 
-/* Light Theme Variables */
 [data-theme="light"] {
   --bg-color: #F8FAFC;
   --surface-color: #FFFFFF;
   --surface-variant: #F1F5F9;
   --surface-hover: #E2E8F0;
-  --card-bg: rgba(255, 255, 255, 0.9);
+  --card-bg: rgba(255, 255, 255, 0.95);
   --border-color: rgba(0, 0, 0, 0.08);
-  --border-focus: #2563EB;
+  --border-subtle: rgba(0, 0, 0, 0.04);
+  --divider: rgba(0, 0, 0, 0.06);
   
   --text-main: #0F172A;
   --text-muted: #64748B;
   --text-dim: #94A3B8;
   
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
-  --shadow-lg: 0 12px 32px rgba(0,0,0,0.12);
-  --shadow-island: 0 8px 24px rgba(0,0,0,0.15);
+  --shadow-sm: 0 2px 6px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.06);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,0.08);
+  --shadow-island: 0 8px 28px rgba(0,0,0,0.12);
 }
 
-/* Color Palettes */
 [data-palette="emerald"] {
   --primary: #059669;
   --primary-hover: #047857;
   --primary-container: #D1FAE5;
   --on-primary-container: #065F46;
+  --primary-gradient: linear-gradient(135deg, #065F46, #059669, #34D399);
 }
+
 [data-palette="purple"] {
   --primary: #7C3AED;
   --primary-hover: #6D28D9;
   --primary-container: #EDE9FE;
   --on-primary-container: #5B21B6;
+  --primary-gradient: linear-gradient(135deg, #5B21B6, #7C3AED, #A78BFA);
 }
+
 [data-palette="sunset"] {
   --primary: #EA580C;
   --primary-hover: #C2410C;
   --primary-container: #FFEDD5;
   --on-primary-container: #9A3412;
+  --primary-gradient: linear-gradient(135deg, #9A3412, #EA580C, #FB923C);
 }
 
 * {
@@ -101,159 +119,590 @@ body {
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
-  flex-direction: column;
-  overflow-x: hidden;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-/* App Frame Container */
-#app {
-  display: flex;
-  flex-direction: column;
+/* ==========================================================================
+   Android Device Frame Simulation
+   ========================================================================== */
+#app-viewport {
+  width: 100%;
+  max-width: 480px;
   height: 100vh;
   height: 100dvh;
-  width: 100%;
-  max-width: 520px;
-  margin: 0 auto;
+  background-color: var(--bg-color);
+  display: flex;
+  flex-direction: column;
   position: relative;
   overflow: hidden;
-  background-color: var(--bg-color);
-  box-shadow: 0 0 40px rgba(0,0,0,0.3);
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.4);
 }
 
-@media (min-width: 521px) {
-  #app {
-    border-left: 1px solid var(--border-color);
-    border-right: 1px solid var(--border-color);
+@media (min-width: 481px) {
+  #app-viewport {
+    height: 94vh;
+    border-radius: 40px;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.55);
   }
 }
 
 /* ==========================================================================
-   Header Bar
+   Dynamic Island (Top Black Notch Notification Pill)
    ========================================================================== */
-.top-bar {
+.dynamic-island-notch {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #000000;
+  color: #FFFFFF;
+  border-radius: 24px;
+  height: 34px;
+  width: 120px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 18px;
+  padding: 0 10px;
+  z-index: 999;
+  transition: all 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+  pointer-events: none;
+}
+
+.dynamic-island-camera-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #111;
+  box-shadow: inset 0 0 2px #333;
+}
+
+.dynamic-island-content {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.dynamic-island-notch.expanded {
+  width: 90%;
+  max-width: 380px;
+  height: 52px;
+  padding: 0 16px;
+  border-radius: 26px;
+  pointer-events: auto;
+}
+
+.dynamic-island-notch.expanded .dynamic-island-content {
+  display: flex;
+}
+
+/* ==========================================================================
+   Android Status Bar & App Header
+   ========================================================================== */
+.android-status-bar {
+  height: 28px;
+  padding: 6px 20px 0 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  z-index: 20;
+}
+
+.app-top-header {
+  padding: 10px 18px 12px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   background-color: var(--surface-color);
   border-bottom: 1px solid var(--border-color);
   z-index: 20;
 }
 
-.top-bar-left {
+.app-header-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
-.app-title-group h1 {
-  font-size: 1.15rem;
-  font-weight: 700;
-  letter-spacing: -0.3px;
+.app-header-title {
+  font-size: 1.18rem;
+  font-weight: 800;
+  letter-spacing: -0.4px;
   color: var(--text-main);
+  line-height: 1.2;
 }
 
-.app-subtitle {
+.app-header-subtitle {
   font-size: 0.75rem;
   color: var(--text-muted);
 }
 
-.top-bar-actions {
+.app-header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
-.icon-btn {
+.header-icon-btn {
   background: transparent;
   border: none;
   color: var(--text-main);
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background-color 0.15s ease, transform 0.1s ease;
+  transition: all 0.15s ease;
 }
 
-.icon-btn:hover {
-  background-color: var(--surface-variant);
-}
+.header-icon-btn:hover { background-color: var(--surface-variant); }
+.header-icon-btn:active { transform: scale(0.92); }
 
-.icon-btn:active {
-  transform: scale(0.92);
-}
-
-.avatar-badge {
+.avatar-circle-badge {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary), #38BDF8);
+  background: var(--primary-gradient);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1rem;
-  box-shadow: var(--shadow-sm);
+  font-weight: bold;
   cursor: pointer;
+  box-shadow: var(--shadow-sm);
 }
 
 /* ==========================================================================
-   Main Content Area (Scrollable Screens)
+   Screen Container & Views
    ========================================================================== */
-.screen-container {
+.screens-viewport {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 16px 90px 16px;
+  padding: 14px 16px 96px 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   -webkit-overflow-scrolling: touch;
 }
 
-.screen-container::-webkit-scrollbar {
-  width: 4px;
-}
-.screen-container::-webkit-scrollbar-thumb {
-  background: var(--surface-variant);
-  border-radius: 4px;
-}
+.screens-viewport::-webkit-scrollbar { width: 3px; }
+.screens-viewport::-webkit-scrollbar-thumb { background: var(--surface-variant); border-radius: 4px; }
 
-.screen {
+.app-screen {
   display: none;
-  animation: fadeIn 0.2s ease-out;
-}
-
-.screen.active {
-  display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
+  animation: screenFade 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-@keyframes fadeIn {
+.app-screen.active {
+  display: flex;
+}
+
+@keyframes screenFade {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 /* ==========================================================================
-   Floating Island Bottom Navigation Bar
+   1. HOME SCREEN COMPONENTS (Hero, Quick Stats, Filter Bar)
    ========================================================================== */
-.island-nav-wrapper {
+.hero-greeting-card {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-greeting-card::before {
+  content: "";
   position: absolute;
-  bottom: 14px;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--primary);
+}
+
+.hero-left h2 {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+.hero-left .hero-date {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.hero-badges-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-variant);
+  color: var(--text-main);
+}
+
+/* Circular Progress Ring */
+.progress-ring-box {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.progress-ring-box svg {
+  transform: rotate(-90deg);
+}
+.progress-ring-pct {
+  position: absolute;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+/* Quick Stats Row */
+.quick-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.quick-stat-chip {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 8px 4px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.quick-stat-chip:hover { border-color: var(--primary); }
+.quick-stat-chip .stat-num {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+.quick-stat-chip .stat-lbl {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* Search Bar */
+.search-bar-box {
+  background: var(--surface-variant);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.search-bar-box input {
+  background: transparent;
+  border: none;
+  color: var(--text-main);
+  font-size: 0.88rem;
+  outline: none;
+  width: 100%;
+}
+
+/* Filter Scroll Pills */
+.filter-scroll-container {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.filter-scroll-container::-webkit-scrollbar { display: none; }
+
+.m3-filter-pill {
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+.m3-filter-pill.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #FFFFFF;
+}
+
+/* ==========================================================================
+   Homework Cards (1:1 Android HomeworkItemCard.kt)
+   ========================================================================== */
+.homework-card {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  transition: all 0.2s ease;
+}
+.homework-card:hover { border-color: var(--primary); }
+
+.homework-card.completed {
+  opacity: 0.55;
+  background: var(--surface-variant);
+}
+
+.homework-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.course-badge-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-xs);
+  color: #FFFFFF;
+}
+
+.due-date-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+}
+.due-urgent { background: var(--danger-bg); color: var(--danger); }
+.due-normal { background: var(--surface-variant); color: var(--text-muted); }
+
+.homework-card-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.m3-round-checkbox {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.m3-round-checkbox.checked {
+  background-color: var(--success);
+  border-color: var(--success);
+  color: white;
+  transform: scale(1.05);
+}
+
+.homework-title-text {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.4;
+}
+.homework-desc-text {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 3px;
+  line-height: 1.35;
+}
+
+.homework-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 6px;
+  border-top: 1px solid var(--divider);
+}
+
+.homework-tags-group {
+  display: flex;
+  gap: 6px;
+}
+
+.tag-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+  background: var(--surface-variant);
+  color: var(--text-dim);
+}
+
+.delete-hw-btn {
+  background: transparent;
+  border: none;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 4px;
+}
+
+/* ==========================================================================
+   2. CALENDAR SCREEN
+   ========================================================================== */
+.calendar-card-container {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.calendar-month-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.calendar-month-bar h3 {
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.calendar-grid-table {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  text-align: center;
+}
+
+.calendar-day-header {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  padding: 4px 0;
+}
+
+.calendar-day-cell {
+  padding: 8px 0;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s ease;
+}
+.calendar-day-cell:hover { background-color: var(--surface-variant); }
+.calendar-day-cell.selected {
+  background-color: var(--primary) !important;
+  color: #FFFFFF !important;
+  font-weight: 800;
+}
+
+.calendar-day-cell .dot-indicator {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: #F59E0B;
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* ==========================================================================
+   3. TUFI AI SCREEN (Chat & Suggestions)
+   ========================================================================== */
+.tufi-chat-box {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding-bottom: 80px;
+}
+
+.tufi-msg-bubble {
+  max-width: 84%;
+  padding: 12px 16px;
+  border-radius: 20px;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  word-break: break-word;
+}
+.tufi-msg-user {
+  align-self: flex-end;
+  background: var(--primary);
+  color: #FFFFFF;
+  border-bottom-right-radius: 4px;
+}
+.tufi-msg-ai {
+  align-self: flex-start;
+  background: var(--surface-color);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  border-bottom-left-radius: 4px;
+}
+
+.tufi-ai-header-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  color: #38BDF8;
+  font-size: 0.76rem;
+  margin-bottom: 4px;
+}
+
+/* ==========================================================================
+   Floating Island Bottom Navigation (1:1 IslandBottomNavigation.kt)
+   ========================================================================== */
+.floating-bottom-dock-wrapper {
+  position: absolute;
+  bottom: 16px;
   left: 0;
   right: 0;
   display: flex;
   justify-content: center;
   pointer-events: none;
-  z-index: 30;
-  padding: 0 14px;
+  z-index: 50;
+  padding: 0 16px;
 }
 
-.island-nav {
+.floating-bottom-island {
   pointer-events: auto;
   display: flex;
   align-items: center;
@@ -263,13 +712,13 @@ body {
   border: 1px solid var(--border-color);
   border-radius: 28px;
   box-shadow: var(--shadow-island);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
   max-width: 100%;
 }
 
-.island-nav-item {
+.dock-tab-btn {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -280,42 +729,42 @@ body {
   border: none;
   color: var(--text-muted);
   font-size: 0.82rem;
-  font-weight: 600;
-  transition: all 0.2s ease;
+  font-weight: 700;
+  transition: all 0.22s ease;
   white-space: nowrap;
 }
 
-.island-nav-item svg {
-  width: 19px;
-  height: 19px;
+.dock-tab-btn svg {
+  width: 20px;
+  height: 20px;
   fill: currentColor;
   flex-shrink: 0;
 }
 
-.island-nav-item .nav-label {
+.dock-tab-btn .dock-label {
   display: none;
 }
 
-.island-nav-item.active {
+.dock-tab-btn.active {
   background-color: var(--primary-container);
   color: var(--on-primary-container);
-  padding: 8px 16px;
+  padding: 8px 15px;
 }
 
-.island-nav-item.active .nav-label {
+.dock-tab-btn.active .dock-label {
   display: inline-block;
-  animation: slideInText 0.2s ease;
+  animation: tabLabelReveal 0.22s ease;
 }
 
-@keyframes slideInText {
+@keyframes tabLabelReveal {
   from { opacity: 0; transform: translateX(-4px); }
   to { opacity: 1; transform: translateX(0); }
 }
 
 /* ==========================================================================
-   Tufi AI Morphing Input Bar
+   Tufi AI Morphing Textbox (When in Tufi AI mode)
    ========================================================================== */
-.tufi-morph-bar {
+.tufi-expanded-textbox-bar {
   display: none;
   width: 100%;
   background-color: #212121;
@@ -326,19 +775,19 @@ body {
   gap: 8px;
   box-shadow: var(--shadow-lg);
   pointer-events: auto;
-  animation: expandBar 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: barExpandSmooth 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-@keyframes expandBar {
-  from { width: 40%; opacity: 0.5; }
+@keyframes barExpandSmooth {
+  from { width: 45%; opacity: 0.4; }
   to { width: 100%; opacity: 1; }
 }
 
-.tufi-morph-bar.active {
+.tufi-expanded-textbox-bar.active {
   display: flex;
 }
 
-.four-squares-btn {
+.squares-collapse-btn {
   background: transparent;
   border: none;
   color: #B0B0B0;
@@ -352,140 +801,43 @@ body {
   border-radius: 8px;
   flex-shrink: 0;
 }
-.four-squares-btn span {
+.squares-collapse-btn span {
   background-color: currentColor;
   border-radius: 2px;
 }
 
-.tufi-input {
+.tufi-textbox-input {
   flex: 1;
   background: transparent;
   border: none;
   color: white;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   outline: none;
 }
-.tufi-input::placeholder {
-  color: #8E8E93;
-}
+.tufi-textbox-input::placeholder { color: #8E8E93; }
 
-.tufi-action-btn {
+.tufi-send-arrow-btn {
   width: 36px;
   height: 36px;
   border-radius: 50%;
+  background: #FFFFFF;
+  color: #000000;
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
-}
-.tufi-mic-btn {
-  background: transparent;
-  color: white;
-}
-.tufi-waveform-btn {
-  background: #2563EB;
-  color: white;
-}
-.tufi-send-btn {
-  background: white;
-  color: black;
+  font-weight: bold;
 }
 
 /* ==========================================================================
-   Cards, Badges & Lists (M3 Styles)
+   Floating Action Button (FAB)
    ========================================================================== */
-.card {
-  background-color: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: 16px;
-  box-shadow: var(--shadow-sm);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  transition: transform 0.15s ease, border-color 0.15s ease;
-}
-
-.card:hover {
-  border-color: var(--primary);
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: var(--radius-pill);
-}
-
-.badge-primary { background: var(--primary-container); color: var(--on-primary-container); }
-.badge-success { background: var(--success-bg); color: var(--success); }
-.badge-warning { background: var(--warning-bg); color: var(--warning); }
-.badge-danger  { background: var(--danger-bg); color: var(--danger); }
-
-/* Filter Pills */
-.filter-scroll {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  scrollbar-width: none;
-}
-.filter-scroll::-webkit-scrollbar { display: none; }
-
-.filter-pill {
-  padding: 7px 14px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-color);
-  border: 1px solid var(--border-color);
-  color: var(--text-muted);
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.15s ease;
-}
-
-.filter-pill.active {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: white;
-}
-
-/* Task Checkbox */
-.checkbox-round {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 2px solid var(--border-focus);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.2s ease;
-}
-.checkbox-round.checked {
-  background-color: var(--success);
-  border-color: var(--success);
-  color: white;
-}
-
-/* Floating Action Button (FAB) */
-.fab {
+.android-fab {
   position: absolute;
-  right: 20px;
-  bottom: 78px;
+  right: 18px;
+  bottom: 84px;
   width: 56px;
   height: 56px;
   border-radius: 18px;
@@ -494,22 +846,23 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 1.8rem;
+  font-weight: 300;
   box-shadow: var(--shadow-lg);
   border: none;
   cursor: pointer;
-  z-index: 25;
-  transition: transform 0.2s ease, background-color 0.2s ease;
+  z-index: 40;
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.fab:hover { background-color: var(--primary-hover); transform: scale(1.05); }
-.fab:active { transform: scale(0.95); }
+.android-fab:active { transform: scale(0.92); }
 
 /* ==========================================================================
-   Modals & Windows BSOD Screen
+   Modals
    ========================================================================== */
-.modal-overlay {
+.app-modal-layer {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.72);
   display: none;
   align-items: center;
   justify-content: center;
@@ -517,158 +870,137 @@ body {
   backdrop-filter: blur(8px);
   padding: 16px;
 }
+.app-modal-layer.active { display: flex; }
 
-.modal-overlay.active { display: flex; }
-
-.modal-card {
+.app-modal-content {
   background-color: var(--surface-color);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   padding: 24px;
   width: 100%;
-  max-width: 440px;
+  max-width: 420px;
   box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
   gap: 16px;
-  animation: modalPop 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: modalScale 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-@keyframes modalPop {
+@keyframes modalScale {
   from { opacity: 0; transform: scale(0.92); }
   to { opacity: 1; transform: scale(1); }
 }
 
-/* Form Inputs */
-.form-group {
+.input-field-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-.form-label {
-  font-size: 0.82rem;
-  font-weight: 600;
+.input-label {
+  font-size: 0.8rem;
+  font-weight: 700;
   color: var(--text-muted);
 }
-.form-input, .form-select {
+.m3-text-field {
   padding: 11px 14px;
   border-radius: var(--radius-sm);
   background: var(--surface-variant);
   border: 1px solid var(--border-color);
   color: var(--text-main);
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   outline: none;
 }
-.form-input:focus, .form-select:focus {
-  border-color: var(--primary);
-}
+.m3-text-field:focus { border-color: var(--primary); }
 
-.btn-primary {
+.m3-filled-btn {
   background: var(--primary);
-  color: white;
+  color: #FFFFFF;
   border: none;
-  padding: 12px 18px;
+  padding: 12px 20px;
   border-radius: var(--radius-sm);
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: all 0.15s ease;
 }
-.btn-primary:hover { background: var(--primary-hover); }
+.m3-filled-btn:hover { background: var(--primary-hover); }
 
-.btn-secondary {
-  background: transparent;
+.m3-tonal-btn {
+  background: var(--surface-variant);
   color: var(--text-main);
   border: 1px solid var(--border-color);
-  padding: 12px 18px;
+  padding: 12px 20px;
   border-radius: var(--radius-sm);
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
 }
 
 /* ==========================================================================
-   Windows BSOD (Blue Screen of Death) Screen Replica
+   Windows BSOD Crash Screen Easter Egg
    ========================================================================== */
-#bsodScreen {
+#bsodScreenOverlay {
   position: fixed;
   inset: 0;
   background-color: #0078D7;
   color: white;
   font-family: var(--font-mono);
-  z-index: 999;
+  z-index: 9999;
   display: none;
   flex-direction: column;
-  padding: 40px 28px;
+  padding: 48px 32px;
   overflow-y: auto;
 }
-
-#bsodScreen.active { display: flex; }
+#bsodScreenOverlay.active { display: flex; }
 
 .bsod-sad-face {
-  font-size: 5rem;
+  font-size: 5.5rem;
   line-height: 1;
   margin-bottom: 24px;
 }
-
 .bsod-text-main {
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   line-height: 1.6;
   margin-bottom: 28px;
 }
-
 .bsod-progress {
-  font-size: 1.6rem;
+  font-size: 1.7rem;
   font-weight: bold;
   margin-bottom: 32px;
 }
-
 .bsod-qr-row {
   display: flex;
-  gap: 16px;
+  gap: 18px;
   align-items: flex-start;
   margin-bottom: 32px;
 }
-
-.bsod-qr-box {
-  width: 100px;
-  height: 100px;
+.bsod-qr-white-card {
+  width: 108px;
+  height: 108px;
   background: white;
   border-radius: 4px;
-  padding: 6px;
+  padding: 8px;
   flex-shrink: 0;
 }
-
-.bsod-qr-info {
-  font-size: 0.78rem;
-  line-height: 1.5;
+.bsod-buttons-column {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
-
-.bsod-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.bsod-btn-copy {
+.bsod-metro-btn-copy {
   background: white;
   color: #0078D7;
   border: none;
   padding: 14px;
   font-family: var(--font-mono);
   font-weight: bold;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: 2px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
 }
-
-.bsod-btn-restart {
+.bsod-metro-btn-restart {
   background: transparent;
   color: white;
   border: 1.5px solid white;
@@ -676,43 +1008,5 @@ body {
   font-family: var(--font-mono);
   font-weight: bold;
   cursor: pointer;
-  border-radius: 3px;
-}
-
-/* ==========================================================================
-   Focus Timer (Pomodoro) Circle
-   ========================================================================== */
-.timer-circle-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 30px 0;
-}
-
-.timer-circle {
-  width: 220px;
-  height: 220px;
-  border-radius: 50%;
-  border: 8px solid var(--surface-variant);
-  border-top-color: var(--primary);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  box-shadow: var(--shadow-md);
-  position: relative;
-}
-
-.timer-display {
-  font-size: 3rem;
-  font-weight: 700;
-  font-family: var(--font-mono);
-  letter-spacing: -1px;
-}
-
-.timer-label {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  margin-top: 4px;
+  border-radius: 2px;
 }
