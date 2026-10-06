@@ -418,6 +418,89 @@ object TufiAIService {
     }
 
     // ==========================================
+    // VOICE TRANSCRIPTION CLEANUP (Sesli Dikte Düzeltme)
+    // ==========================================
+
+    /**
+     * Whisper ile çıkarılan ham metni Tufi AI (DeepSeek / Gemini) üzerinden
+     * sadece noktalama, büyük harf ve dolgu kelimeleri ("ııı", "şey", "yani", "ee" vb.)
+     * temizleyerek düzenler. Anlam kesinlikle değiştirilmez.
+     * Başarısız olursa veya anahtar yoksa ham metni döner.
+     */
+    suspend fun cleanTranscriptionWithAI(context: Context, rawText: String): String = withContext(Dispatchers.IO) {
+        val apiKey = getApiKey(context)
+        if (apiKey.isBlank() || rawText.isBlank()) return@withContext rawText
+
+        val systemPrompt = "Sen bir sesli dikte düzeltme asistanısın. Kullanıcının konuştuğu Türkçe ham ses kaydı dökümünü düzenle. Kurallar:\n1. Anlamı ve söylenen kelimeleri kesinlikle değiştirme veya yeni bilgi ekleme.\n2. Sadece Türkçe imla kurallarına göre noktalama işaretlerini (. , ? !) ve büyük-küçük harfleri düzelt.\n3. Gereksiz konuşma dolgularını ('ııı', 'ımm', 'şey', 'yani', 'ee') temizle.\n4. Çıktı olarak SADECE ve YALNIZCA düzeltilmiş metni yaz. Hiçbir selamlama, tırnak işareti, açıklama veya ek not yazma."
+
+        try {
+            val isGemini = apiKey.startsWith("AIzaSy")
+            if (isGemini) {
+                val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey"
+                val json = JSONObject().apply {
+                    put("contents", JSONArray().apply {
+                        put(JSONObject().apply {
+                            put("role", "user")
+                            put("parts", JSONArray().apply {
+                                put(JSONObject().apply { put("text", "$systemPrompt\n\nHam Metin: $rawText") })
+                            })
+                        })
+                    })
+                }
+                val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+                val request = Request.Builder().url(url).post(body).build()
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val respBody = response.body?.string() ?: ""
+                        val root = JSONObject(respBody)
+                        val text = root.optJSONArray("candidates")
+                            ?.optJSONObject(0)
+                            ?.optJSONObject("content")
+                            ?.optJSONArray("parts")
+                            ?.optJSONObject(0)
+                            ?.optString("text", "")
+                            ?.trim()
+                        if (!text.isNullOrBlank()) return@withContext text
+                    }
+                }
+            } else {
+                val url = "https://api.deepseek.com/chat/completions"
+                val json = JSONObject().apply {
+                    put("model", "deepseek-chat")
+                    put("messages", JSONArray().apply {
+                        put(JSONObject().apply {
+                            put("role", "system")
+                            put("content", systemPrompt)
+                        })
+                        put(JSONObject().apply {
+                            put("role", "user")
+                            put("content", rawText)
+                        })
+                    })
+                    put("temperature", 0.1)
+                }
+                val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+                val request = Request.Builder().url(url).post(body).build()
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val respBody = response.body?.string() ?: ""
+                        val root = JSONObject(respBody)
+                        val text = root.optJSONArray("choices")
+                            ?.optJSONObject(0)
+                            ?.optJSONObject("message")
+                            ?.optString("content", "")
+                            ?.trim()
+                        if (!text.isNullOrBlank()) return@withContext text
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Yapay zeka ses temizleme hatası: ${e.message}")
+        }
+        rawText
+    }
+
+    // ==========================================
     // QUESTION ASKING (Soru Sorma & Sohbet)
     // ==========================================
 

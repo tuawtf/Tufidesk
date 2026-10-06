@@ -47,6 +47,15 @@ jobs:
           gradle wrapper --gradle-version 9.3.1
           chmod +x gradlew
 
+      - name: Sherpa ONNX Whisper Native Kutuphane Kontrolu
+        run: |
+          mkdir -p app/libs
+          if [ ! -f "app/libs/sherpa-onnx-1.13.8.aar" ]; then
+            echo "sherpa-onnx-1.13.8.aar bulunamadi, resmi GitHub surumunden indiriliyor..."
+            curl -L -s -o app/libs/sherpa-onnx-1.13.8.aar "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar"
+          fi
+          ls -lh app/libs/
+
       - name: APK Derle
         run: ./gradlew assembleDebug --stacktrace
 

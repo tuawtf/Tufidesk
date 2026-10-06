@@ -68,10 +68,23 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.outlined.ThumbDown
 import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.CircularProgressIndicator
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import com.example.data.speech.AudioRecorder
+import com.example.data.speech.ModelManager
+import com.example.data.speech.SpeechSettingsManager
+import com.example.data.speech.TranscriptionResult
+import com.example.data.speech.WhisperEngine
+import com.example.data.speech.WhisperModelType
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -405,7 +418,42 @@ fun TufiAIScreen(
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "tufi_tts_${System.currentTimeMillis()}")
     }
 
-    // Sesle Yazma (Speech to Text)
+    // ==========================================
+    // CİHAZ İÇİ WHISPER SES TANIMA & DİKTE
+    // ==========================================
+    val audioRecorder = remember { AudioRecorder(context) }
+    var isRecordingAudio by remember { mutableStateOf(false) }
+    var recordingTimeText by remember { mutableStateOf("00:00") }
+    var isTranscribingAudio by remember { mutableStateOf(false) }
+    var showModelDownloadPromptDialog by remember { mutableStateOf(false) }
+    var isDownloadingModelInDialog by remember { mutableStateOf(false) }
+    var modelDownloadProgressVal by remember { mutableStateOf<Float?>(null) }
+    var modelDownloadStatusText by remember { mutableStateOf("") }
+
+    val recordAudioPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            // İzin verilince doğrudan ses kaydını başlat
+            val selectedModel = SpeechSettingsManager.getSelectedModel(context)
+            if (!ModelManager.isModelDownloaded(context, selectedModel)) {
+                showModelDownloadPromptDialog = true
+            } else {
+                coroutineScope.launch {
+                    val started = audioRecorder.startRecording(
+                        scope = coroutineScope,
+                        onDurationTick = { _, formatted -> recordingTimeText = formatted },
+                        onAmplitudeTick = { _ -> }
+                    )
+                    if (started) isRecordingAudio = true
+                }
+            }
+        } else {
+            Toast.makeText(context, "Sesle yazmak için mikrofon izni gereklidir.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Yedek: Google Sesle Yazma (Speech to Text)
     val speechLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -414,12 +462,16 @@ fun TufiAIScreen(
                 ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
                 ?.firstOrNull()
             if (!spokenText.isNullOrBlank()) {
-                inputText = spokenText
+                if (inputText.isBlank()) {
+                    inputText = spokenText
+                } else {
+                    inputText = "$inputText $spokenText"
+                }
             }
         }
     }
 
-    fun startSpeechToText() {
+    fun fallbackGoogleSpeechToText() {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "tr-TR")
@@ -428,7 +480,68 @@ fun TufiAIScreen(
         try {
             speechLauncher.launch(intent)
         } catch (_: Exception) {
-            Toast.makeText(context, "Ses tanıma bu cihazda aktif değil.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Google ses tanıma bu cihazda aktif değil.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun triggerVoiceInputFlow() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            return
+        }
+
+        if (isRecordingAudio) {
+            // Durdur ve yazıya çevir
+            isRecordingAudio = false
+            isTranscribingAudio = true
+            coroutineScope.launch {
+                val recordResult = audioRecorder.stopRecording()
+                val transResult = WhisperEngine.transcribe(context, recordResult)
+                isTranscribingAudio = false
+                when (transResult) {
+                    is TranscriptionResult.Success -> {
+                        val text = transResult.text
+                        if (inputText.isBlank()) {
+                            inputText = text
+                        } else {
+                            inputText = "$inputText $text"
+                        }
+                        if (transResult.wasAiCleaned) {
+                            Toast.makeText(context, "Dikte Tufi AI ile düzenlendi ✨", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    is TranscriptionResult.SilenceDetected -> {
+                        Toast.makeText(context, "Ses algılanamadı, lütfen mikrofona daha yakın konuşun.", Toast.LENGTH_SHORT).show()
+                    }
+                    is TranscriptionResult.ModelNotAvailable -> {
+                        showModelDownloadPromptDialog = true
+                    }
+                    is TranscriptionResult.Error -> {
+                        Toast.makeText(context, transResult.message, Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        } else {
+            val selectedModel = SpeechSettingsManager.getSelectedModel(context)
+            if (!ModelManager.isModelDownloaded(context, selectedModel)) {
+                showModelDownloadPromptDialog = true
+                return
+            }
+
+            coroutineScope.launch {
+                val started = audioRecorder.startRecording(
+                    scope = coroutineScope,
+                    onDurationTick = { _, formatted ->
+                        recordingTimeText = formatted
+                    },
+                    onAmplitudeTick = { _ -> }
+                )
+                if (started) {
+                    isRecordingAudio = true
+                } else {
+                    Toast.makeText(context, "Mikrofon başlatılamadı.", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 
@@ -846,58 +959,120 @@ fun TufiAIScreen(
                             Icon(imageVector = Icons.Default.Add, contentDescription = "Öneriler & Ekle", tint = Color.White, modifier = Modifier.size(22.dp))
                         }
 
-                        // Orta: Metin Giriş Alanı ("Tufi AI'a sor...")
-                        BasicTextField(
-                            value = inputText,
-                            onValueChange = { inputText = it },
-                            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White, fontSize = 15.sp),
-                            cursorBrush = SolidColor(Color.White),
-                            singleLine = false,
-                            maxLines = 4,
-                            keyboardOptions = KeyboardOptions(
-                                capitalization = KeyboardCapitalization.Sentences,
-                                imeAction = ImeAction.Default
-                            ),
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = 6.dp),
-                            decorationBox = { innerTextField ->
-                                if (inputText.isBlank()) {
-                                    Text(
-                                        text = "Tufi AI'a sor...",
-                                        style = MaterialTheme.typography.bodyLarge.copy(color = Color(0xFF8E8E93), fontSize = 15.sp)
+                        // Orta & Sağ: Kayıt Durumu / Transkripsiyon / Metin Giriş Alanı
+                        if (isRecordingAudio) {
+                            // Canlı Kayıt Durumu: Kırmızı yanıp sönen nokta ve süre
+                            Row(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(horizontal = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFEF4444))
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Dinleniyor... $recordingTimeText",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold
                                     )
-                                }
-                                innerTextField()
+                                )
                             }
-                        )
 
-                        // Sağ: Mikrofon ve Mavi Dalga Ses Modu Butonu (Metin girilince Gönder oku)
-                        if (inputText.isBlank()) {
-                            IconButton(onClick = { startSpeechToText() }, modifier = Modifier.size(36.dp)) {
-                                Icon(imageVector = Icons.Default.Mic, contentDescription = "Sesle Yaz", tint = Color.White, modifier = Modifier.size(21.dp))
-                            }
-                            Spacer(modifier = Modifier.width(2.dp))
+                            // Kaydı Durdur Butonu (Kırmızı yuvarlak buton)
                             Box(
                                 modifier = Modifier
                                     .size(36.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFF2563EB))
-                                    .clickable { startSpeechToText() },
+                                    .background(Color(0xFFEF4444))
+                                    .clickable { triggerVoiceInputFlow() },
                                 contentAlignment = Alignment.Center
                             ) {
-                                ChatGptWaveformIcon()
+                                Icon(
+                                    imageVector = Icons.Default.Stop,
+                                    contentDescription = "Kaydı Durdur",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        } else if (isTranscribingAudio) {
+                            // Transkripsiyon Yapılıyor Göstergesi
+                            Row(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(horizontal = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = Color.White
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = "Yazıya çevriliyor...",
+                                    style = MaterialTheme.typography.bodyMedium.copy(color = Color.White)
+                                )
                             }
                         } else {
-                            Box(
+                            // Normal Metin Giriş Alanı ("Tufi AI'a sor...")
+                            BasicTextField(
+                                value = inputText,
+                                onValueChange = { inputText = it },
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White, fontSize = 15.sp),
+                                cursorBrush = SolidColor(Color.White),
+                                singleLine = false,
+                                maxLines = 4,
+                                keyboardOptions = KeyboardOptions(
+                                    capitalization = KeyboardCapitalization.Sentences,
+                                    imeAction = ImeAction.Default
+                                ),
                                 modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White)
-                                    .clickable { sendMessage(inputText) },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(imageVector = Icons.Default.ArrowUpward, contentDescription = "Gönder", tint = Color.Black, modifier = Modifier.size(19.dp))
+                                    .weight(1f)
+                                    .padding(horizontal = 6.dp),
+                                decorationBox = { innerTextField ->
+                                    if (inputText.isBlank()) {
+                                        Text(
+                                            text = "Tufi AI'a sor...",
+                                            style = MaterialTheme.typography.bodyLarge.copy(color = Color(0xFF8E8E93), fontSize = 15.sp)
+                                        )
+                                    }
+                                    innerTextField()
+                                }
+                            )
+
+                            // Sağ: Mikrofon ve Mavi Dalga Ses Modu Butonu (Metin girilince Gönder oku)
+                            if (inputText.isBlank()) {
+                                IconButton(onClick = { triggerVoiceInputFlow() }, modifier = Modifier.size(36.dp)) {
+                                    Icon(imageVector = Icons.Default.Mic, contentDescription = "Sesle Yaz", tint = Color.White, modifier = Modifier.size(21.dp))
+                                }
+                                Spacer(modifier = Modifier.width(2.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF2563EB))
+                                        .clickable { triggerVoiceInputFlow() },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    ChatGptWaveformIcon()
+                                }
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.White)
+                                        .clickable { sendMessage(inputText) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(imageVector = Icons.Default.ArrowUpward, contentDescription = "Gönder", tint = Color.Black, modifier = Modifier.size(19.dp))
+                                }
                             }
                         }
                     }
@@ -1205,6 +1380,96 @@ fun TufiAIScreen(
         if (showApiKeyDialog) {
             TufiAISettingsDialog(
                 onDismiss = { showApiKeyDialog = false }
+            )
+        }
+
+        // ÇEVRİMDIŞI MODEL İNDİRME / FALLBACK İLETİŞİM KUTUSU
+        if (showModelDownloadPromptDialog) {
+            val selectedModel = SpeechSettingsManager.getSelectedModel(context)
+            AlertDialog(
+                onDismissRequest = {
+                    if (!isDownloadingModelInDialog) {
+                        showModelDownloadPromptDialog = false
+                    }
+                },
+                icon = {
+                    Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                },
+                title = { Text("Çevrimdışı Ses Tanıma Modeli") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            text = "Tamamen internetsiz ve gizlilik odaklı Whisper ses tanıma için Türkçe ${selectedModel.displayName} modelinin indirilmesi gerekmektedir (~${selectedModel.approximateSizeMb} MB).\n\nİsterseniz modeli cihazınıza indirebilir veya eski Google Ses Tanıma sistemini kullanabilirsiniz."
+                        )
+                        if (isDownloadingModelInDialog) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            LinearProgressIndicator(
+                                progress = { modelDownloadProgressVal ?: 0f },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                            )
+                            Text(
+                                text = modelDownloadStatusText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    if (!isDownloadingModelInDialog) {
+                        Button(
+                            onClick = {
+                                isDownloadingModelInDialog = true
+                                modelDownloadProgressVal = 0f
+                                modelDownloadStatusText = "Bağlantı kuruluyor..."
+                                coroutineScope.launch {
+                                    val res = ModelManager.downloadModel(context, selectedModel) { prog, msg ->
+                                        modelDownloadProgressVal = prog
+                                        modelDownloadStatusText = msg
+                                    }
+                                    isDownloadingModelInDialog = false
+                                    if (res.isSuccess) {
+                                        showModelDownloadPromptDialog = false
+                                        Toast.makeText(context, "Model hazır! Şimdi mikrofona dokunarak konuşabilirsiniz.", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(context, res.exceptionOrNull()?.message ?: "İndirme başarısız", Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            }
+                        ) {
+                            Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Modeli İndir")
+                        }
+                    }
+                },
+                dismissButton = {
+                    if (!isDownloadingModelInDialog) {
+                        Row {
+                            TextButton(
+                                onClick = {
+                                    showModelDownloadPromptDialog = false
+                                    fallbackGoogleSpeechToText()
+                                }
+                            ) {
+                                Text("Google ile Konuş")
+                            }
+                            TextButton(
+                                onClick = { showModelDownloadPromptDialog = false }
+                            ) {
+                                Text("İptal")
+                            }
+                        }
+                    }
+                }
             )
         }
     }
