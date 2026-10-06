@@ -5,7 +5,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -70,6 +69,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.ThumbDown
 import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material3.AlertDialog
@@ -79,8 +79,12 @@ import androidx.compose.material3.CircularProgressIndicator
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
+import com.example.CrashActivity
 import com.example.data.speech.AudioRecorder
+import com.example.data.speech.CloudTranscriptionResult
+import com.example.data.speech.CloudWhisperService
 import com.example.data.speech.ModelManager
+import com.example.data.speech.SpeechMode
 import com.example.data.speech.SpeechSettingsManager
 import com.example.data.speech.TranscriptionResult
 import com.example.data.speech.WhisperEngine
@@ -429,58 +433,59 @@ fun TufiAIScreen(
     var isDownloadingModelInDialog by remember { mutableStateOf(false) }
     var modelDownloadProgressVal by remember { mutableStateOf<Float?>(null) }
     var modelDownloadStatusText by remember { mutableStateOf("") }
+    var showSpeechErrorDialog by remember { mutableStateOf(false) }
+    var lastSpeechErrorMessage by remember { mutableStateOf("") }
+    var lastSpeechErrorTrace by remember { mutableStateOf("") }
+
+    fun startAudioRecordingInternal() {
+        val mode = SpeechSettingsManager.getSpeechMode(context)
+        if (mode == SpeechMode.OFFLINE_SHERPA) {
+            val selectedModel = SpeechSettingsManager.getSelectedModel(context)
+            if (!ModelManager.isModelDownloaded(context, selectedModel)) {
+                showModelDownloadPromptDialog = true
+                return
+            }
+        } else {
+            if (!CloudWhisperService.isOnline(context)) {
+                Toast.makeText(context, "İnternet bağlantısı yok. Ağınızı kontrol edin veya Ayarlar'dan Çevrimdışı Whisper'ı seçin.", Toast.LENGTH_LONG).show()
+                return
+            }
+            if (!SpeechSettingsManager.isOpenRouterKeyConfigured(context)) {
+                lastSpeechErrorMessage = "TufiAI Whisper (Bulut) için OpenRouter API anahtarı gereklidir. Lütfen Ayarlar > Sesli Dikte bölümünden anahtarınızı kaydedin."
+                lastSpeechErrorTrace = "HTTP 401: Missing OPENROUTER_API_KEY in settings"
+                showSpeechErrorDialog = true
+                return
+            }
+        }
+
+        coroutineScope.launch {
+            try {
+                val started = audioRecorder.startRecording(
+                    scope = coroutineScope,
+                    onDurationTick = { _, formatted -> recordingTimeText = formatted },
+                    onAmplitudeTick = { _ -> }
+                )
+                if (started) {
+                    isRecordingAudio = true
+                } else {
+                    Toast.makeText(context, "Mikrofon başlatılamadı.", Toast.LENGTH_SHORT).show()
+                }
+            } catch (t: Throwable) {
+                android.util.Log.e("TufiAIScreen", "Recording start failed", t)
+                lastSpeechErrorMessage = t.message ?: "Mikrofon başlatılamadı"
+                lastSpeechErrorTrace = android.util.Log.getStackTraceString(t)
+                showSpeechErrorDialog = true
+            }
+        }
+    }
 
     val recordAudioPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            // İzin verilince doğrudan ses kaydını başlat
-            val selectedModel = SpeechSettingsManager.getSelectedModel(context)
-            if (!ModelManager.isModelDownloaded(context, selectedModel)) {
-                showModelDownloadPromptDialog = true
-            } else {
-                coroutineScope.launch {
-                    val started = audioRecorder.startRecording(
-                        scope = coroutineScope,
-                        onDurationTick = { _, formatted -> recordingTimeText = formatted },
-                        onAmplitudeTick = { _ -> }
-                    )
-                    if (started) isRecordingAudio = true
-                }
-            }
+            startAudioRecordingInternal()
         } else {
-            Toast.makeText(context, "Sesle yazmak için mikrofon izni gereklidir.", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    // Yedek: Google Sesle Yazma (Speech to Text)
-    val speechLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val spokenText = result.data
-                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-                ?.firstOrNull()
-            if (!spokenText.isNullOrBlank()) {
-                if (inputText.isBlank()) {
-                    inputText = spokenText
-                } else {
-                    inputText = "$inputText $spokenText"
-                }
-            }
-        }
-    }
-
-    fun fallbackGoogleSpeechToText() {
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "tr-TR")
-            putExtra(RecognizerIntent.EXTRA_PROMPT, "Tufi AI'a konuşun...")
-        }
-        try {
-            speechLauncher.launch(intent)
-        } catch (_: Exception) {
-            Toast.makeText(context, "Google ses tanıma bu cihazda aktif değil.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Sesle yazdırmak için mikrofon izni gereklidir.", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -495,53 +500,96 @@ fun TufiAIScreen(
             isRecordingAudio = false
             isTranscribingAudio = true
             coroutineScope.launch {
-                val recordResult = audioRecorder.stopRecording()
-                val transResult = WhisperEngine.transcribe(context, recordResult)
-                isTranscribingAudio = false
-                when (transResult) {
-                    is TranscriptionResult.Success -> {
-                        val text = transResult.text
-                        if (inputText.isBlank()) {
-                            inputText = text
-                        } else {
-                            inputText = "$inputText $text"
-                        }
-                        if (transResult.wasAiCleaned) {
-                            Toast.makeText(context, "Dikte Tufi AI ile düzenlendi ✨", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                    is TranscriptionResult.SilenceDetected -> {
+                try {
+                    val recordResult = audioRecorder.stopRecording()
+                    if (recordResult.isSilent || recordResult.samples.isEmpty()) {
+                        isTranscribingAudio = false
                         Toast.makeText(context, "Ses algılanamadı, lütfen mikrofona daha yakın konuşun.", Toast.LENGTH_SHORT).show()
+                        return@launch
                     }
-                    is TranscriptionResult.ModelNotAvailable -> {
-                        showModelDownloadPromptDialog = true
+
+                    val mode = SpeechSettingsManager.getSpeechMode(context)
+                    if (mode == SpeechMode.CLOUD_OPENROUTER) {
+                        // Bulut Whisper (OpenRouter)
+                        val wavBytes = recordResult.toWavByteArray()
+                        val cloudResult = CloudWhisperService.transcribeAudio(context, wavBytes)
+                        isTranscribingAudio = false
+                        when (cloudResult) {
+                            is CloudTranscriptionResult.Success -> {
+                                var text = cloudResult.text
+                                var wasAiCleaned = false
+                                if (SpeechSettingsManager.isAiCleanupEnabled(context) && TufiAIService.isApiKeyConfigured(context)) {
+                                    try {
+                                        val cleaned = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                            TufiAIService.cleanTranscriptionWithAI(context, text)
+                                        }
+                                        if (cleaned.isNotBlank()) {
+                                            text = cleaned
+                                            wasAiCleaned = true
+                                        }
+                                    } catch (_: Throwable) {}
+                                }
+                                if (inputText.isBlank()) {
+                                    inputText = text
+                                } else {
+                                    inputText = "$inputText $text"
+                                }
+                                if (wasAiCleaned) {
+                                    Toast.makeText(context, "Dikte Tufi AI ile düzenlendi ✨", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                            is CloudTranscriptionResult.Error -> {
+                                lastSpeechErrorMessage = cloudResult.message
+                                lastSpeechErrorTrace = cloudResult.cause?.let { android.util.Log.getStackTraceString(it) }
+                                    ?: "HTTP Durum: ${cloudResult.statusCode ?: "Bilinmiyor"}"
+                                showSpeechErrorDialog = true
+                            }
+                        }
+                    } else {
+                        // Çevrimdışı Whisper (sherpa-onnx)
+                        val selectedModel = SpeechSettingsManager.getSelectedModel(context)
+                        if (!ModelManager.isModelDownloaded(context, selectedModel)) {
+                            isTranscribingAudio = false
+                            showModelDownloadPromptDialog = true
+                            return@launch
+                        }
+                        val transResult = WhisperEngine.transcribe(context, recordResult, selectedModel)
+                        isTranscribingAudio = false
+                        when (transResult) {
+                            is TranscriptionResult.Success -> {
+                                val text = transResult.text
+                                if (inputText.isBlank()) {
+                                    inputText = text
+                                } else {
+                                    inputText = "$inputText $text"
+                                }
+                                if (transResult.wasAiCleaned) {
+                                    Toast.makeText(context, "Dikte Tufi AI ile düzenlendi ✨", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                            is TranscriptionResult.SilenceDetected -> {
+                                Toast.makeText(context, "Ses algılanamadı, lütfen mikrofona daha yakın konuşun.", Toast.LENGTH_SHORT).show()
+                            }
+                            is TranscriptionResult.ModelNotAvailable -> {
+                                showModelDownloadPromptDialog = true
+                            }
+                            is TranscriptionResult.Error -> {
+                                lastSpeechErrorMessage = transResult.message
+                                lastSpeechErrorTrace = transResult.cause?.let { android.util.Log.getStackTraceString(it) } ?: ""
+                                showSpeechErrorDialog = true
+                            }
+                        }
                     }
-                    is TranscriptionResult.Error -> {
-                        Toast.makeText(context, transResult.message, Toast.LENGTH_LONG).show()
-                    }
+                } catch (t: Throwable) {
+                    android.util.Log.e("TufiAIScreen", "Voice transcribe coroutine failed", t)
+                    isTranscribingAudio = false
+                    lastSpeechErrorMessage = t.message ?: t.localizedMessage ?: "Bilinmeyen hata"
+                    lastSpeechErrorTrace = android.util.Log.getStackTraceString(t)
+                    showSpeechErrorDialog = true
                 }
             }
         } else {
-            val selectedModel = SpeechSettingsManager.getSelectedModel(context)
-            if (!ModelManager.isModelDownloaded(context, selectedModel)) {
-                showModelDownloadPromptDialog = true
-                return
-            }
-
-            coroutineScope.launch {
-                val started = audioRecorder.startRecording(
-                    scope = coroutineScope,
-                    onDurationTick = { _, formatted ->
-                        recordingTimeText = formatted
-                    },
-                    onAmplitudeTick = { _ -> }
-                )
-                if (started) {
-                    isRecordingAudio = true
-                } else {
-                    Toast.makeText(context, "Mikrofon başlatılamadı.", Toast.LENGTH_SHORT).show()
-                }
-            }
+            startAudioRecordingInternal()
         }
     }
 
@@ -1383,7 +1431,7 @@ fun TufiAIScreen(
             )
         }
 
-        // ÇEVRİMDIŞI MODEL İNDİRME / FALLBACK İLETİŞİM KUTUSU
+        // ÇEVRİMDIŞI MODEL İNDİRME / BULUT MODUNA GEÇİŞ DİYALOĞU
         if (showModelDownloadPromptDialog) {
             val selectedModel = SpeechSettingsManager.getSelectedModel(context)
             AlertDialog(
@@ -1400,11 +1448,12 @@ fun TufiAIScreen(
                         modifier = Modifier.size(28.dp)
                     )
                 },
-                title = { Text("Çevrimdışı Ses Tanıma Modeli") },
+                title = { Text("Çevrimdışı Model Gerekli") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
-                            text = "Tamamen internetsiz ve gizlilik odaklı Whisper ses tanıma için Türkçe ${selectedModel.displayName} modelinin indirilmesi gerekmektedir (~${selectedModel.approximateSizeMb} MB).\n\nİsterseniz modeli cihazınıza indirebilir veya eski Google Ses Tanıma sistemini kullanabilirsiniz."
+                            text = "Çevrimdışı Whisper için Türkçe ${selectedModel.displayName} modelinin indirilmesi gerekmektedir (~${selectedModel.approximateSizeMb} MB).\n\nModeli hemen cihazınıza indirebilir veya internet üzerinden çalışan TufiAI Bulut Whisper moduna geçebilirsiniz.",
+                            style = MaterialTheme.typography.bodyMedium
                         )
                         if (isDownloadingModelInDialog) {
                             Spacer(modifier = Modifier.height(4.dp))
@@ -1413,7 +1462,6 @@ fun TufiAIScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(6.dp)
-                                    .clip(RoundedCornerShape(3.dp))
                             )
                             Text(
                                 text = modelDownloadStatusText,
@@ -1438,7 +1486,7 @@ fun TufiAIScreen(
                                     isDownloadingModelInDialog = false
                                     if (res.isSuccess) {
                                         showModelDownloadPromptDialog = false
-                                        Toast.makeText(context, "Model hazır! Şimdi mikrofona dokunarak konuşabilirsiniz.", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "${selectedModel.displayName} hazırlandı! Mikrofona dokunarak konuşabilirsiniz.", Toast.LENGTH_SHORT).show()
                                     } else {
                                         Toast.makeText(context, res.exceptionOrNull()?.message ?: "İndirme başarısız", Toast.LENGTH_LONG).show()
                                     }
@@ -1456,11 +1504,12 @@ fun TufiAIScreen(
                         Row {
                             TextButton(
                                 onClick = {
+                                    SpeechSettingsManager.setSpeechMode(context, SpeechMode.CLOUD_OPENROUTER)
                                     showModelDownloadPromptDialog = false
-                                    fallbackGoogleSpeechToText()
+                                    Toast.makeText(context, "TufiAI Bulut Whisper moduna geçildi.", Toast.LENGTH_SHORT).show()
                                 }
                             ) {
-                                Text("Google ile Konuş")
+                                Text("Bulut Moduna Geç")
                             }
                             TextButton(
                                 onClick = { showModelDownloadPromptDialog = false }
@@ -1468,6 +1517,59 @@ fun TufiAIScreen(
                                 Text("İptal")
                             }
                         }
+                    }
+                }
+            )
+        }
+
+        // SES TANIMA HATA VE LOG KOPYALAMA DİYALOĞU
+        if (showSpeechErrorDialog) {
+            AlertDialog(
+                onDismissRequest = { showSpeechErrorDialog = false },
+                icon = {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(28.dp)
+                    )
+                },
+                title = { Text("Sesli Dikte Hatası") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(text = lastSpeechErrorMessage, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium)
+                        if (lastSpeechErrorTrace.isNotBlank()) {
+                            Surface(
+                                shape = MaterialTheme.shapes.small,
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.fillMaxWidth().heightIn(max = 140.dp)
+                            ) {
+                                Text(
+                                    text = lastSpeechErrorTrace.take(600),
+                                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, fontSize = 11.sp),
+                                    modifier = Modifier.padding(8.dp)
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val clipText = "TufiDESK Sesli Dikte Hatası:\n$lastSpeechErrorMessage\n\nDetaylar:\n$lastSpeechErrorTrace"
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                            clipboard?.setPrimaryClip(ClipData.newPlainText("TufiDESK Speech Error", clipText))
+                            Toast.makeText(context, "Hata logları panoya kopyalandı 📋", Toast.LENGTH_SHORT).show()
+                        }
+                    ) {
+                        Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Logları Kopyala")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showSpeechErrorDialog = false }) {
+                        Text("Kapat")
                     }
                 }
             )

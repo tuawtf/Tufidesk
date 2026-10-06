@@ -1,4 +1,7 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.net.URI
+import java.io.InputStream
+import java.io.OutputStream
 
 plugins {
   alias(libs.plugins.android.application)
@@ -71,6 +74,26 @@ secrets {
 }
 
 googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }
+
+val sherpaAar = file("libs/sherpa-onnx-1.13.8.aar")
+if (!sherpaAar.exists()) {
+    sherpaAar.parentFile?.mkdirs()
+    try {
+        println("Downloading sherpa-onnx-1.13.8.aar...")
+        val url = URI("https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar").toURL()
+        val connection = url.openConnection()
+        val input: InputStream = connection.getInputStream()
+        val output: OutputStream = sherpaAar.outputStream()
+        input.use { inStream ->
+            output.use { outStream ->
+                inStream.copyTo(outStream)
+            }
+        }
+        println("sherpa-onnx-1.13.8.aar download complete.")
+    } catch (e: Exception) {
+        println("Warning: Could not download sherpa-onnx aar: ${e.message}")
+    }
+}
 
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.

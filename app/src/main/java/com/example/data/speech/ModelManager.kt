@@ -1,13 +1,16 @@
 package com.example.data.speech
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
-import java.io.FileOutputStream
 import java.io.RandomAccessFile
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -22,6 +25,13 @@ object ModelManager {
             .followRedirects(true)
             .followSslRedirects(true)
             .build()
+    }
+
+    fun isConnectedToWifi(context: Context): Boolean {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
+        val activeNet = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(activeNet) ?: return false
+        return caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
     }
 
     fun getModelDirectory(context: Context, type: WhisperModelType): File {
@@ -50,10 +60,20 @@ object ModelManager {
         val encoder = getEncoderFile(context, type)
         val decoder = getDecoderFile(context, type)
 
-        // Tokens file should be > 100 KB, encoder > 10 MB, decoder > 30 MB
-        return tokens.exists() && tokens.length() > 100_000 &&
-               encoder.exists() && encoder.length() > 10_000_000 &&
-               decoder.exists() && decoder.length() > 30_000_000
+        val minEncoderBytes = when (type) {
+            WhisperModelType.TINY -> 10_000_000L
+            WhisperModelType.BASE -> 20_000_000L
+            WhisperModelType.SMALL -> 60_000_000L
+        }
+        val minDecoderBytes = when (type) {
+            WhisperModelType.TINY -> 20_000_000L
+            WhisperModelType.BASE -> 45_000_000L
+            WhisperModelType.SMALL -> 150_000_000L
+        }
+
+        return tokens.exists() && tokens.length() > 50_000 &&
+               encoder.exists() && encoder.length() > minEncoderBytes &&
+               decoder.exists() && decoder.length() > minDecoderBytes
     }
 
     fun getDownloadedSizeBytes(context: Context, type: WhisperModelType): Long {
@@ -97,7 +117,7 @@ object ModelManager {
         val url: String,
         val targetFile: File,
         val label: String,
-        val weight: Float // relative weight for overall progress
+        val weight: Float
     )
 
     suspend fun downloadModel(
@@ -105,6 +125,13 @@ object ModelManager {
         type: WhisperModelType,
         onProgress: (overallProgress: Float, statusMessage: String) -> Unit
     ): Result<Unit> = withContext(Dispatchers.IO) {
+        // Wi-Fi denetimi
+        if (SpeechSettingsManager.isDownloadWifiOnlyEnabled(context) && !isConnectedToWifi(context)) {
+            return@withContext Result.failure(
+                IllegalStateException("Yalnızca Wi-Fi ile indir seçeneği aktif. Mobil veri kullanımını engellemek için lütfen bir Wi-Fi ağına bağlanın veya ayarı kapatın.")
+            )
+        }
+
         val tokens = getTokensFile(context, type)
         val encoder = getEncoderFile(context, type)
         val decoder = getDecoderFile(context, type)
@@ -118,14 +145,19 @@ object ModelManager {
         var completedWeights = 0f
 
         for (item in items) {
+            if (!currentCoroutineContext().isActive) {
+                return@withContext Result.failure(InterruptedException("İndirme kullanıcı tarafından iptal edildi."))
+            }
+
             val success = downloadSingleFileWithResume(item.url, item.targetFile) { fileProgress ->
                 val currentOverall = completedWeights + (fileProgress * item.weight)
                 val percentInt = (currentOverall * 100).coerceIn(0f, 100f).toInt()
                 onProgress(currentOverall, "${item.label} indiriliyor (%$percentInt)...")
             }
+
             if (!success) {
                 return@withContext Result.failure(
-                    Exception("${item.label} dosyası indirilemedi. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.")
+                    Exception("${item.label} dosyası indirilemedi. Lütfen bağlantınızı kontrol edip tekrar deneyin.")
                 )
             }
             completedWeights += item.weight
@@ -135,16 +167,15 @@ object ModelManager {
         Result.success(Unit)
     }
 
-    private fun downloadSingleFileWithResume(
+    private suspend fun downloadSingleFileWithResume(
         url: String,
         targetFile: File,
         onFileProgress: (Float) -> Unit
-    ): Boolean {
+    ): Boolean = withContext(Dispatchers.IO) {
         val tempFile = File(targetFile.parentFile, "${targetFile.name}.downloading")
         var existingBytes = if (tempFile.exists()) tempFile.length() else 0L
 
         try {
-            // First attempt with Range header if partially downloaded
             var requestBuilder = Request.Builder().url(url)
             if (existingBytes > 0) {
                 requestBuilder = requestBuilder.addHeader("Range", "bytes=$existingBytes-")
@@ -152,7 +183,6 @@ object ModelManager {
 
             var response = httpClient.newCall(requestBuilder.build()).execute()
 
-            // If range not satisfiable (416) or server ignored range (200 with full content), restart from 0
             if (response.code == 416 || (existingBytes > 0 && response.code == 200)) {
                 response.close()
                 tempFile.delete()
@@ -161,12 +191,12 @@ object ModelManager {
             }
 
             if (!response.isSuccessful && response.code != 206) {
-                Log.e(TAG, "İndirme başarısız kod: ${response.code}")
+                Log.e(TAG, "İndirme başarısız yanıt: ${response.code}")
                 response.close()
-                return false
+                return@withContext false
             }
 
-            val body = response.body ?: return false
+            val body = response.body ?: return@withContext false
             val contentLength = body.contentLength()
             val totalBytes = if (contentLength > 0) existingBytes + contentLength else -1L
 
@@ -182,11 +212,14 @@ object ModelManager {
 
             try {
                 while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                    if (!currentCoroutineContext().isActive) {
+                        return@withContext false
+                    }
                     randomAccessFile.write(buffer, 0, bytesRead)
                     currentBytes += bytesRead
 
                     val now = System.currentTimeMillis()
-                    if (now - lastReportTime > 100 || currentBytes == totalBytes) {
+                    if (now - lastReportTime > 80 || currentBytes == totalBytes) {
                         lastReportTime = now
                         val progress = if (totalBytes > 0) (currentBytes.toFloat() / totalBytes) else 0.5f
                         onFileProgress(progress.coerceIn(0f, 1f))
@@ -198,23 +231,21 @@ object ModelManager {
                 body.close()
             }
 
-            // Verify file has non-zero size and rename
             if (tempFile.exists() && tempFile.length() > 0) {
                 if (targetFile.exists()) {
                     targetFile.delete()
                 }
                 val renamed = tempFile.renameTo(targetFile)
                 if (!renamed) {
-                    // Fallback copy
                     tempFile.copyTo(targetFile, overwrite = true)
                     tempFile.delete()
                 }
-                return true
+                return@withContext true
             }
-            return false
+            return@withContext false
         } catch (e: Exception) {
-            Log.e(TAG, "Dosya indirme hatası: ${e.message}", e)
-            return false
+            Log.e(TAG, "Dosya indirme istisnası: ${e.message}", e)
+            return@withContext false
         }
     }
 }

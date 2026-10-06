@@ -9,19 +9,49 @@ import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.sqrt
 
 data class AudioRecordResult(
     val samples: FloatArray,
+    val rawPcmBytes: ByteArray,
     val durationMs: Long,
     val isSilent: Boolean,
     val maxRms: Double
 ) {
+    fun toWavByteArray(sampleRate: Int = AudioRecorder.SAMPLE_RATE, channels: Short = 1, bitsPerSample: Short = 16): ByteArray {
+        val pcmDataSize = rawPcmBytes.size
+        val totalDataLen = pcmDataSize + 36
+        val byteRate = sampleRate * channels * bitsPerSample / 8
+        val header = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN)
+        header.put("RIFF".toByteArray())
+        header.putInt(totalDataLen)
+        header.put("WAVE".toByteArray())
+        header.put("fmt ".toByteArray())
+        header.putInt(16) // Subchunk1Size
+        header.putShort(1.toShort()) // AudioFormat 1 = PCM
+        header.putShort(channels)
+        header.putInt(sampleRate)
+        header.putInt(byteRate)
+        header.putShort((channels * bitsPerSample / 8).toShort()) // BlockAlign
+        header.putShort(bitsPerSample)
+        header.put("data".toByteArray())
+        header.putInt(pcmDataSize)
+
+        val wavBytes = ByteArray(44 + pcmDataSize)
+        System.arraycopy(header.array(), 0, wavBytes, 0, 44)
+        System.arraycopy(rawPcmBytes, 0, wavBytes, 44, pcmDataSize)
+        return wavBytes
+    }
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
@@ -46,9 +76,7 @@ class AudioRecorder(private val context: Context) {
         private const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
         private const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
 
-        // Silence threshold: If maximum RMS throughout the recording is below this,
-        // it means only microphone background hiss was recorded (no audible speech).
-        // 16-bit PCM ranges from -32768 to 32767. Whispered/ambient speech typically produces RMS > 350-500.
+        // Sessizlik eşiği: mikrofon dip gürültüsünden yüksek anlamlı konuşma var mı?
         private const val SILENCE_RMS_THRESHOLD = 200.0
         private const val MIN_RECORDING_DURATION_MS = 400L
     }
@@ -58,7 +86,8 @@ class AudioRecorder(private val context: Context) {
     private var tickerJob: Job? = null
     private val isRecording = AtomicBoolean(false)
 
-    private val pcmSamples = mutableListOf<Short>()
+    private val rawByteStream = ByteArrayOutputStream(64 * 1024)
+    private val streamLock = Any()
     private var recordingStartTime = 0L
     private var maxRecordedRms = 0.0
 
@@ -99,13 +128,15 @@ class AudioRecorder(private val context: Context) {
                 return@withContext false
             }
 
-            pcmSamples.clear()
+            synchronized(streamLock) {
+                rawByteStream.reset()
+            }
             maxRecordedRms = 0.0
             recordingStartTime = System.currentTimeMillis()
             audioRecord?.startRecording()
             isRecording.set(true)
 
-            // Duration ticker
+            // Süre sayacı
             tickerJob = scope.launch(Dispatchers.Main) {
                 while (isRecording.get()) {
                     val elapsedSec = ((System.currentTimeMillis() - recordingStartTime) / 1000).toInt()
@@ -117,19 +148,26 @@ class AudioRecorder(private val context: Context) {
                 }
             }
 
-            // Audio read loop
+            // Ses okuma döngüsü
             recordingJob = scope.launch(Dispatchers.IO) {
-                val readBuffer = ShortArray(1024)
+                val byteBuffer = ByteArray(2048)
                 while (isActive && isRecording.get()) {
-                    val readCount = audioRecord?.read(readBuffer, 0, readBuffer.size) ?: -1
-                    if (readCount > 0) {
+                    val readBytes = audioRecord?.read(byteBuffer, 0, byteBuffer.size) ?: -1
+                    if (readBytes > 0) {
+                        synchronized(streamLock) {
+                            rawByteStream.write(byteBuffer, 0, readBytes)
+                        }
+
+                        // RMS hesaplama
                         var sumSquares = 0.0
-                        for (i in 0 until readCount) {
-                            val sample = readBuffer[i]
-                            pcmSamples.add(sample)
+                        val sampleCount = readBytes / 2
+                        for (i in 0 until sampleCount) {
+                            val low = byteBuffer[i * 2].toInt() and 0xFF
+                            val high = byteBuffer[i * 2 + 1].toInt()
+                            val sample = (high shl 8) or low
                             sumSquares += sample * sample
                         }
-                        val rms = sqrt(sumSquares / readCount)
+                        val rms = sqrt(sumSquares / sampleCount.coerceAtLeast(1))
                         if (rms > maxRecordedRms) {
                             maxRecordedRms = rms
                         }
@@ -142,9 +180,11 @@ class AudioRecorder(private val context: Context) {
             }
 
             return@withContext true
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Kayıt başlatılırken hata: ${e.message}", e)
-            audioRecord?.release()
+            try {
+                audioRecord?.release()
+            } catch (_: Throwable) {}
             audioRecord = null
             isRecording.set(false)
             return@withContext false
@@ -155,32 +195,47 @@ class AudioRecorder(private val context: Context) {
         isRecording.set(false)
         tickerJob?.cancel()
         tickerJob = null
-        recordingJob?.cancel()
+
+        try {
+            recordingJob?.cancelAndJoin()
+        } catch (_: Throwable) {}
         recordingJob = null
 
         try {
-            audioRecord?.stop()
-        } catch (e: Exception) {
+            if (audioRecord?.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                audioRecord?.stop()
+            }
+        } catch (e: Throwable) {
             Log.w(TAG, "Kayıt durdurulurken uyarı: ${e.message}")
         }
-        audioRecord?.release()
+        try {
+            audioRecord?.release()
+        } catch (_: Throwable) {}
         audioRecord = null
 
         val duration = System.currentTimeMillis() - recordingStartTime
 
-        // Convert short samples to float array normalized to [-1.0, 1.0]
-        val floatArray = FloatArray(pcmSamples.size)
-        for (i in pcmSamples.indices) {
-            floatArray[i] = (pcmSamples[i].toFloat() / 32768.0f).coerceIn(-1.0f, 1.0f)
+        val rawBytes = synchronized(streamLock) {
+            rawByteStream.toByteArray()
         }
 
-        // Silence check
-        val isSilent = duration < MIN_RECORDING_DURATION_MS || maxRecordedRms < SILENCE_RMS_THRESHOLD
+        val sampleCount = rawBytes.size / 2
+        val floatArray = FloatArray(sampleCount)
+        val byteBuf = ByteBuffer.wrap(rawBytes).order(ByteOrder.LITTLE_ENDIAN)
 
-        Log.d(TAG, "Kayıt bitti. Örnek sayısı: ${floatArray.size}, Süre: ${duration}ms, MaxRMS: $maxRecordedRms, Sessiz: $isSilent")
+        for (i in 0 until sampleCount) {
+            val shortVal = byteBuf.short
+            floatArray[i] = (shortVal.toFloat() / 32768.0f).coerceIn(-1.0f, 1.0f)
+        }
+
+        // Sessizlik denetimi
+        val isSilent = duration < MIN_RECORDING_DURATION_MS || maxRecordedRms < SILENCE_RMS_THRESHOLD || sampleCount < 1600
+
+        Log.d(TAG, "Kayıt tamamlandı. Örnek sayısı: $sampleCount, Süre: ${duration}ms, MaxRMS: $maxRecordedRms, Sessiz: $isSilent")
 
         return@withContext AudioRecordResult(
             samples = floatArray,
+            rawPcmBytes = rawBytes,
             durationMs = duration,
             isSilent = isSilent,
             maxRms = maxRecordedRms
