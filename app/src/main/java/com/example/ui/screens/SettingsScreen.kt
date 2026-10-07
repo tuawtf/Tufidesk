@@ -1,129 +1,128 @@
 package com.example.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BrightnessAuto
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteForever
-import androidx.compose.material.icons.filled.FileDownload
-import androidx.compose.material.icons.filled.FormatListBulleted
+import androidx.compose.material.icons.filled.DeveloperMode
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockReset
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.WifiOff
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.runtime.saveable.rememberSaveable
-import android.widget.Toast
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import com.google.firebase.FirebaseApp
-import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.DeveloperMode
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.ContentPaste
-import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material.icons.filled.CloudUpload
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.ui.text.font.FontFamily
-import android.content.Intent
 import com.example.CrashActivity
+import com.example.data.ai.TufiAIService
 import com.example.data.firebase.SyncState
 import com.example.data.model.UserAccount
-import com.example.ui.components.UserFlowerAvatar
-import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material3.OutlinedButton
-import com.example.data.ai.TufiAIService
 import com.example.ui.components.TufiAISettingsDialog
-import androidx.activity.compose.BackHandler
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material3.IconButton
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
-import com.example.data.speech.SpeechSettingsManager
-import com.example.data.speech.WhisperModelType
-import com.example.data.speech.ModelManager
-import com.example.data.speech.WhisperEngine
+import com.example.ui.components.UserFlowerAvatar
+import com.example.ui.screens.settings.SearchableSettingItem
+import com.example.ui.screens.settings.SettingsSection
 import com.example.ui.screens.speech.SpeechSettingsSection
+import com.google.firebase.FirebaseApp
 
 data class MaterialPaletteOption(
     val id: String,
@@ -134,6 +133,7 @@ data class MaterialPaletteOption(
     val isDynamic: Boolean = false
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     currentThemeMode: String,
@@ -167,10 +167,32 @@ fun SettingsScreen(
     onImportFirebaseJson: (String, (Boolean, String) -> Unit) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val appVersion = remember(context) {
+        try {
+            val pInfo = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0)
+            }
+            pInfo.versionName ?: "1.0.0"
+        } catch (_: Exception) {
+            "1.0.0"
+        }
+    }
+
+    // Navigasyon State: Seçili kategori (null ise ana ayarlar listesi)
+    var selectedSection by rememberSaveable { mutableStateOf<String?>(null) }
     var showDeveloperSettingsScreen by rememberSaveable { mutableStateOf(false) }
+
+    // Arama state
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+
+    // Dialog State'leri
     var showThemeDialog by remember { mutableStateOf(false) }
     var showPaletteDialog by remember { mutableStateOf(false) }
-    var versionTapCount by remember { mutableStateOf(0) }
+    var versionTapCount by remember { mutableIntStateOf(0) }
     var isDeveloperModeActive by rememberSaveable { mutableStateOf(true) }
     var showDevOptionsDialog by remember { mutableStateOf(false) }
 
@@ -187,6 +209,8 @@ fun SettingsScreen(
     var showImportJsonDialog by remember { mutableStateOf(false) }
     var importJsonInput by remember { mutableStateOf("") }
     var isImportingJson by remember { mutableStateOf(false) }
+
+    var showAiSettingsDialog by remember { mutableStateOf(false) }
 
     val paletteOptions = listOf(
         MaterialPaletteOption(
@@ -241,21 +265,43 @@ fun SettingsScreen(
         )
     )
 
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val appVersion = remember(context) {
-        try {
-            val pInfo = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0))
-            } else {
-                @Suppress("DEPRECATION")
-                context.packageManager.getPackageInfo(context.packageName, 0)
+    // Aranabilir ayar öğeleri dizini
+    val searchableItems = remember {
+        listOf(
+            SearchableSettingItem("Aktif Profil", "Öğrenci hesabı ve profil değiştirme", SettingsSection.PROFILE, Icons.Default.SwapHoriz, listOf("hesap", "öğrenci", "profil")),
+            SearchableSettingItem("Uygulama Teması", "Açık, koyu veya sistem teması", SettingsSection.APPEARANCE, Icons.Default.BrightnessAuto, listOf("karanlık", "aydınlık", "dark", "light", "renk")),
+            SearchableSettingItem("Materyal Renk Paleti", "Material You dinamik renkler veya özel temalar", SettingsSection.APPEARANCE, Icons.Default.Palette, listOf("palet", "renk", "dynamic", "mavi", "yeşil", "indigo")),
+            SearchableSettingItem("Tam Ekran Yap", "Durum ve gezinme çubuklarını gizler", SettingsSection.APPEARANCE, Icons.Default.Fullscreen, listOf("statusbar", "odaklanma", "ekran")),
+            SearchableSettingItem("Alt Gezinme Barı Görünümü", "Yüzen ada kapsülü veya sabit alt bar", SettingsSection.APPEARANCE, Icons.Default.Layers, listOf("ada", "navigasyon", "bar")),
+            SearchableSettingItem("Tamamlananları Gizle", "Tamamlanan ödevler ana listede gizlensin", SettingsSection.HOMEWORK, Icons.Default.VisibilityOff, listOf("ödev", "gizle", "tamamlanan")),
+            SearchableSettingItem("2 Sütunlu Kılavuz (Grid)", "Notlar çift sütunlu düzen veya tek sütun liste", SettingsSection.NOTES, Icons.Default.GridView, listOf("not", "ızgara", "sütun", "liste")),
+            SearchableSettingItem("İşaretlenen Öğeleri En Alta Taşı", "Tamamlanan kontrol listesi maddeleri otomatik alta taşınsın", SettingsSection.NOTES, Icons.Default.Check, listOf("madde", "kontrol", "yapılacak")),
+            SearchableSettingItem("Tufi AI & API Anahtarı Ayarları", "DeepSeek / Gemini API anahtarı ve canlı model", SettingsSection.AI_AND_SPEECH, Icons.Default.AutoAwesome, listOf("ai", "yapay zeka", "tufi", "deepseek", "gemini", "api", "anahtar")),
+            SearchableSettingItem("Sesli Dikte (Whisper)", "Bulut ve çevrimdışı Whisper ses-yazı tanıma motoru", SettingsSection.AI_AND_SPEECH, Icons.Default.AutoAwesome, listOf("ses", "dikte", "whisper", "mikrofon", "konuşma", "çevrimdışı")),
+            SearchableSettingItem("Bulut Senkronizasyonu (Firebase)", "İnternet bağlantısı ve anlık senkronizasyon durumu", SettingsSection.DATA_AND_SYNC, Icons.Default.CloudSync, listOf("firebase", "bulut", "eşitleme", "online", "sync")),
+            SearchableSettingItem("JSON Veri Yedekleme & Geri Yükleme", "Ders, ödev ve notları JSON ile dışa/içe aktar", SettingsSection.DATA_AND_SYNC, Icons.Default.CloudDownload, listOf("yedek", "json", "dışa aktar", "içe aktar", "export", "import")),
+            SearchableSettingItem("Firebase Veritabanı Sıfırlama", "Buluttaki verileri silme veya demo yükleme", SettingsSection.DATA_AND_SYNC, Icons.Default.DeleteForever, listOf("sıfırla", "sil", "temizle", "firestore")),
+            SearchableSettingItem("Geliştirici Ayarları & Teşhis Paneli", "Firebase logları, sistem teşhis raporu", SettingsSection.ADVANCED, Icons.Default.DeveloperMode, listOf("dev", "teşhis", "log", "hata", "bağlantı")),
+            SearchableSettingItem("Çökme & BSOD Testi", "Windows temalı mavi ekran ve hata logu testi", SettingsSection.ADVANCED, Icons.Default.ErrorOutline, listOf("çökme", "crash", "bsod", "test")),
+            SearchableSettingItem("Uygulama Hakkında", "TufiDESK sürümü ve geliştirici modu", SettingsSection.ABOUT, Icons.Default.Info, listOf("sürüm", "version", "tufidesk", "hakkında", "bilgi"))
+        )
+    }
+
+    val filteredSearchResults = remember(searchQuery) {
+        if (searchQuery.isBlank()) {
+            emptyList()
+        } else {
+            val q = searchQuery.trim().lowercase()
+            searchableItems.filter { item ->
+                item.title.lowercase().contains(q) ||
+                item.subtitle.lowercase().contains(q) ||
+                item.section.title.lowercase().contains(q) ||
+                item.keywords.any { it.contains(q) }
             }
-            pInfo.versionName ?: "1.0.0"
-        } catch (_: Exception) {
-            "1.0.0"
         }
     }
 
+    // Geliştirici ayarları tam ekranı açıksa
     if (showDeveloperSettingsScreen) {
         BackHandler { showDeveloperSettingsScreen = false }
         DeveloperSettingsContent(
@@ -285,425 +331,1002 @@ fun SettingsScreen(
             onOpenDiagnosticsClick = { showDevOptionsDialog = true },
             modifier = modifier
         )
-    } else {
-        LazyColumn(
-            modifier = modifier
-                .fillMaxSize()
-                .testTag("settings_screen"),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-        // Section 0: User Profile
-        item {
-            SettingsCategoryCard(title = "Aktif Profil") {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        UserFlowerAvatar(
-                            user = currentUser,
-                            size = 56.dp,
-                            shape = RoundedCornerShape(16.dp),
-                            isSelected = true
-                        )
-                        Spacer(modifier = Modifier.width(14.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = currentUser?.name ?: "Kullanıcı",
-                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Öğrenci Hesabı",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
+        return
+    }
 
-                        OutlinedButton(
-                            onClick = onSwitchProfile,
-                            shape = RoundedCornerShape(12.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+    // Geri tuşu yönetimi: Kategori alt ekranındaysak ana ayarlara dön
+    BackHandler(enabled = selectedSection != null) {
+        selectedSection = null
+    }
+
+    // Kategori içerik lambda'sı
+    @Composable
+    fun RenderCategoryContent(section: SettingsSection) {
+        when (section) {
+            SettingsSection.PROFILE -> {
+                SettingsCategoryCard(title = "Aktif Profil") {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.SwapHoriz,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
+                            UserFlowerAvatar(
+                                user = currentUser,
+                                size = 56.dp,
+                                shape = RoundedCornerShape(16.dp),
+                                isSelected = true
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Değiştir", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
-                        }
-                    }
-                }
-            }
-        }
-
-        // Section 1: Appearance & Theme
-        item {
-            SettingsCategoryCard(title = "Görünüm ve Tema") {
-                val themeLabel = when (currentThemeMode) {
-                    "LIGHT" -> "Açık Tema"
-                    "DARK" -> "Koyu Tema"
-                    else -> "Sistem Teması (Otomatik)"
-                }
-                val themeIcon = when (currentThemeMode) {
-                    "LIGHT" -> Icons.Default.LightMode
-                    "DARK" -> Icons.Default.DarkMode
-                    else -> Icons.Default.BrightnessAuto
-                }
-
-                SettingsClickableItem(
-                    icon = themeIcon,
-                    title = "Uygulama Teması",
-                    subtitle = themeLabel,
-                    onClick = { showThemeDialog = true }
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                val currentOption = paletteOptions.find { it.id == currentColorPalette } ?: paletteOptions.first()
-                SettingsClickableItem(
-                    icon = Icons.Default.Palette,
-                    title = "Materyal Renk Paleti",
-                    subtitle = currentOption.name,
-                    onClick = { showPaletteDialog = true }
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                SettingsSwitchItem(
-                    icon = if (isFullScreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
-                    title = "Tam Ekran Yap",
-                    subtitle = "Durum ve gezinme çubuklarını gizleyerek odaklanmış tam ekran deneyimi sağlar",
-                    checked = isFullScreen,
-                    onCheckedChange = onFullScreenChange
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                SettingsSwitchItem(
-                    icon = if (floatingBottomBar) Icons.Default.Layers else Icons.Default.GridView,
-                    title = if (floatingBottomBar) "Yüzen Ada Alt Bar" else "Sabit Alt Bar",
-                    subtitle = if (floatingBottomBar) "Havada süzülen ada kapsülü görünümü (Açık: Yüzen Ada, Kapalı: Sabit Alt Bar)" else "Ekrana tam oturan standart sabit Material 3 alt gezinme çubuğu",
-                    checked = floatingBottomBar,
-                    onCheckedChange = onFloatingBottomBarChange
-                )
-            }
-        }
-
-        // Section 2: Homework Preferences
-        item {
-            SettingsCategoryCard(title = "Ödev Tercihleri") {
-                SettingsSwitchItem(
-                    icon = Icons.Default.VisibilityOff,
-                    title = "Tamamlananları Gizle",
-                    subtitle = "Tamamlanan ödevler ana listede gizlensin",
-                    checked = hideCompleted,
-                    onCheckedChange = onHideCompletedChange
-                )
-            }
-        }
-
-        // Section 2.2: Not Tercihleri
-        item {
-            SettingsCategoryCard(title = "Not Tercihleri") {
-                Column {
-                    SettingsSwitchItem(
-                        icon = Icons.Default.GridView,
-                        title = "2 Sütunlu Kılavuz (Grid)",
-                        subtitle = "Notlar çift sütunlu düzen veya tek sütun liste olarak gösterilsin",
-                        checked = isNoteGrid,
-                        onCheckedChange = onNoteGridChange
-                    )
-                    SettingsSwitchItem(
-                        icon = Icons.Default.Check,
-                        title = "İşaretlenen Öğeleri En Alta Taşı",
-                        subtitle = "Tamamlanan kontrol listesi maddeleri otomatik alta taşınsın",
-                        checked = moveCheckedToBottom,
-                        onCheckedChange = onMoveCheckedToBottomChange
-                    )
-                }
-            }
-        }
-
-        // Section 2.5: Cloud Sync (Firebase)
-        item {
-            SettingsCategoryCard(title = "Bulut Senkronizasyonu (Firebase)") {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = if (isOnline) Icons.Default.Wifi else Icons.Default.WifiOff,
-                                contentDescription = null,
-                                tint = if (isOnline) Color(0xFF10B981) else MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (isOnline) "İnternet Bağlantısı Aktif" else "Çevrimdışı Mod",
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        val syncStatusText = when (syncState) {
-                            SyncState.SYNCED -> "Eşitlendi"
-                            SyncState.SYNCING -> "Eşitleniyor..."
-                            SyncState.ERROR -> "Hata"
-                            SyncState.OFFLINE -> "Çevrimdışı"
-                            SyncState.IDLE -> "Hazır"
-                        }
-                        val syncStatusColor = when (syncState) {
-                            SyncState.SYNCED -> Color(0xFF10B981)
-                            SyncState.SYNCING -> Color(0xFFF59E0B)
-                            SyncState.ERROR -> MaterialTheme.colorScheme.error
-                            SyncState.OFFLINE -> MaterialTheme.colorScheme.onSurfaceVariant
-                            SyncState.IDLE -> MaterialTheme.colorScheme.primary
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = syncStatusColor.copy(alpha = 0.15f)
-                        ) {
-                            Text(
-                                text = syncStatusText,
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = syncStatusColor),
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-
-                    if (syncState == SyncState.ERROR && syncErrorMessage != null) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.Top) {
-                                Icon(
-                                    imageVector = Icons.Default.Warning,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = syncErrorMessage,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                    text = currentUser?.name ?: "Kullanıcı",
+                                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
+                                Text(
+                                    text = "Öğrenci Hesabı",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            OutlinedButton(
+                                onClick = onSwitchProfile,
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.SwapHoriz,
+                                    contentDescription = "Profili Değiştir",
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Değiştir", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
                             }
                         }
                     }
+                }
+            }
+            SettingsSection.APPEARANCE -> {
+                SettingsCategoryCard(title = "Görünüm ve Tema") {
+                    val themeLabel = when (currentThemeMode) {
+                        "LIGHT" -> "Açık Tema"
+                        "DARK" -> "Koyu Tema"
+                        else -> "Sistem Teması (Otomatik)"
+                    }
+                    val themeIcon = when (currentThemeMode) {
+                        "LIGHT" -> Icons.Default.LightMode
+                        "DARK" -> Icons.Default.DarkMode
+                        else -> Icons.Default.BrightnessAuto
+                    }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    SettingsClickableItem(
+                        icon = themeIcon,
+                        title = "Uygulama Teması",
+                        subtitle = themeLabel,
+                        onClick = { showThemeDialog = true }
+                    )
 
-                    Button(
-                        onClick = onManualSync,
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    val currentOption = paletteOptions.find { it.id == currentColorPalette } ?: paletteOptions.first()
+                    SettingsClickableItem(
+                        icon = Icons.Default.Palette,
+                        title = "Materyal Renk Paleti",
+                        subtitle = currentOption.name,
+                        onClick = { showPaletteDialog = true }
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    SettingsSwitchItem(
+                        icon = if (isFullScreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                        title = "Tam Ekran Yap",
+                        subtitle = "Durum ve gezinme çubuklarını gizleyerek odaklanmış tam ekran deneyimi sağlar",
+                        checked = isFullScreen,
+                        onCheckedChange = onFullScreenChange
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    SettingsSwitchItem(
+                        icon = if (floatingBottomBar) Icons.Default.Layers else Icons.Default.GridView,
+                        title = if (floatingBottomBar) "Yüzen Ada Alt Bar" else "Sabit Alt Bar",
+                        subtitle = if (floatingBottomBar) "Havada süzülen ada kapsülü görünümü (Açık: Yüzen Ada, Kapalı: Sabit Alt Bar)" else "Ekrana tam oturan standart sabit Material 3 alt gezinme çubuğu",
+                        checked = floatingBottomBar,
+                        onCheckedChange = onFloatingBottomBarChange
+                    )
+                }
+            }
+            SettingsSection.HOMEWORK -> {
+                SettingsCategoryCard(title = "Ödev Tercihleri") {
+                    SettingsSwitchItem(
+                        icon = Icons.Default.VisibilityOff,
+                        title = "Tamamlananları Gizle",
+                        subtitle = "Tamamlanan ödevler ana listede gizlensin",
+                        checked = hideCompleted,
+                        onCheckedChange = onHideCompletedChange
+                    )
+                }
+            }
+            SettingsSection.NOTES -> {
+                SettingsCategoryCard(title = "Not Tercihleri") {
+                    Column {
+                        SettingsSwitchItem(
+                            icon = Icons.Default.GridView,
+                            title = "2 Sütunlu Kılavuz (Grid)",
+                            subtitle = "Notlar çift sütunlu düzen veya tek sütun liste olarak gösterilsin",
+                            checked = isNoteGrid,
+                            onCheckedChange = onNoteGridChange
                         )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CloudSync,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Şimdi Bulut ile Eşitle",
-                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                        SettingsSwitchItem(
+                            icon = Icons.Default.Check,
+                            title = "İşaretlenen Öğeleri En Alta Taşı",
+                            subtitle = "Tamamlanan kontrol listesi maddeleri otomatik alta taşınsın",
+                            checked = moveCheckedToBottom,
+                            onCheckedChange = onMoveCheckedToBottomChange
                         )
                     }
                 }
             }
-        }
+            SettingsSection.AI_AND_SPEECH -> {
+                val isAiConfigured = remember { TufiAIService.isApiKeyConfigured(context) }
 
-        // Section: Tufi AI & Yapay Zeka Ayarları
-        item {
-            var showAiSettingsDialog by remember { mutableStateOf(false) }
-            val isAiConfigured = remember { TufiAIService.isApiKeyConfigured(context) }
+                SettingsCategoryCard(title = "Yapay Zeka (Tufi AI)") {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { showAiSettingsDialog = true },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = if (isAiConfigured) Color(0xFF10B981).copy(alpha = 0.15f) else Color(0xFFF59E0B).copy(alpha = 0.18f),
+                                modifier = Modifier.size(38.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.AutoAwesome,
+                                        contentDescription = "Tufi AI Durumu",
+                                        tint = if (isAiConfigured) Color(0xFF059669) else Color(0xFFD97706),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Tufi AI & API Anahtarı Ayarları",
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                                )
+                                Text(
+                                    text = if (isAiConfigured) "🟢 Canlı API Bağlantısı Aktif" else "⚠️ API Anahtarı Tanımlı Değil (Çevrimdışı Mod)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (isAiConfigured) Color(0xFF065F46) else Color(0xFF92400E)
+                                )
+                            }
+                            Text(
+                                text = "Düzenle ❯",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
 
-            SettingsCategoryCard(title = "Yapay Zeka (Tufi AI)") {
-                Column(modifier = Modifier.padding(14.dp)) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Sesli Dikte (Bulut Whisper & Çevrimdışı Whisper)
+                SpeechSettingsSection()
+            }
+            SettingsSection.DATA_AND_SYNC -> {
+                SettingsCategoryCard(title = "Bulut Senkronizasyonu (Firebase)") {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (isOnline) Icons.Default.Wifi else Icons.Default.WifiOff,
+                                    contentDescription = if (isOnline) "İnternet aktif" else "İnternet yok",
+                                    tint = if (isOnline) Color(0xFF10B981) else MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isOnline) "İnternet Bağlantısı Aktif" else "Çevrimdışı Mod",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+
+                            val syncStatusText = when (syncState) {
+                                SyncState.SYNCED -> "Eşitlendi"
+                                SyncState.SYNCING -> "Eşitleniyor..."
+                                SyncState.ERROR -> "Hata"
+                                SyncState.OFFLINE -> "Çevrimdışı"
+                                SyncState.IDLE -> "Hazır"
+                            }
+                            val syncStatusColor = when (syncState) {
+                                SyncState.SYNCED -> Color(0xFF10B981)
+                                SyncState.SYNCING -> Color(0xFFF59E0B)
+                                SyncState.ERROR -> MaterialTheme.colorScheme.error
+                                SyncState.OFFLINE -> MaterialTheme.colorScheme.onSurfaceVariant
+                                SyncState.IDLE -> MaterialTheme.colorScheme.primary
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = syncStatusColor.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    text = syncStatusText,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = syncStatusColor),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+
+                        if (syncState == SyncState.ERROR && syncErrorMessage != null) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.Top) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = "Senkronizasyon uyarısı",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = syncErrorMessage,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Button(
+                            onClick = onManualSync,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CloudSync,
+                                contentDescription = "Bulut ile Eşitle",
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Şimdi Bulut ile Eşitle",
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // JSON Yedekleme & Geri Yükleme Kartı
+                SettingsCategoryCard(title = "📦 JSON Veri Yedekleme & Geri Yükleme") {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = !isExportingJson) {
+                                    isExportingJson = true
+                                    onExportFirebaseJson { success, result ->
+                                        isExportingJson = false
+                                        if (success) {
+                                            exportedJsonText = result
+                                            showExportJsonDialog = true
+                                        } else {
+                                            Toast.makeText(context, result, Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudDownload,
+                                    contentDescription = "Verileri Dışa Aktar",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Verileri Dışa Aktar (JSON)",
+                                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "Tüm ders, ödev ve not verilerini JSON formatında dışa aktarın veya paylaşın.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                if (isExportingJson) {
+                                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                }
+                            }
+                        }
+
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.25f)),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.35f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    importJsonInput = ""
+                                    showImportJsonDialog = true
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudUpload,
+                                    contentDescription = "Verileri İçe Aktar",
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Verileri İçe Aktar (JSON)",
+                                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.secondary
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "JSON yedeğini yapıştırarak veritabanına geri yükleyin.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            SettingsSection.ADVANCED -> {
+                SettingsCategoryCard(title = "Gelişmiş Seçenekler") {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .clickable { showAiSettingsDialog = true },
+                            .clickable { showDeveloperSettingsScreen = true }
+                            .padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = if (isAiConfigured) Color(0xFF10B981).copy(alpha = 0.15f) else Color(0xFFF59E0B).copy(alpha = 0.18f),
-                            modifier = Modifier.size(38.dp)
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.AutoAwesome,
-                                    contentDescription = null,
-                                    tint = if (isAiConfigured) Color(0xFF059669) else Color(0xFFD97706),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Default.DeveloperMode,
+                                contentDescription = "Geliştirici Modu",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(14.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Tufi AI & API Anahtarı Ayarları",
-                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                                text = "Geliştirici Ayarları Paneli",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
                             )
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = if (isAiConfigured) "🟢 Canlı API Bağlantısı Aktif" else "⚠️ API Anahtarı Tanımlı Değil (Çevrimdışı Mod)",
+                                text = "Firebase sıfırlama, tam temizlik, test verileri ve gelişmiş araçlar",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = if (isAiConfigured) Color(0xFF065F46) else Color(0xFF92400E)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        Text(
-                            text = "Düzenle ❯",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.primary
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = "Geliştirici Ayarlarını Aç",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
-            }
 
-            if (showAiSettingsDialog) {
-                TufiAISettingsDialog(
-                    onDismiss = { showAiSettingsDialog = false }
-                )
-            }
-        }
+                Spacer(modifier = Modifier.height(16.dp))
 
-        // Section: Sesli Dikte (Bulut Whisper & Çevrimdışı Whisper)
-        item {
-            SpeechSettingsSection()
-        }
-
-        // Section 3: About
-        item {
-            SettingsCategoryCard(title = "Uygulama Hakkında") {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable {
-                            if (!isDeveloperModeActive) {
-                                versionTapCount++
-                                if (versionTapCount >= 5) {
-                                    isDeveloperModeActive = true
-                                    Toast.makeText(context, "🎉 Geliştirici Seçenekleri Aktif Edildi!", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    val remaining = 5 - versionTapCount
-                                    Toast.makeText(context, "Geliştirici modu için $remaining dokunuş kaldı", Toast.LENGTH_SHORT).show()
-                                }
-                            } else {
-                                showDevOptionsDialog = true
-                            }
-                        }
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(14.dp))
-                    Column(modifier = Modifier.weight(1f)) {
+                SettingsCategoryCard(title = "🔍 Teşhis & Test") {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                         Text(
-                            text = "TufiDESK",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            text = "Bağlantı & Senkronizasyon Teşhis Paneli",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Sürüm $appVersion • Material Design 3",
+                            text = "Firebase bağlantı testleri, hata logları, paket bilgileri ve sistem teşhis raporu.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    }
-                    if (isDeveloperModeActive) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.padding(start = 8.dp)
+                        OutlinedButton(
+                            onClick = { showDevOptionsDialog = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
                         ) {
-                            Text(
-                                text = "DEV",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
+                            Icon(imageVector = Icons.Default.BugReport, contentDescription = "Teşhis Raporu", modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Teşhis Raporunu Görüntüle", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                SettingsCategoryCard(title = "💥 Çökme & BSOD Ekranı Testi") {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = ":( Windows BSOD & Hata Ekranı",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            ),
+                            color = Color(0xFF0078D7)
+                        )
+                        Text(
+                            text = "Çökme ekranını ve Windows temalı log kopyalama arayüzünü görmek için manuel olarak çökme tetikleyebilirsiniz.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Button(
+                            onClick = {
+                                CrashActivity.start(
+                                    context,
+                                    RuntimeException("MANUEL GELİŞTİRİCİ ÇÖKME TESTİ:\nKullanıcı Geliştirici Ayarlarından BSOD ekranını test etmek için manuel çökme tetikledi.\nHata Kodu: STATUS_SYSTEM_PROCESS_TERMINATED (0xC000021A)\nModül: com.example.ui.screens.SettingsScreen")
+                                )
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0078D7)),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(imageVector = Icons.Default.ErrorOutline, contentDescription = "BSOD Testi", modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Manuel Çökmeyi Başlat (BSOD Test)", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
-        }
-
-        // Section: Geliştirici Ayarları Giriş Kartı
-        item {
-            SettingsCategoryCard(title = "Gelişmiş Seçenekler") {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { showDeveloperSettingsScreen = true }
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
+            SettingsSection.ABOUT -> {
+                SettingsCategoryCard(title = "Uygulama Hakkında") {
+                    Row(
                         modifier = Modifier
-                            .size(42.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer),
-                        contentAlignment = Alignment.Center
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable {
+                                if (!isDeveloperModeActive) {
+                                    versionTapCount++
+                                    if (versionTapCount >= 5) {
+                                        isDeveloperModeActive = true
+                                        Toast.makeText(context, "🎉 Geliştirici Seçenekleri Aktif Edildi!", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        val remaining = 5 - versionTapCount
+                                        Toast.makeText(context, "Geliştirici modu için $remaining dokunuş kaldı", Toast.LENGTH_SHORT).show()
+                                    }
+                                } else {
+                                    showDevOptionsDialog = true
+                                }
+                            }
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = Icons.Default.DeveloperMode,
-                            contentDescription = null,
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Uygulama Bilgisi",
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(24.dp)
                         )
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "TufiDESK",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Sürüm $appVersion • Material Design 3",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (isDeveloperModeActive) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier.padding(start = 8.dp)
+                            ) {
+                                Text(
+                                    text = "DEV",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
                     }
-                    Spacer(modifier = Modifier.width(14.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Geliştirici Ayarları",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Firebase sıfırlama, demo veriler, JSON içe/dışa aktar",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            }
+        }
+    }
+
+    // Arama Çubuğu Composable
+    @Composable
+    fun SearchBarHeader(modifier: Modifier = Modifier) {
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            placeholder = { Text("Ayarlarda ara...", style = MaterialTheme.typography.bodyMedium) },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = "Arama",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            trailingIcon = {
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { searchQuery = "" }) {
+                        Icon(
+                            imageVector = Icons.Default.Clear,
+                            contentDescription = "Aramayı Temizle",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = "Geliştirici Ayarlarını Aç",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
+                }
+            },
+            shape = RoundedCornerShape(28.dp),
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+            )
+        )
+    }
+
+    // Kategori Listesi Composable
+    @Composable
+    fun CategoryListPane(
+        selectedSectionName: String?,
+        onSectionClick: (SettingsSection) -> Unit,
+        modifier: Modifier = Modifier
+    ) {
+        LazyColumn(
+            modifier = modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(SettingsSection.entries.toTypedArray()) { section ->
+                val isSelected = selectedSectionName == section.name
+                val containerColor = if (isSelected) {
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                }
+
+                Card(
+                    onClick = { onSectionClick(section) },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = containerColor),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    ListItem(
+                        headlineContent = {
+                            Text(
+                                text = section.title,
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                            )
+                        },
+                        supportingContent = {
+                            Text(
+                                text = section.subtitle,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        leadingContent = {
+                            Surface(
+                                shape = CircleShape,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier.size(42.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = section.icon,
+                                        contentDescription = section.title,
+                                        tint = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
+                        },
+                        trailingContent = {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = "Aç",
+                                tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                     )
                 }
             }
         }
     }
-}
 
-    // Theme Mode Dialog
+    // Arama Sonuçları Paneli Composable
+    @Composable
+    fun SearchResultsPane(
+        results: List<SearchableSettingItem>,
+        onResultClick: (SettingsSection) -> Unit,
+        modifier: Modifier = Modifier
+    ) {
+        if (results.isEmpty()) {
+            Box(
+                modifier = modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Sonuç yok",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Sonuç bulunamadı",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "\"$searchQuery\" ile eşleşen bir ayar bulunamadı.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(results) { item ->
+                    Card(
+                        onClick = {
+                            searchQuery = ""
+                            onResultClick(item.section)
+                        },
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    text = item.title,
+                                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
+                                )
+                            },
+                            supportingContent = {
+                                Column {
+                                    Text(
+                                        text = item.subtitle,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                    ) {
+                                        Text(
+                                            text = item.section.title,
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            },
+                            leadingContent = {
+                                Icon(
+                                    imageVector = item.icon,
+                                    contentDescription = item.title,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            },
+                            trailingContent = {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = "Git",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // Genişlik Tespiti (Tablet / Telefon ayrımı)
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val isExpandedTablet = maxWidth >= 680.dp
+
+        if (isExpandedTablet) {
+            // TABLET DÜZENİ: İki bölmeli (Sol kategori listesi, Sağ seçili kategori içeriği)
+            val currentTabletSection = selectedSection?.let { sName ->
+                try { SettingsSection.valueOf(sName) } catch (_: Exception) { SettingsSection.PROFILE }
+            } ?: SettingsSection.PROFILE
+
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = {
+                            Text(
+                                text = "Ayarlar",
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                            )
+                        },
+                        actions = {
+                            IconButton(onClick = { selectedSection = SettingsSection.ABOUT.name }) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = "Uygulama Hakkında",
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        )
+                    )
+                }
+            ) { innerPadding ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                ) {
+                    SearchBarHeader()
+
+                    if (searchQuery.isNotBlank()) {
+                        SearchResultsPane(
+                            results = filteredSearchResults,
+                            onResultClick = { section -> selectedSection = section.name }
+                        )
+                    } else {
+                        Row(modifier = Modifier.fillMaxSize()) {
+                            // Sol Sütun: Kategoriler (Genişliği 320-380 dp)
+                            Box(
+                                modifier = Modifier
+                                    .width(340.dp)
+                                    .fillMaxHeight()
+                            ) {
+                                CategoryListPane(
+                                    selectedSectionName = currentTabletSection.name,
+                                    onSectionClick = { section -> selectedSection = section.name }
+                                )
+                            }
+
+                            // Dikey ayırıcı çizgi
+                            Box(
+                                modifier = Modifier
+                                    .width(1.dp)
+                                    .fillMaxHeight()
+                                    .background(MaterialTheme.colorScheme.outlineVariant)
+                            )
+
+                            // Sağ Sütun: Seçili Kategori İçeriği (Geniş ekranda maks 800 dp ortalanmış)
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .padding(horizontal = 24.dp, vertical = 12.dp)
+                            ) {
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .widthIn(max = 800.dp)
+                                        .align(Alignment.TopCenter),
+                                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                                    contentPadding = PaddingValues(bottom = 32.dp)
+                                ) {
+                                    item {
+                                        Text(
+                                            text = currentTabletSection.title,
+                                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.padding(bottom = 8.dp)
+                                        )
+                                    }
+                                    item {
+                                        RenderCategoryContent(currentTabletSection)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // TELEFON DÜZENİ: İki seviyeli (Ana Ekran -> Kategori Alt Ekranı)
+            AnimatedContent(
+                targetState = selectedSection,
+                transitionSpec = {
+                    if (targetState != null) {
+                        (slideInHorizontally { width -> width } + fadeIn()).togetherWith(
+                            slideOutHorizontally { width -> -width } + fadeOut()
+                        )
+                    } else {
+                        (slideInHorizontally { width -> -width } + fadeIn()).togetherWith(
+                            slideOutHorizontally { width -> width } + fadeOut()
+                        )
+                    }
+                },
+                label = "SettingsScreenNavigation"
+            ) { targetSectionName ->
+                if (targetSectionName == null) {
+                    // 1. ANA AYARLAR EKRANI
+                    Scaffold(
+                        topBar = {
+                            TopAppBar(
+                                title = {
+                                    Text(
+                                        text = "Ayarlar",
+                                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                                    )
+                                },
+                                actions = {
+                                    IconButton(onClick = { selectedSection = SettingsSection.ABOUT.name }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Info,
+                                            contentDescription = "Uygulama Hakkında",
+                                            tint = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                },
+                                colors = TopAppBarDefaults.topAppBarColors(
+                                    containerColor = MaterialTheme.colorScheme.surface
+                                )
+                            )
+                        }
+                    ) { innerPadding ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(innerPadding)
+                        ) {
+                            SearchBarHeader()
+
+                            if (searchQuery.isNotBlank()) {
+                                SearchResultsPane(
+                                    results = filteredSearchResults,
+                                    onResultClick = { section -> selectedSection = section.name }
+                                )
+                            } else {
+                                CategoryListPane(
+                                    selectedSectionName = null,
+                                    onSectionClick = { section -> selectedSection = section.name }
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    // 2. KATEGORİ ALT EKRANI
+                    val section = try {
+                        SettingsSection.valueOf(targetSectionName)
+                    } catch (_: Exception) {
+                        SettingsSection.PROFILE
+                    }
+
+                    Scaffold(
+                        topBar = {
+                            TopAppBar(
+                                title = {
+                                    Text(
+                                        text = section.title,
+                                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                                    )
+                                },
+                                navigationIcon = {
+                                    IconButton(onClick = { selectedSection = null }) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                            contentDescription = "Ayarlara Geri Dön",
+                                            tint = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                },
+                                colors = TopAppBarDefaults.topAppBarColors(
+                                    containerColor = MaterialTheme.colorScheme.surface
+                                )
+                            )
+                        }
+                    ) { innerPadding ->
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(innerPadding)
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            contentPadding = PaddingValues(bottom = 32.dp)
+                        ) {
+                            item {
+                                RenderCategoryContent(section)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ==========================================
+    // DIALOGLAR (Mevcut Mantık Korundu)
+    // ==========================================
+
+    // 1. Tema Modu Dialogu
     if (showThemeDialog) {
         AlertDialog(
             onDismissRequest = { showThemeDialog = false },
@@ -737,7 +1360,7 @@ fun SettingsScreen(
                             if (currentThemeMode == mode) {
                                 Icon(
                                     imageVector = Icons.Default.Check,
-                                    contentDescription = null,
+                                    contentDescription = "Seçili",
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
@@ -753,7 +1376,7 @@ fun SettingsScreen(
         )
     }
 
-    // Material Color Palette Selection Dialog
+    // 2. Materyal Renk Paleti Dialogu
     if (showPaletteDialog) {
         AlertDialog(
             onDismissRequest = { showPaletteDialog = false },
@@ -782,7 +1405,6 @@ fun SettingsScreen(
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Color Preview Swatch
                             if (option.isDynamic) {
                                 Box(
                                     modifier = Modifier
@@ -793,7 +1415,7 @@ fun SettingsScreen(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.AutoAwesome,
-                                        contentDescription = null,
+                                        contentDescription = "Dinamik Sistem",
                                         tint = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(18.dp)
                                     )
@@ -835,7 +1457,7 @@ fun SettingsScreen(
                             if (isSelected) {
                                 Icon(
                                     imageVector = Icons.Default.Check,
-                                    contentDescription = null,
+                                    contentDescription = "Seçili",
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
@@ -851,7 +1473,7 @@ fun SettingsScreen(
         )
     }
 
-    // Developer Options & Sync Diagnostics Dialog
+    // 3. Teşhis Paneli Dialogu
     if (showDevOptionsDialog) {
         val isFirebaseInitialized = remember(context) {
             try {
@@ -899,7 +1521,7 @@ fun SettingsScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.BugReport,
-                        contentDescription = null,
+                        contentDescription = "Hata Raporu",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(24.dp)
                     )
@@ -914,7 +1536,6 @@ fun SettingsScreen(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Firebase Card
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = if (isFirebaseInitialized) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
@@ -945,7 +1566,6 @@ fun SettingsScreen(
                         }
                     }
 
-                    // Network & Sync State
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
@@ -967,7 +1587,6 @@ fun SettingsScreen(
                         }
                     }
 
-                    // Error Log / Analysis
                     if (!syncErrorMessage.isNullOrBlank()) {
                         Surface(
                             shape = RoundedCornerShape(12.dp),
@@ -991,36 +1610,6 @@ fun SettingsScreen(
                         }
                     }
 
-                    // Recommendations
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(
-                                text = "💡 Teşhis & Çözüm İpucu:",
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            val advice = when {
-                                !isFirebaseInitialized -> "GitHub Actions ile derlenen APK'ya google-services.json dosyası eklenmemiş. GitHub reponuza veya GitHub Secret olarak google-services.json ekleyin."
-                                syncErrorMessage?.contains("PERMISSION_DENIED", ignoreCase = true) == true -> "Firebase Console > Firestore > Kurallar (Rules) sekmesinde izinleri 'allow read, write: if true;' olarak güncelleyin."
-                                syncErrorMessage?.contains("NOT_FOUND", ignoreCase = true) == true -> "Firebase projenizde Cloud Firestore henüz oluşturulmamış. Firebase Console'dan 'Create database' yapın."
-                                syncErrorMessage?.contains("UNAVAILABLE", ignoreCase = true) == true -> "Firestore sunucularına ulaşılamadı. Farklı bir Wi-Fi veya mobil internet ile tekrar deneyin."
-                                !isOnline -> "Cihazınızda internet bağlantısı yok. Yerel Room veritabanı aktif şekilde çalışıyor."
-                                else -> "Firebase ve senkronizasyon sağlıklı çalışıyor. Herhangi bir blokaj yok."
-                            }
-                            Text(
-                                text = advice,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        }
-                    }
-
-                    // Actions
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1035,7 +1624,7 @@ fun SettingsScreen(
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(10.dp)
                         ) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.ContentCopy, contentDescription = "Kopyala", modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Kopyala", style = MaterialTheme.typography.labelMedium)
                         }
@@ -1048,7 +1637,7 @@ fun SettingsScreen(
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(10.dp)
                         ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Refresh, contentDescription = "Test Et", modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Test Et", style = MaterialTheme.typography.labelMedium)
                         }
@@ -1066,7 +1655,7 @@ fun SettingsScreen(
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(Icons.Default.ErrorOutline, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.ErrorOutline, contentDescription = "BSOD", modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("💥 Manuel Çökme & BSOD Testi", fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                     }
@@ -1092,14 +1681,14 @@ fun SettingsScreen(
         )
     }
 
-    // 0. Clear All Firebase Confirmation Dialog (Tamamen Sil ve Boşalt)
+    // 4. Clear All Firebase Dialog
     if (showClearFirebaseAllConfirmDialog) {
         AlertDialog(
             onDismissRequest = { if (!isClearingFirebase) showClearFirebaseAllConfirmDialog = false },
             icon = {
                 Icon(
                     imageVector = Icons.Default.DeleteForever,
-                    contentDescription = null,
+                    contentDescription = "Tümünü Sil",
                     tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(36.dp)
                 )
@@ -1159,14 +1748,14 @@ fun SettingsScreen(
         )
     }
 
-    // 1. Reset Firebase Confirmation Dialog
+    // 5. Reset Firebase Dialog
     if (showResetFirebaseConfirmDialog) {
         AlertDialog(
             onDismissRequest = { if (!isResettingFirebase) showResetFirebaseConfirmDialog = false },
             icon = {
                 Icon(
                     imageVector = Icons.Default.Warning,
-                    contentDescription = null,
+                    contentDescription = "Sıfırla",
                     tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(36.dp)
                 )
@@ -1185,7 +1774,7 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Ardından uygulama için gerekli ve geçerli kurallara (haftalık Pazar teslimatlı ödevler, dersler, notlar) sahip temiz demo veriler Firebase'e yüklenecektir.",
+                        text = "Ardından uygulama için gerekli temiz demo veriler Firebase'e yüklenecektir.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1226,14 +1815,14 @@ fun SettingsScreen(
         )
     }
 
-    // 2. Export JSON Dialog
+    // 6. Export JSON Dialog
     if (showExportJsonDialog) {
         AlertDialog(
             onDismissRequest = { showExportJsonDialog = false },
             icon = {
                 Icon(
                     imageVector = Icons.Default.CloudDownload,
-                    contentDescription = null,
+                    contentDescription = "Dışa Aktar",
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(36.dp)
                 )
@@ -1294,7 +1883,7 @@ fun SettingsScreen(
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(10.dp)
                         ) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.ContentCopy, contentDescription = "Kopyala", modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Kopyala", style = MaterialTheme.typography.labelSmall)
                         }
@@ -1315,7 +1904,7 @@ fun SettingsScreen(
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(10.dp)
                         ) {
-                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Share, contentDescription = "Paylaş", modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Paylaş", style = MaterialTheme.typography.labelSmall)
                         }
@@ -1330,14 +1919,14 @@ fun SettingsScreen(
         )
     }
 
-    // 3. Import JSON Dialog
+    // 7. Import JSON Dialog
     if (showImportJsonDialog) {
         AlertDialog(
             onDismissRequest = { if (!isImportingJson) showImportJsonDialog = false },
             icon = {
                 Icon(
                     imageVector = Icons.Default.CloudUpload,
-                    contentDescription = null,
+                    contentDescription = "İçe Aktar",
                     tint = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.size(36.dp)
                 )
@@ -1373,7 +1962,7 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Icon(Icons.Default.ContentPaste, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.ContentPaste, contentDescription = "Panodan Yapıştır", modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Panodan Yapıştır", style = MaterialTheme.typography.labelMedium)
                     }
@@ -1430,7 +2019,18 @@ fun SettingsScreen(
             }
         )
     }
+
+    // 8. Tufi AI Ayarları Dialogu
+    if (showAiSettingsDialog) {
+        TufiAISettingsDialog(
+            onDismiss = { showAiSettingsDialog = false }
+        )
+    }
 }
+
+// ==========================================
+// YARDIMCI BİLEŞENLER
+// ==========================================
 
 @Composable
 private fun SettingsCategoryCard(
@@ -1491,6 +2091,12 @@ private fun SettingsClickableItem(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            modifier = Modifier.size(16.dp)
+        )
     }
 }
 
@@ -1506,7 +2112,6 @@ private fun SettingsSwitchItem(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable { onCheckedChange(!checked) }
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1552,7 +2157,7 @@ fun DeveloperSettingsContent(
     onOpenDiagnosticsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
 
     Column(
         modifier = modifier
