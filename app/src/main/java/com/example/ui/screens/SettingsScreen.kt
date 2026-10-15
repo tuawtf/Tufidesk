@@ -320,6 +320,13 @@ fun SettingsScreen(
             description = "Sıcak kehribar ve sonbahar tonları",
             primaryColor = Color(0xFF865300),
             secondaryColor = Color(0xFF705B40)
+        ),
+        MaterialPaletteOption(
+            id = "TWILIGHT",
+            name = "Twilight Sparkle",
+            description = "Lila, gece mavisi ve ışıltılı pembe tonları",
+            primaryColor = Color(0xFFD491EA),
+            secondaryColor = Color(0xFF243870)
         )
     )
 

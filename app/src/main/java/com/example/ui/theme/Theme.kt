@@ -34,6 +34,7 @@ fun MyApplicationTheme(
         colorPalette == "ROSE" -> if (isDark) RoseDark else RoseLight
         colorPalette == "FOREST" -> if (isDark) ForestDark else ForestLight
         colorPalette == "AMBER" -> if (isDark) AmberDark else AmberLight
+        colorPalette == "TWILIGHT" -> if (isDark) TwilightSparkleDark else TwilightSparkleLight
         else -> if (isDark) IndigoDark else IndigoLight
     }
 

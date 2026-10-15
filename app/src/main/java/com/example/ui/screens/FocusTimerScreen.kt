@@ -104,6 +104,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
@@ -182,6 +183,8 @@ private fun TimerBottomIslandNavigation(
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
+    val configuration = LocalConfiguration.current
+    val isTablet = configuration.screenWidthDp >= 600 || configuration.smallestScreenWidthDp >= 600
 
     Box(
         modifier = modifier
@@ -214,42 +217,44 @@ private fun TimerBottomIslandNavigation(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // EN SOLDA ÖZEL FARKLI TASARIMLI ARAÇLAR BUTONU (Yazısız, sadece kompakt ikon)
-                Surface(
-                    shape = RoundedCornerShape(22.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.85f),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(22.dp))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = ripple(bounded = true),
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onBackToTools()
-                            }
-                        )
-                        .testTag("timer_back_to_tools_button")
-                ) {
-                    Box(
-                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 10.dp),
-                        contentAlignment = Alignment.Center
+                // EN SOLDA ÖZEL FARKLI TASARIMLI ARAÇLAR BUTONU (Sadece telefon modunda gösterilir, tablet için gizlenir)
+                if (!isTablet) {
+                    Surface(
+                        shape = RoundedCornerShape(22.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.85f),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(22.dp))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = ripple(bounded = true),
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onBackToTools()
+                                }
+                            )
+                            .testTag("timer_back_to_tools_button")
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.GridView,
-                            contentDescription = "Araçlar Menüsü",
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Box(
+                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.GridView,
+                                contentDescription = "Araçlar Menüsü",
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
-                }
 
-                // İnce Dikey Ayırıcı
-                Box(
-                    modifier = Modifier
-                        .height(24.dp)
-                        .width(1.dp)
-                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                )
+                    // İnce Dikey Ayırıcı
+                    Box(
+                        modifier = Modifier
+                            .height(24.dp)
+                            .width(1.dp)
+                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    )
+                }
 
                 // 1. KRONOMETRE
                 IslandBottomNavItem(

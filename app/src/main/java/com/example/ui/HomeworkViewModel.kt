@@ -762,7 +762,7 @@ class HomeworkViewModel(
     }
 
     val themeMode = MutableStateFlow("SYSTEM") // "SYSTEM", "LIGHT", "DARK"
-    val colorPalette = MutableStateFlow("DYNAMIC") // "DYNAMIC", "INDIGO", "TEAL", "VIOLET", "ROSE", "FOREST", "AMBER"
+    val colorPalette = MutableStateFlow("DYNAMIC") // "DYNAMIC", "INDIGO", "TEAL", "VIOLET", "ROSE", "FOREST", "AMBER", "TWILIGHT"
     val hideCompleted = MutableStateFlow(false)
 
     fun setThemeMode(mode: String) {
