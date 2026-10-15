@@ -45,6 +45,21 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowDropUp
+import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.HourglassTop
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.surfaceColorAtElevation
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.example.Screen
 import com.example.data.firebase.SyncState
 import com.example.data.model.UserAccount
@@ -63,6 +78,11 @@ fun TabletIslandNavigation(
     onSyncClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
     onSwitchProfile: () -> Unit = {},
+    isSettingsOpen: Boolean = false,
+    onSettingsClick: () -> Unit = {},
+    activeTool: String? = null,
+    onSelectTool: (String) -> Unit = {},
+    currentRoute: String = Screen.Home.route,
     modifier: Modifier = Modifier
 ) {
     // Floating Island Navigation Card (Ada şeklinde sol menü)
@@ -159,25 +179,129 @@ fun TabletIslandNavigation(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
+                var isToolsMenuOpen by remember { mutableStateOf(false) }
+
                 // Navigation Items List
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     navItems.forEachIndexed { index, screen ->
-                        val isSelected = currentTab == index
+                        val isSelected = !isSettingsOpen && currentTab == index && currentRoute == screen.route
                         TabletNavItem(
                             icon = if (isSelected) screen.selectedIcon else screen.unselectedIcon,
                             label = screen.title,
                             isSelected = isSelected,
-                            onClick = { onTabSelected(index) },
+                            onClick = {
+                                isToolsMenuOpen = false
+                                onTabSelected(index)
+                            },
                             testTag = "tablet_nav_item_${screen.route}"
                         )
+                    }
+
+                    // Araçlar Açılır Menüsü (Tablet için doğrudan araçlar listesi)
+                    val isToolsActive = !isSettingsOpen && (currentRoute == Screen.Tools.route || currentRoute == Screen.Notes.route || currentRoute == Screen.Exams.route || currentRoute == Screen.Timer.route)
+
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        TabletNavItem(
+                            icon = if (isToolsActive) Icons.Filled.GridView else Icons.Outlined.GridView,
+                            label = "Araçlar",
+                            isSelected = isToolsActive,
+                            trailingIcon = if (isToolsMenuOpen) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                            onClick = { isToolsMenuOpen = !isToolsMenuOpen },
+                            testTag = "tablet_nav_item_tools"
+                        )
+
+                        DropdownMenu(
+                            expanded = isToolsMenuOpen,
+                            onDismissRequest = { isToolsMenuOpen = false },
+                            modifier = Modifier
+                                .width(202.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp))
+                        ) {
+                            val isNotesActive = isToolsActive && activeTool == "notes"
+                            val isExamsActive = isToolsActive && activeTool == "exams"
+                            val isTimerActive = isToolsActive && activeTool == "timer"
+
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = "Notlar",
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontWeight = if (isNotesActive) FontWeight.Bold else FontWeight.Medium
+                                        ),
+                                        color = if (isNotesActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Description,
+                                        contentDescription = "Notlar",
+                                        tint = if (isNotesActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                },
+                                onClick = {
+                                    isToolsMenuOpen = false
+                                    onSelectTool("notes")
+                                },
+                                modifier = Modifier.testTag("tablet_menu_item_notes")
+                            )
+
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = "Deneme Sınavları",
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontWeight = if (isExamsActive) FontWeight.Bold else FontWeight.Medium
+                                        ),
+                                        color = if (isExamsActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Assessment,
+                                        contentDescription = "Deneme Sınavları",
+                                        tint = if (isExamsActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                },
+                                onClick = {
+                                    isToolsMenuOpen = false
+                                    onSelectTool("exams")
+                                },
+                                modifier = Modifier.testTag("tablet_menu_item_exams")
+                            )
+
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = "Sayaç & Odak",
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontWeight = if (isTimerActive) FontWeight.Bold else FontWeight.Medium
+                                        ),
+                                        color = if (isTimerActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.HourglassTop,
+                                        contentDescription = "Sayaç & Odak",
+                                        tint = if (isTimerActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                },
+                                onClick = {
+                                    isToolsMenuOpen = false
+                                    onSelectTool("timer")
+                                },
+                                modifier = Modifier.testTag("tablet_menu_item_timer")
+                            )
+                        }
                     }
                 }
             }
 
-            // Bottom Island: User Profile & Sync Status
+            // Bottom Island: User Profile, Sync Status & Settings Button
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -267,6 +391,15 @@ fun TabletIslandNavigation(
                         }
                     }
                 }
+
+                // Tablet Paneli En Altında Ayarlar Butonu
+                TabletNavItem(
+                    icon = if (isSettingsOpen) Icons.Filled.Settings else Icons.Outlined.Settings,
+                    label = "Ayarlar",
+                    isSelected = isSettingsOpen,
+                    onClick = onSettingsClick,
+                    testTag = "tablet_nav_item_settings"
+                )
             }
         }
     }
@@ -278,7 +411,8 @@ fun TabletNavItem(
     label: String,
     isSelected: Boolean,
     onClick: () -> Unit,
-    testTag: String
+    testTag: String,
+    trailingIcon: ImageVector? = null
 ) {
     val bgColor by animateColorAsState(
         targetValue = if (isSelected) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent,
@@ -314,8 +448,17 @@ fun TabletNavItem(
                 style = MaterialTheme.typography.bodyMedium.copy(
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                 ),
-                color = contentColor
+                color = contentColor,
+                modifier = Modifier.weight(1f)
             )
+            if (trailingIcon != null) {
+                Icon(
+                    imageVector = trailingIcon,
+                    contentDescription = null,
+                    tint = contentColor.copy(alpha = 0.8f),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
     }
 }

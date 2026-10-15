@@ -262,6 +262,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val isOnline by viewModel.isOnline.collectAsStateWithLifecycle()
     val syncState by viewModel.syncState.collectAsStateWithLifecycle()
+    val lastSyncTime by viewModel.lastSyncTime.collectAsStateWithLifecycle()
     val syncErrorMessage by viewModel.syncErrorMessage.collectAsStateWithLifecycle()
     val adminAssignedFilter by viewModel.adminAssignedFilter.collectAsStateWithLifecycle()
 
@@ -381,12 +382,18 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
     val isTufiActive = (selectedScreen == Screen.TufiAI)
     val isCustomBottomBarActive = isTimerActive || isNotesActive || isTufiActive
 
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isTabletLayout = configuration.screenWidthDp >= 600
+
     // Handle back button on sub-tabs
     BackHandler(enabled = isSettingsOpen) {
         isSettingsOpen = false
     }
     BackHandler(enabled = !isSettingsOpen && activeTool != null) {
         activeTool = null
+        if (isTabletLayout) {
+            currentRoute = Screen.Home.route
+        }
     }
     BackHandler(enabled = !isSettingsOpen && activeTool == null && currentRoute != Screen.Home.route) {
         currentRoute = Screen.Home.route
@@ -440,7 +447,9 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
             currentUser = currentUser,
             isOnline = isOnline,
             syncState = syncState,
+            lastSyncTime = lastSyncTime,
             syncErrorMessage = syncErrorMessage,
+            onClose = { isSettingsOpen = false },
             onManualSync = {
                 viewModel.syncCloudNow()
                 if (!isOnline) {
@@ -661,6 +670,9 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     }
 
                     Screen.Tools -> {
+                        if (isTabletLayout && activeTool == null) {
+                            activeTool = "notes"
+                        }
                         when (activeTool) {
                             "notes" -> {
                                 NotesScreen(
@@ -699,6 +711,9 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                                     },
                                     onBackToTools = {
                                         activeTool = null
+                                        if (isTabletLayout) {
+                                            currentRoute = Screen.Home.route
+                                        }
                                     },
                                     canManage = canManage,
                                     currentUser = currentUser,
@@ -737,6 +752,9 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                                 FocusTimerScreen(
                                     onBackToTools = {
                                         activeTool = null
+                                        if (isTabletLayout) {
+                                            currentRoute = Screen.Home.route
+                                        }
                                     },
                                     onNotify = { msg ->
                                         showNotification(msg, IslandNotificationType.SUCCESS, "Sayaç & Odak")
@@ -803,6 +821,15 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
 
         if (isTablet) {
             // TABLET MODE: Left Floating Island Dock + Right Content Area
+            val tabletNavItems = remember {
+                listOf(
+                    Screen.Home,
+                    Screen.Calendar,
+                    Screen.TufiAI,
+                    Screen.Stats
+                )
+            }
+
             Surface(
                 modifier = Modifier.fillMaxSize(),
                 color = MaterialTheme.colorScheme.background
@@ -810,15 +837,19 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                 Row(modifier = Modifier.fillMaxSize()) {
                     // Left Island Menu
                     TabletIslandNavigation(
-                        currentTab = currentTab,
+                        currentTab = tabletNavItems.indexOfFirst { it.route == currentRoute },
                         onTabSelected = { index ->
-                            navItems.getOrNull(index)?.let { currentRoute = it.route }
+                            isSettingsOpen = false
+                            tabletNavItems.getOrNull(index)?.let {
+                                currentRoute = it.route
+                                activeTool = null
+                            }
                         },
                         onAddHomeworkClick = {
                             homeworkToEdit = null
                             showAddEditHomeworkDialog = true
                         },
-                        navItems = navItems,
+                        navItems = tabletNavItems,
                         showAddAction = canManage,
                         currentUser = currentUser,
                         isOnline = isOnline,
@@ -836,7 +867,18 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                         },
                         onSwitchProfile = {
                             showSwitchProfileDialog = true
-                        }
+                        },
+                        isSettingsOpen = isSettingsOpen,
+                        onSettingsClick = {
+                            isSettingsOpen = !isSettingsOpen
+                        },
+                        activeTool = activeTool,
+                        onSelectTool = { toolKey ->
+                            isSettingsOpen = false
+                            currentRoute = Screen.Tools.route
+                            activeTool = toolKey
+                        },
+                        currentRoute = currentRoute
                     )
 
                     // Right Content Scaffold
@@ -846,7 +888,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                             .weight(1f),
                         snackbarHost = {},
                         topBar = {
-                            if (!isTufiActive || isSettingsOpen) {
+                            if (!isSettingsOpen && !isTufiActive) {
                                 TopAppBar(
                                     title = {
                                         Text(
@@ -854,75 +896,59 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                                         )
                                     },
-                                navigationIcon = {
-                                    if (isSettingsOpen) {
-                                        IconButton(onClick = { isSettingsOpen = false }) {
-                                            Icon(
-                                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                                contentDescription = "Geri"
-                                            )
+                                    navigationIcon = {
+                                        if (activeTool != null) {
+                                            IconButton(onClick = {
+                                                activeTool = null
+                                                currentRoute = Screen.Home.route
+                                            }) {
+                                                Icon(
+                                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                                    contentDescription = "Ana Sayfaya Dön"
+                                                )
+                                            }
                                         }
-                                    } else if (currentTab == 3 && activeTool != null) {
-                                        IconButton(onClick = { activeTool = null }) {
-                                            Icon(
-                                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                                contentDescription = "Araçlara Dön"
-                                            )
+                                    },
+                                    actions = {
+                                        if (!isSettingsOpen && currentTab == 0 && selectedCourseFilter != null) {
+                                            IconButton(onClick = { viewModel.setCourseFilter(null) }) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Close,
+                                                    contentDescription = "Filtreyi Kaldır"
+                                                )
+                                            }
                                         }
-                                    }
-                                },
-                                actions = {
-                                    if (!isSettingsOpen && currentTab == 0 && selectedCourseFilter != null) {
-                                        IconButton(onClick = { viewModel.setCourseFilter(null) }) {
-                                            Icon(
-                                                imageVector = Icons.Default.Close,
-                                                contentDescription = "Filtreyi Kaldır"
-                                            )
-                                        }
-                                    }
 
-                                    IconButton(onClick = {
-                                        viewModel.syncCloudNow()
-                                        if (!isOnline) {
-                                            showNotification("Çevrimdışı mod: İnternet bağlantısı bekleniyor", IslandNotificationType.WARNING, "Bağlantı")
-                                        } else if (syncState == SyncState.ERROR && syncErrorMessage != null) {
-                                            showNotification("Hata: $syncErrorMessage", IslandNotificationType.ERROR, "Senkronizasyon")
-                                        } else {
-                                            showNotification("Bulut senkronizasyonu başlatıldı...", IslandNotificationType.INFO, "Senkronizasyon")
+                                        IconButton(onClick = {
+                                            viewModel.syncCloudNow()
+                                            if (!isOnline) {
+                                                showNotification("Çevrimdışı mod: İnternet bağlantısı bekleniyor", IslandNotificationType.WARNING, "Bağlantı")
+                                            } else if (syncState == SyncState.ERROR && syncErrorMessage != null) {
+                                                showNotification("Hata: $syncErrorMessage", IslandNotificationType.ERROR, "Senkronizasyon")
+                                            } else {
+                                                showNotification("Bulut senkronizasyonu başlatıldı...", IslandNotificationType.INFO, "Senkronizasyon")
+                                            }
+                                        }) {
+                                            val syncIcon = when {
+                                                !isOnline -> Icons.Default.CloudOff
+                                                syncState == SyncState.SYNCED -> Icons.Default.CloudDone
+                                                syncState == SyncState.ERROR -> Icons.Default.CloudOff
+                                                else -> Icons.Default.Sync
+                                            }
+                                            val syncColor = when {
+                                                !isOnline || syncState == SyncState.ERROR -> MaterialTheme.colorScheme.error
+                                                syncState == SyncState.SYNCED -> MaterialTheme.colorScheme.primary
+                                                else -> MaterialTheme.colorScheme.tertiary
+                                            }
+                                            Icon(imageVector = syncIcon, contentDescription = "Eşitle", tint = syncColor)
                                         }
-                                    }) {
-                                        val syncIcon = when {
-                                            !isOnline -> Icons.Default.CloudOff
-                                            syncState == SyncState.SYNCED -> Icons.Default.CloudDone
-                                            syncState == SyncState.ERROR -> Icons.Default.CloudOff
-                                            else -> Icons.Default.Sync
-                                        }
-                                        val syncColor = when {
-                                            !isOnline || syncState == SyncState.ERROR -> MaterialTheme.colorScheme.error
-                                            syncState == SyncState.SYNCED -> MaterialTheme.colorScheme.primary
-                                            else -> MaterialTheme.colorScheme.tertiary
-                                        }
-                                        Icon(imageVector = syncIcon, contentDescription = "Eşitle", tint = syncColor)
-                                    }
-
-                                    // Ayarlar butonu (Bulut simgesinin sağı)
-                                    IconButton(
-                                        onClick = { isSettingsOpen = !isSettingsOpen },
-                                        modifier = Modifier.testTag("tablet_top_bar_settings_button")
-                                    ) {
-                                        Icon(
-                                            imageVector = if (isSettingsOpen) Icons.Filled.Settings else Icons.Outlined.Settings,
-                                            contentDescription = "Ayarlar",
-                                            tint = if (isSettingsOpen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                },
-                                colors = TopAppBarDefaults.topAppBarColors(
-                                    containerColor = MaterialTheme.colorScheme.background
+                                    },
+                                    colors = TopAppBarDefaults.topAppBarColors(
+                                        containerColor = MaterialTheme.colorScheme.background
+                                    )
                                 )
-                            )
-                        }
-                    },
+                            }
+                        },
                         containerColor = MaterialTheme.colorScheme.background
                     ) { innerPadding ->
                         Box(
@@ -942,7 +968,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                 contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 snackbarHost = {},
                 topBar = {
-                    if (!isTufiActive || isSettingsOpen) {
+                    if (!isSettingsOpen && !isTufiActive) {
                         TopAppBar(
                             title = {
                                 Text(
@@ -951,14 +977,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                                 )
                             },
                         navigationIcon = {
-                            if (isSettingsOpen) {
-                                IconButton(onClick = { isSettingsOpen = false }) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                        contentDescription = "Geri"
-                                    )
-                                }
-                            } else if (currentTab == 3 && activeTool != null) {
+                            if (currentTab == 3 && activeTool != null) {
                                 IconButton(onClick = { activeTool = null }) {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,

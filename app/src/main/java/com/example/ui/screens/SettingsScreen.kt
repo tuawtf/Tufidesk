@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -73,6 +74,9 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.WifiOff
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -113,6 +117,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.example.CrashActivity
 import com.example.data.ai.TufiAIService
 import com.example.data.firebase.SyncState
@@ -123,6 +131,12 @@ import com.example.ui.screens.settings.SearchableSettingItem
 import com.example.ui.screens.settings.SettingsSection
 import com.example.ui.screens.speech.SpeechSettingsSection
 import com.google.firebase.FirebaseApp
+
+sealed class UpdateCheckResult {
+    data class NewVersion(val version: String, val releaseUrl: String) : UpdateCheckResult()
+    data class UpToDate(val version: String) : UpdateCheckResult()
+    data class Error(val message: String) : UpdateCheckResult()
+}
 
 data class MaterialPaletteOption(
     val id: String,
@@ -153,7 +167,9 @@ fun SettingsScreen(
     onSelectProfile: (UserAccount) -> Unit = {},
     isOnline: Boolean = true,
     syncState: SyncState = SyncState.IDLE,
+    lastSyncTime: Long? = null,
     syncErrorMessage: String? = null,
+    onClose: () -> Unit = {},
     onManualSync: () -> Unit = {},
     onLogout: () -> Unit = {},
     canManage: Boolean = true,
@@ -168,6 +184,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val appVersion = remember(context) {
         try {
             val pInfo = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -179,6 +196,47 @@ fun SettingsScreen(
             pInfo.versionName ?: "1.0.0"
         } catch (_: Exception) {
             "1.0.0"
+        }
+    }
+
+    // Güncelleme kontrolü durumu
+    var isCheckingUpdate by remember { mutableStateOf(false) }
+    var updateCheckResult by remember { mutableStateOf<UpdateCheckResult?>(null) }
+
+    fun checkForUpdates() {
+        isCheckingUpdate = true
+        coroutineScope.launch {
+            try {
+                val (latestTag, htmlUrl) = withContext(Dispatchers.IO) {
+                    val url = java.net.URL("https://api.github.com/repos/tuawtf/Tufidesk/releases/latest")
+                    val conn = url.openConnection() as java.net.HttpURLConnection
+                    conn.requestMethod = "GET"
+                    conn.setRequestProperty("Accept", "application/vnd.github.v3+json")
+                    conn.setRequestProperty("User-Agent", "Tufidesk-Android-App")
+                    conn.connectTimeout = 8000
+                    conn.readTimeout = 8000
+                    val responseCode = conn.responseCode
+                    if (responseCode == 200) {
+                        val stream = conn.inputStream.bufferedReader().use { it.readText() }
+                        val json = org.json.JSONObject(stream)
+                        val tagName = json.optString("tag_name", "").removePrefix("v").trim()
+                        val urlStr = json.optString("html_url", "https://github.com/tuawtf/Tufidesk/releases")
+                        Pair(tagName, urlStr)
+                    } else {
+                        throw Exception("Sunucu yanıt vermedi (Kod: $responseCode)")
+                    }
+                }
+                val currentClean = appVersion.removePrefix("v").trim()
+                if (latestTag.isNotEmpty() && latestTag != currentClean) {
+                    updateCheckResult = UpdateCheckResult.NewVersion(latestTag, htmlUrl)
+                } else {
+                    updateCheckResult = UpdateCheckResult.UpToDate(appVersion)
+                }
+            } catch (e: Exception) {
+                updateCheckResult = UpdateCheckResult.Error("Güncelleme kontrolü başarısız oldu: ${e.localizedMessage ?: "Bağlantı hatası"}")
+            } finally {
+                isCheckingUpdate = false
+            }
         }
     }
 
@@ -559,15 +617,38 @@ fun SettingsScreen(
                                 SyncState.IDLE -> MaterialTheme.colorScheme.primary
                             }
 
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = syncStatusColor.copy(alpha = 0.15f)
-                            ) {
-                                Text(
-                                    text = syncStatusText,
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = syncStatusColor),
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = syncStatusColor.copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        text = syncStatusText,
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = syncStatusColor),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+
+                                if (lastSyncTime != null && lastSyncTime > 0) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    val formattedLastSync = remember(lastSyncTime) {
+                                        val now = java.util.Calendar.getInstance()
+                                        val syncCal = java.util.Calendar.getInstance().apply { timeInMillis = lastSyncTime }
+                                        val timeFormat = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(lastSyncTime))
+                                        if (now.get(java.util.Calendar.YEAR) == syncCal.get(java.util.Calendar.YEAR) &&
+                                            now.get(java.util.Calendar.DAY_OF_YEAR) == syncCal.get(java.util.Calendar.DAY_OF_YEAR)) {
+                                            "Son eşitleme: bugün $timeFormat"
+                                        } else {
+                                            val dateFormat = java.text.SimpleDateFormat("dd MMM HH:mm", java.util.Locale.getDefault()).format(java.util.Date(lastSyncTime))
+                                            "Son eşitleme: $dateFormat"
+                                        }
+                                    }
+                                    Text(
+                                        text = formattedLastSync,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
 
@@ -890,6 +971,27 @@ fun SettingsScreen(
                             }
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    SettingsClickableItem(
+                        title = "Güncellemeleri Kontrol Et",
+                        subtitle = if (isCheckingUpdate) "Kontrol ediliyor..." else "En son sürümü GitHub üzerinden denetle",
+                        icon = Icons.Default.CloudDownload,
+                        onClick = { if (!isCheckingUpdate) checkForUpdates() }
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    SettingsClickableItem(
+                        title = "GitHub'da Görüntüle",
+                        subtitle = "tuawtf/Tufidesk açık kaynak projesi",
+                        icon = Icons.Default.Code,
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/tuawtf/Tufidesk"))
+                            context.startActivity(intent)
+                        }
+                    )
                 }
             }
         }
@@ -1236,6 +1338,15 @@ fun SettingsScreen(
                                         text = "Ayarlar",
                                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                                     )
+                                },
+                                navigationIcon = {
+                                    IconButton(onClick = onClose) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                            contentDescription = "Geri",
+                                            tint = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
                                 },
                                 actions = {
                                     IconButton(onClick = { selectedSection = SettingsSection.ABOUT.name }) {
@@ -2025,6 +2136,110 @@ fun SettingsScreen(
         TufiAISettingsDialog(
             onDismiss = { showAiSettingsDialog = false }
         )
+    }
+
+    // 9. Güncelleme Kontrolü Dialogu
+    updateCheckResult?.let { result ->
+        when (result) {
+            is UpdateCheckResult.NewVersion -> {
+                AlertDialog(
+                    onDismissRequest = { updateCheckResult = null },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.CloudDownload,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    title = {
+                        Text(
+                            text = "Yeni Sürüm Mevcut!",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                    },
+                    text = {
+                        Text(
+                            text = "TufiDESK v${result.version} yayınlandı.\nMevcut sürümünüz: v$appVersion.\n\nİndirmek için GitHub release sayfasını açabilirsiniz.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(result.releaseUrl))
+                                context.startActivity(intent)
+                                updateCheckResult = null
+                            }
+                        ) {
+                            Text("İndir")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { updateCheckResult = null }) {
+                            Text("Daha Sonra")
+                        }
+                    }
+                )
+            }
+            is UpdateCheckResult.UpToDate -> {
+                AlertDialog(
+                    onDismissRequest = { updateCheckResult = null },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = Color(0xFF10B981)
+                        )
+                    },
+                    title = {
+                        Text(
+                            text = "Uygulamanız Güncel",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                    },
+                    text = {
+                        Text(
+                            text = "En son sürümü (v${result.version}) kullanıyorsunuz.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { updateCheckResult = null }) {
+                            Text("Tamam")
+                        }
+                    }
+                )
+            }
+            is UpdateCheckResult.Error -> {
+                AlertDialog(
+                    onDismissRequest = { updateCheckResult = null },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.ErrorOutline,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    },
+                    title = {
+                        Text(
+                            text = "Güncelleme Kontrolü",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                    },
+                    text = {
+                        Text(
+                            text = result.message,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { updateCheckResult = null }) {
+                            Text("Tamam")
+                        }
+                    }
+                )
+            }
+        }
     }
 }
 
