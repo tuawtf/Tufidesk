@@ -53,9 +53,11 @@ class NotesRepository(
     }
 
     suspend fun seedInitialNotesIfNeeded(force: Boolean = false) = withContext(Dispatchers.IO) {
-        if (!force) return@withContext
-        clearAll()
-        val mathFolderId = noteDao.insertFolder(
+        if (force) {
+            clearAll()
+        }
+        if (force || noteDao.getNotesCount() == 0) {
+            val mathFolderId = noteDao.insertFolder(
                 NoteFolder(name = "Matematik", colorHex = "#1E88E5", iconName = "Calculate")
             )
             val scienceFolderId = noteDao.insertFolder(
@@ -103,7 +105,7 @@ class NotesRepository(
                     isPinned = true,
                     assignedTo = "Tuna",
                     type = NoteType.REPORT,
-                    reportData = "{\"examName\":\"TYT 1. Genel Deneme\",\"turkce\":{\"d\":33,\"y\":4},\"matematik\":{\"d\":29,\"y\":3},\"fen\":{\"d\":16,\"y\":2},\"sosyal\":{\"d\":17,\"y\":2},\"totalNet\":92.25}"
+                    reportData = """{"examName":"TYT 1. Genel Deneme","turkce":{"d":33,"y":4},"matematik":{"d":29,"y":3},"fen":{"d":16,"y":2},"sosyal":{"d":17,"y":2},"totalNet":92.25}"""
                 )
             )
 
