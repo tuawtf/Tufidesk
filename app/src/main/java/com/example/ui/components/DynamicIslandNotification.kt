@@ -253,23 +253,29 @@ fun DynamicIslandOverlay(
         }
     }
 
-    // Uyarı geldiğinde status bar'ı otomatik gizle; kapandığında eski haline getir
+    val isTablet = configuration.screenWidthDp >= 600 || configuration.smallestScreenWidthDp >= 600
+
+    // Uyarı geldiğinde status bar'ı otomatik gizle (telefonlar için); tabletler için devre dışı bırak
     val isIslandActive = isVisible || animProgress.value > 0.001f
-    DisposableEffect(isIslandActive, activity) {
-        activity?.window?.let { window ->
-            val insetsController = WindowCompat.getInsetsController(window, window.decorView)
-            if (isIslandActive) {
-                insetsController.hide(WindowInsetsCompat.Type.statusBars())
-                insetsController.systemBarsBehavior =
-                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            } else {
-                insetsController.show(WindowInsetsCompat.Type.statusBars())
+    DisposableEffect(isIslandActive, isTablet, activity) {
+        if (!isTablet) {
+            activity?.window?.let { window ->
+                val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+                if (isIslandActive) {
+                    insetsController.hide(WindowInsetsCompat.Type.statusBars())
+                    insetsController.systemBarsBehavior =
+                        WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                } else {
+                    insetsController.show(WindowInsetsCompat.Type.statusBars())
+                }
             }
         }
         onDispose {
-            activity?.window?.let { window ->
-                val insetsController = WindowCompat.getInsetsController(window, window.decorView)
-                insetsController.show(WindowInsetsCompat.Type.statusBars())
+            if (!isTablet) {
+                activity?.window?.let { window ->
+                    val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+                    insetsController.show(WindowInsetsCompat.Type.statusBars())
+                }
             }
         }
     }
@@ -335,11 +341,12 @@ fun DynamicIslandOverlay(
 
         // Kamera deliği eksenine göre yatay hizalama (-1f sol, 0f orta, 1f sağ)
         val horizontalBias = ((cutoutPivotX * 2f) - 1f).coerceIn(-0.85f, 0.85f)
+        val topPadding = if (isTablet) 38.dp else maxOf(cutoutTopDp, 10.dp)
 
         Box(
             modifier = modifier
                 .fillMaxWidth()
-                .padding(top = maxOf(cutoutTopDp, 10.dp), start = 16.dp, end = 16.dp),
+                .padding(top = topPadding, start = 16.dp, end = 16.dp),
             contentAlignment = BiasAlignment(horizontalBias, -1f)
         ) {
             Box(

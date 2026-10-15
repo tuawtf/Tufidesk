@@ -1221,91 +1221,61 @@ fun SettingsScreen(
                 try { SettingsSection.valueOf(sName) } catch (_: Exception) { SettingsSection.PROFILE }
             } ?: SettingsSection.PROFILE
 
-            Scaffold(
-                topBar = {
-                    TopAppBar(
-                        title = {
-                            Text(
-                                text = "Ayarlar",
-                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
-                            )
-                        },
-                        actions = {
-                            IconButton(onClick = { selectedSection = SettingsSection.ABOUT.name }) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = "Uygulama Hakkında",
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        )
-                    )
-                }
-            ) { innerPadding ->
-                Column(
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background
+            ) {
+                Row(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(innerPadding)
+                        .padding(top = 16.dp, bottom = 16.dp, end = 16.dp)
                 ) {
-                    SearchBarHeader()
-
-                    if (searchQuery.isNotBlank()) {
-                        SearchResultsPane(
-                            results = filteredSearchResults,
-                            onResultClick = { section -> selectedSection = section.name }
+                    // Sol Sütun: Kategoriler (Genişliği 320 dp)
+                    Box(
+                        modifier = Modifier
+                            .width(320.dp)
+                            .fillMaxHeight()
+                    ) {
+                        CategoryListPane(
+                            selectedSectionName = currentTabletSection.name,
+                            onSectionClick = { section -> selectedSection = section.name }
                         )
-                    } else {
-                        Row(modifier = Modifier.fillMaxSize()) {
-                            // Sol Sütun: Kategoriler (Genişliği 320-380 dp)
-                            Box(
-                                modifier = Modifier
-                                    .width(340.dp)
-                                    .fillMaxHeight()
-                            ) {
-                                CategoryListPane(
-                                    selectedSectionName = currentTabletSection.name,
-                                    onSectionClick = { section -> selectedSection = section.name }
+                    }
+
+                    // Dikey ayırıcı çizgi
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .fillMaxHeight()
+                            .padding(vertical = 8.dp)
+                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    )
+
+                    // Sağ Sütun: Seçili Kategori İçeriği (Geniş ekranda maks 800 dp ortalanmış)
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .padding(horizontal = 24.dp, vertical = 8.dp)
+                    ) {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .widthIn(max = 800.dp)
+                                .align(Alignment.TopCenter),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            contentPadding = PaddingValues(bottom = 32.dp)
+                        ) {
+                            item {
+                                Text(
+                                    text = currentTabletSection.title,
+                                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(bottom = 8.dp)
                                 )
                             }
-
-                            // Dikey ayırıcı çizgi
-                            Box(
-                                modifier = Modifier
-                                    .width(1.dp)
-                                    .fillMaxHeight()
-                                    .background(MaterialTheme.colorScheme.outlineVariant)
-                            )
-
-                            // Sağ Sütun: Seçili Kategori İçeriği (Geniş ekranda maks 800 dp ortalanmış)
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
-                                    .padding(horizontal = 24.dp, vertical = 12.dp)
-                            ) {
-                                LazyColumn(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .widthIn(max = 800.dp)
-                                        .align(Alignment.TopCenter),
-                                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                                    contentPadding = PaddingValues(bottom = 32.dp)
-                                ) {
-                                    item {
-                                        Text(
-                                            text = currentTabletSection.title,
-                                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            modifier = Modifier.padding(bottom = 8.dp)
-                                        )
-                                    }
-                                    item {
-                                        RenderCategoryContent(currentTabletSection)
-                                    }
-                                }
+                            item {
+                                RenderCategoryContent(currentTabletSection)
                             }
                         }
                     }

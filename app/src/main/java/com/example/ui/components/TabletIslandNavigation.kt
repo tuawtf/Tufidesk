@@ -133,51 +133,30 @@ fun TabletIslandNavigation(
                         )
                     }
                     Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            text = "TufiDESK",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Tablet Modu",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                if (showAddAction) {
-                    Spacer(modifier = Modifier.height(18.dp))
-
-                    // Primary Action Button (Yeni Ödev)
-                    Button(
-                        onClick = onAddHomeworkClick,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(46.dp)
-                            .testTag("tablet_add_homework_button"),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
+                    Text(
+                        text = "TUFI DESK",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
                         ),
-                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Yeni Ödev",
-                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
-                        )
-                    }
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Modern alt çizgi (<hr>) - kenarlarla birleşmeyen şık çizgi
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp)
+                        .height(1.5.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
 
                 var isToolsMenuOpen by remember { mutableStateOf(false) }
 
@@ -200,10 +179,10 @@ fun TabletIslandNavigation(
                         )
                     }
 
-                    // Araçlar Açılır Menüsü (Tablet için doğrudan araçlar listesi)
+                    // Araçlar Butonu (Geri açma/kapama oku ile)
                     val isToolsActive = !isSettingsOpen && (currentRoute == Screen.Tools.route || currentRoute == Screen.Notes.route || currentRoute == Screen.Exams.route || currentRoute == Screen.Timer.route)
 
-                    Box(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                         TabletNavItem(
                             icon = if (isToolsActive) Icons.Filled.GridView else Icons.Outlined.GridView,
                             label = "Araçlar",
@@ -213,143 +192,66 @@ fun TabletIslandNavigation(
                             testTag = "tablet_nav_item_tools"
                         )
 
-                        DropdownMenu(
-                            expanded = isToolsMenuOpen,
-                            onDismissRequest = { isToolsMenuOpen = false },
-                            modifier = Modifier
-                                .width(202.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp))
+                        // Panel üzerinde alt başlık gibi alta doğru açılan menüler (1 satır arayla)
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = isToolsMenuOpen,
+                            enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                            exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
                         ) {
-                            val isNotesActive = isToolsActive && activeTool == "notes"
-                            val isExamsActive = isToolsActive && activeTool == "exams"
-                            val isTimerActive = isToolsActive && activeTool == "timer"
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 12.dp, top = 8.dp, bottom = 4.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                val isNotesActive = isToolsActive && activeTool == "notes"
+                                val isExamsActive = isToolsActive && activeTool == "exams"
+                                val isTimerActive = isToolsActive && activeTool == "timer"
 
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        text = "Notlar",
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontWeight = if (isNotesActive) FontWeight.Bold else FontWeight.Medium
-                                        ),
-                                        color = if (isNotesActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                    )
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.Description,
-                                        contentDescription = "Notlar",
-                                        tint = if (isNotesActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                },
-                                onClick = {
-                                    isToolsMenuOpen = false
-                                    onSelectTool("notes")
-                                },
-                                modifier = Modifier.testTag("tablet_menu_item_notes")
-                            )
+                                TabletSubNavItem(
+                                    icon = Icons.Default.Description,
+                                    label = "Notlar",
+                                    isSelected = isNotesActive,
+                                    onClick = { onSelectTool("notes") },
+                                    testTag = "tablet_menu_item_notes"
+                                )
 
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        text = "Deneme Sınavları",
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontWeight = if (isExamsActive) FontWeight.Bold else FontWeight.Medium
-                                        ),
-                                        color = if (isExamsActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                    )
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.Assessment,
-                                        contentDescription = "Deneme Sınavları",
-                                        tint = if (isExamsActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                },
-                                onClick = {
-                                    isToolsMenuOpen = false
-                                    onSelectTool("exams")
-                                },
-                                modifier = Modifier.testTag("tablet_menu_item_exams")
-                            )
+                                TabletSubNavItem(
+                                    icon = Icons.Default.Assessment,
+                                    label = "Deneme Sınavları",
+                                    isSelected = isExamsActive,
+                                    onClick = { onSelectTool("exams") },
+                                    testTag = "tablet_menu_item_exams"
+                                )
 
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        text = "Sayaç & Odak",
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontWeight = if (isTimerActive) FontWeight.Bold else FontWeight.Medium
-                                        ),
-                                        color = if (isTimerActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                    )
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.HourglassTop,
-                                        contentDescription = "Sayaç & Odak",
-                                        tint = if (isTimerActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                },
-                                onClick = {
-                                    isToolsMenuOpen = false
-                                    onSelectTool("timer")
-                                },
-                                modifier = Modifier.testTag("tablet_menu_item_timer")
-                            )
+                                TabletSubNavItem(
+                                    icon = Icons.Default.HourglassTop,
+                                    label = "Sayaç & Odak",
+                                    isSelected = isTimerActive,
+                                    onClick = { onSelectTool("timer") },
+                                    testTag = "tablet_menu_item_timer"
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            // Bottom Island: User Profile, Sync Status & Settings Button
+            // Bottom Island: Ayarlar Butonu Üstte, Profil En Altta (Bulut eşitlendi kaldırıldı)
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Cloud Sync Pill (Clickable)
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { onSyncClick() }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        val syncIcon = when {
-                            !isOnline -> Icons.Default.CloudOff
-                            syncState == SyncState.SYNCED -> Icons.Default.CloudDone
-                            else -> Icons.Default.Sync
-                        }
-                        val syncColor = when {
-                            !isOnline -> MaterialTheme.colorScheme.error
-                            syncState == SyncState.SYNCED -> MaterialTheme.colorScheme.primary
-                            else -> MaterialTheme.colorScheme.tertiary
-                        }
-                        Icon(
-                            imageVector = syncIcon,
-                            contentDescription = null,
-                            tint = syncColor,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = when {
-                                !isOnline -> "Çevrimdışı Mod"
-                                syncState == SyncState.SYNCING -> "Eşitleniyor..."
-                                syncState == SyncState.SYNCED -> "Bulut Eşitlendi"
-                                else -> "Bulut Aktif"
-                            },
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+                // Tablet Paneli: Ayarlar Butonu (Profilin üstünde)
+                TabletNavItem(
+                    icon = if (isSettingsOpen) Icons.Filled.Settings else Icons.Outlined.Settings,
+                    label = "Ayarlar",
+                    isSelected = isSettingsOpen,
+                    onClick = onSettingsClick,
+                    testTag = "tablet_nav_item_settings"
+                )
 
-                // User Profile & Switch
+                // User Profile & Switch (En altta)
                 if (currentUser != null) {
                     Surface(
                         shape = RoundedCornerShape(14.dp),
@@ -391,15 +293,6 @@ fun TabletIslandNavigation(
                         }
                     }
                 }
-
-                // Tablet Paneli En Altında Ayarlar Butonu
-                TabletNavItem(
-                    icon = if (isSettingsOpen) Icons.Filled.Settings else Icons.Outlined.Settings,
-                    label = "Ayarlar",
-                    isSelected = isSettingsOpen,
-                    onClick = onSettingsClick,
-                    testTag = "tablet_nav_item_settings"
-                )
             }
         }
     }
@@ -462,3 +355,53 @@ fun TabletNavItem(
         }
     }
 }
+
+@Composable
+fun TabletSubNavItem(
+    icon: ImageVector,
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    testTag: String
+) {
+    val bgColor by animateColorAsState(
+        targetValue = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f) else Color.Transparent,
+        label = "subnav_bg"
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+        label = "subnav_content"
+    )
+
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = bgColor,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onClick() }
+            .testTag(testTag)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = contentColor,
+                modifier = Modifier.size(19.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    fontSize = 13.5.sp
+                ),
+                color = contentColor
+            )
+        }
+    }
+}
+

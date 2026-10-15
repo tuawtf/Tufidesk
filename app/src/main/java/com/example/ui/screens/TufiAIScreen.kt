@@ -697,7 +697,7 @@ fun TufiAIScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF000000).copy(alpha = screenContentAlpha.value)) // Animasyon bitene kadar saydam/geçişli!
+            .background(MaterialTheme.colorScheme.background.copy(alpha = screenContentAlpha.value)) // Animasyon bitene kadar saydam/geçişli!
             .testTag("tufi_ai_screen")
     ) {
         // ==========================================
@@ -721,7 +721,7 @@ fun TufiAIScreen(
                     modifier = Modifier
                         .size(42.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF212121))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
@@ -737,7 +737,7 @@ fun TufiAIScreen(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    ChatGptMenuIcon(color = Color.White)
+                    ChatGptMenuIcon(color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
@@ -747,7 +747,7 @@ fun TufiAIScreen(
                     modifier = Modifier
                         .height(42.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF212121))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -759,7 +759,7 @@ fun TufiAIScreen(
                         Icon(
                             imageVector = Icons.Default.Edit,
                             contentDescription = "Yeni Sohbet",
-                            tint = Color.White,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(19.dp)
                         )
                     }
@@ -773,7 +773,7 @@ fun TufiAIScreen(
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
                                 contentDescription = "Daha Fazla",
-                                tint = Color.White,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -781,10 +781,10 @@ fun TufiAIScreen(
                         DropdownMenu(
                             expanded = showTopMenu,
                             onDismissRequest = { showTopMenu = false },
-                            modifier = Modifier.background(Color(0xFF262626))
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
                         ) {
                             DropdownMenuItem(
-                                text = { Text("💬 Eski Sohbetler", color = Color.White) },
+                                text = { Text("💬 Eski Sohbetler", color = MaterialTheme.colorScheme.onSurface) },
                                 onClick = {
                                     showTopMenu = false
                                     pastSessions = TufiAIService.loadAllSessions(context)
@@ -792,14 +792,14 @@ fun TufiAIScreen(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Yeni Sohbet Başlat", color = Color.White) },
+                                text = { Text("Yeni Sohbet Başlat", color = MaterialTheme.colorScheme.onSurface) },
                                 onClick = {
                                     showTopMenu = false
                                     clearChat()
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("📋 Günlük Ödev Raporu", color = Color.White) },
+                                text = { Text("📋 Günlük Ödev Raporu", color = MaterialTheme.colorScheme.onSurface) },
                                 onClick = {
                                     showTopMenu = false
                                     showAdviceReportSheet = true
@@ -811,7 +811,7 @@ fun TufiAIScreen(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("⚙️ Tufi AI & API Ayarları", color = Color.White) },
+                                text = { Text("⚙️ Tufi AI & API Ayarları", color = MaterialTheme.colorScheme.onSurface) },
                                 onClick = {
                                     showTopMenu = false
                                     showApiKeyDialog = true
@@ -838,7 +838,7 @@ fun TufiAIScreen(
                             fontFamily = FontFamily.Serif,
                             fontWeight = FontWeight.Normal,
                             fontSize = 36.sp,
-                            color = Color(0xFFF3EFEA),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
                             letterSpacing = (-0.5).sp
                         )
                     )
@@ -855,20 +855,20 @@ fun TufiAIScreen(
                 ) {
                     items(chatMessages, key = { it.id }) { msg ->
                         if (msg.isUser) {
-                            // Kullanıcı Mesajı: Sağa hizalı, koyu mavi ChatGPT baloncuk
+                            // Kullanıcı Mesajı: Sağa hizalı, temayla uyumlu baloncuk
                             Box(
                                 modifier = Modifier.fillMaxWidth(),
                                 contentAlignment = Alignment.CenterEnd
                             ) {
                                 Surface(
                                     shape = RoundedCornerShape(22.dp),
-                                    color = Color(0xFF1E3A8A),
+                                    color = MaterialTheme.colorScheme.primaryContainer,
                                     modifier = Modifier.widthIn(max = 290.dp)
                                 ) {
                                     Text(
                                         text = msg.text,
                                         style = MaterialTheme.typography.bodyLarge.copy(
-                                            color = Color.White,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
                                             fontSize = 15.5.sp,
                                             lineHeight = 22.sp
                                         ),
@@ -881,7 +881,7 @@ fun TufiAIScreen(
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 TufiMarkdownText(
                                     markdownText = msg.text,
-                                    textColor = Color(0xFFECECEC)
+                                    textColor = MaterialTheme.colorScheme.onSurface
                                 )
 
                                 Spacer(modifier = Modifier.height(6.dp))
@@ -892,22 +892,22 @@ fun TufiAIScreen(
                                     horizontalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
                                     IconButton(onClick = { copyToClipboard(msg.text) }, modifier = Modifier.size(32.dp)) {
-                                        Icon(imageVector = Icons.Default.ContentCopy, contentDescription = "Kopyala", tint = Color(0xFF8E8E93), modifier = Modifier.size(16.dp))
+                                        Icon(imageVector = Icons.Default.ContentCopy, contentDescription = "Kopyala", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                                     }
                                     IconButton(onClick = { Toast.makeText(context, "Geri bildiriminiz için teşekkürler! 👍", Toast.LENGTH_SHORT).show() }, modifier = Modifier.size(32.dp)) {
-                                        Icon(imageVector = Icons.Outlined.ThumbUp, contentDescription = "Beğen", tint = Color(0xFF8E8E93), modifier = Modifier.size(16.dp))
+                                        Icon(imageVector = Icons.Outlined.ThumbUp, contentDescription = "Beğen", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                                     }
                                     IconButton(onClick = { Toast.makeText(context, "Geri bildirim kaydedildi.", Toast.LENGTH_SHORT).show() }, modifier = Modifier.size(32.dp)) {
-                                        Icon(imageVector = Icons.Outlined.ThumbDown, contentDescription = "Beğenme", tint = Color(0xFF8E8E93), modifier = Modifier.size(16.dp))
+                                        Icon(imageVector = Icons.Outlined.ThumbDown, contentDescription = "Beğenme", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                                     }
                                     IconButton(onClick = { speakText(msg.text) }, modifier = Modifier.size(32.dp)) {
-                                        Icon(imageVector = Icons.Default.VolumeUp, contentDescription = "Dinle", tint = Color(0xFF8E8E93), modifier = Modifier.size(17.dp))
+                                        Icon(imageVector = Icons.Default.VolumeUp, contentDescription = "Dinle", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(17.dp))
                                     }
                                     IconButton(onClick = { shareText(msg.text) }, modifier = Modifier.size(32.dp)) {
-                                        Icon(imageVector = Icons.Default.Share, contentDescription = "Paylaş", tint = Color(0xFF8E8E93), modifier = Modifier.size(16.dp))
+                                        Icon(imageVector = Icons.Default.Share, contentDescription = "Paylaş", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                                     }
                                     IconButton(onClick = { copyToClipboard(msg.text) }, modifier = Modifier.size(32.dp)) {
-                                        Icon(imageVector = Icons.Default.MoreVert, contentDescription = "Daha Fazla", tint = Color(0xFF8E8E93), modifier = Modifier.size(16.dp))
+                                        Icon(imageVector = Icons.Default.MoreVert, contentDescription = "Daha Fazla", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                                     }
                                 }
                             }
@@ -921,8 +921,8 @@ fun TufiAIScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 modifier = Modifier.padding(vertical = 6.dp)
                             ) {
-                                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = Color(0xFF2563EB))
-                                Text(text = "Tufi AI yanıtlıyor...", style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF8E8E93)))
+                                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
+                                Text(text = "Tufi AI yanıtlıyor...", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                             }
                         }
                     }
@@ -938,12 +938,12 @@ fun TufiAIScreen(
         val cornerDp = lerpDp(28.dp, 29.dp, barExpandProgress.value)
 
         val barBgColor by animateColorAsState(
-            targetValue = if (isTextbox || barExpandProgress.value > 0.5f) Color(0xFF212121) else MaterialTheme.colorScheme.surface,
+            targetValue = if (isTextbox || barExpandProgress.value > 0.5f) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
             animationSpec = tween(280),
             label = "bar_bg_color"
         )
         val barBorderColor by animateColorAsState(
-            targetValue = if (isTextbox || barExpandProgress.value > 0.5f) Color(0xFF383838) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+            targetValue = if (isTextbox || barExpandProgress.value > 0.5f) MaterialTheme.colorScheme.outlineVariant else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
             animationSpec = tween(280),
             label = "bar_border_color"
         )
@@ -994,7 +994,7 @@ fun TufiAIScreen(
                             modifier = Modifier.size(38.dp)
                         ) {
                             FourSquaresIcon(
-                                color = Color(0xFFB0B0B0),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 sizeDp = 18.dp
                             )
                         }
@@ -1004,7 +1004,7 @@ fun TufiAIScreen(
                             onClick = { showActionsSheet = true },
                             modifier = Modifier.size(36.dp)
                         ) {
-                            Icon(imageVector = Icons.Default.Add, contentDescription = "Öneriler & Ekle", tint = Color.White, modifier = Modifier.size(22.dp))
+                            Icon(imageVector = Icons.Default.Add, contentDescription = "Öneriler & Ekle", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
                         }
 
                         // Orta & Sağ: Kayıt Durumu / Transkripsiyon / Metin Giriş Alanı
@@ -1020,13 +1020,13 @@ fun TufiAIScreen(
                                     modifier = Modifier
                                         .size(10.dp)
                                         .clip(CircleShape)
-                                        .background(Color(0xFFEF4444))
+                                        .background(MaterialTheme.colorScheme.error)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = "Dinleniyor... $recordingTimeText",
                                     style = MaterialTheme.typography.bodyMedium.copy(
-                                        color = Color.White,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         fontWeight = FontWeight.Bold
                                     )
                                 )
@@ -1037,14 +1037,14 @@ fun TufiAIScreen(
                                 modifier = Modifier
                                     .size(36.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFFEF4444))
+                                    .background(MaterialTheme.colorScheme.error)
                                     .clickable { triggerVoiceInputFlow() },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Stop,
                                     contentDescription = "Kaydı Durdur",
-                                    tint = Color.White,
+                                    tint = MaterialTheme.colorScheme.onError,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -1059,12 +1059,12 @@ fun TufiAIScreen(
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(18.dp),
                                     strokeWidth = 2.dp,
-                                    color = Color.White
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text(
                                     text = "Yazıya çevriliyor...",
-                                    style = MaterialTheme.typography.bodyMedium.copy(color = Color.White)
+                                    style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface)
                                 )
                             }
                         } else {
@@ -1072,8 +1072,8 @@ fun TufiAIScreen(
                             BasicTextField(
                                 value = inputText,
                                 onValueChange = { inputText = it },
-                                textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White, fontSize = 15.sp),
-                                cursorBrush = SolidColor(Color.White),
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp),
+                                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                                 singleLine = false,
                                 maxLines = 4,
                                 keyboardOptions = KeyboardOptions(
@@ -1087,7 +1087,7 @@ fun TufiAIScreen(
                                     if (inputText.isBlank()) {
                                         Text(
                                             text = "Tufi AI'a sor...",
-                                            style = MaterialTheme.typography.bodyLarge.copy(color = Color(0xFF8E8E93), fontSize = 15.sp)
+                                            style = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 15.sp)
                                         )
                                     }
                                     innerTextField()
@@ -1097,14 +1097,14 @@ fun TufiAIScreen(
                             // Sağ: Mikrofon ve Mavi Dalga Ses Modu Butonu (Metin girilince Gönder oku)
                             if (inputText.isBlank()) {
                                 IconButton(onClick = { triggerVoiceInputFlow() }, modifier = Modifier.size(36.dp)) {
-                                    Icon(imageVector = Icons.Default.Mic, contentDescription = "Sesle Yaz", tint = Color.White, modifier = Modifier.size(21.dp))
+                                    Icon(imageVector = Icons.Default.Mic, contentDescription = "Sesle Yaz", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(21.dp))
                                 }
                                 Spacer(modifier = Modifier.width(2.dp))
                                 Box(
                                     modifier = Modifier
                                         .size(36.dp)
                                         .clip(CircleShape)
-                                        .background(Color(0xFF2563EB))
+                                        .background(MaterialTheme.colorScheme.primary)
                                         .clickable { triggerVoiceInputFlow() },
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -1115,11 +1115,11 @@ fun TufiAIScreen(
                                     modifier = Modifier
                                         .size(36.dp)
                                         .clip(CircleShape)
-                                        .background(Color.White)
+                                        .background(MaterialTheme.colorScheme.primary)
                                         .clickable { sendMessage(inputText) },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(imageVector = Icons.Default.ArrowUpward, contentDescription = "Gönder", tint = Color.Black, modifier = Modifier.size(19.dp))
+                                    Icon(imageVector = Icons.Default.ArrowUpward, contentDescription = "Gönder", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(19.dp))
                                 }
                             }
                         }
@@ -1149,8 +1149,8 @@ fun TufiAIScreen(
                                                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = (1f - tabsShrinkProgress.value).coerceIn(0f, 1f))
                                         )
                                         .padding(
-                                            horizontal = (12f * (1f - tabsShrinkProgress.value) + 4f).dp,
-                                            vertical = 6.dp
+                                             horizontal = (12f * (1f - tabsShrinkProgress.value) + 4f).dp,
+                                             vertical = 6.dp
                                         )
                                         .clickable {
                                             if (morphState == TufiBarMorphState.TABS) {
@@ -1180,7 +1180,7 @@ fun TufiAIScreen(
                                             )
                                         } else {
                                             FourSquaresIcon(
-                                                color = if (barBgColor == Color(0xFF212121)) Color.White else MaterialTheme.colorScheme.onPrimaryContainer,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer,
                                                 sizeDp = 18.dp
                                             )
                                         }
@@ -1277,7 +1277,7 @@ fun TufiAIScreen(
         if (showActionsSheet) {
             ModalBottomSheet(
                 onDismissRequest = { showActionsSheet = false },
-                containerColor = Color(0xFF1E1E1E),
+                containerColor = MaterialTheme.colorScheme.surface,
                 sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
             ) {
                 Column(
@@ -1290,7 +1290,7 @@ fun TufiAIScreen(
                         text = "Tufi AI Hızlı Araçlar",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     )
 
@@ -1305,7 +1305,7 @@ fun TufiAIScreen(
                     sheetActions.forEach { (title, subtitle) ->
                         Surface(
                             shape = RoundedCornerShape(14.dp),
-                            color = Color(0xFF2A2A2A),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
@@ -1322,14 +1322,14 @@ fun TufiAIScreen(
                                     text = title,
                                     style = MaterialTheme.typography.bodyLarge.copy(
                                         fontWeight = FontWeight.SemiBold,
-                                        color = Color.White
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = subtitle,
                                     style = MaterialTheme.typography.bodySmall.copy(
-                                        color = Color(0xFF9E9E9E)
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 )
                             }
@@ -1345,7 +1345,7 @@ fun TufiAIScreen(
         if (showAdviceReportSheet) {
             ModalBottomSheet(
                 onDismissRequest = { showAdviceReportSheet = false },
-                containerColor = Color(0xFF181818),
+                containerColor = MaterialTheme.colorScheme.surface,
                 sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
             ) {
                 Column(
@@ -1358,7 +1358,7 @@ fun TufiAIScreen(
                         text = "📋 Tufi AI Günlük Ödev Raporu",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     )
 
@@ -1369,7 +1369,7 @@ fun TufiAIScreen(
                                 .height(160.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            CircularProgressIndicator(color = Color(0xFF2563EB))
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                         }
                     } else {
                         val currentAdvice = advice ?: remember(homeworks) {
@@ -1378,41 +1378,41 @@ fun TufiAIScreen(
 
                         Surface(
                             shape = RoundedCornerShape(16.dp),
-                            color = Color(0xFF242424),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Text(
                                     text = currentAdvice.headline,
-                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = Color(0xFF60A5FA))
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text(text = currentAdvice.summary, color = Color(0xFFECECEC), fontSize = 14.sp)
+                                Text(text = currentAdvice.summary, color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp)
                             }
                         }
 
                         Surface(
                             shape = RoundedCornerShape(16.dp),
-                            color = Color(0xFF242424),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
-                                Text(text = "📅 Bugünkü Teslimler", fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(text = "📅 Bugünkü Teslimler", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text(text = currentAdvice.todayTasksInsight, color = Color(0xFFB0B0B0), fontSize = 13.5.sp)
+                                Text(text = currentAdvice.todayTasksInsight, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.5.sp)
                             }
                         }
 
                         Surface(
                             shape = RoundedCornerShape(16.dp),
-                            color = Color(0xFF242424),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
-                                Text(text = "🚀 Adım Adım Strateji", fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(text = "🚀 Adım Adım Strateji", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 Spacer(modifier = Modifier.height(6.dp))
                                 currentAdvice.stepByStepPlan.forEach { step ->
-                                    Text(text = "• $step", color = Color(0xFFECECEC), fontSize = 13.5.sp)
+                                    Text(text = "• $step", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.5.sp)
                                     Spacer(modifier = Modifier.height(2.dp))
                                 }
                             }
@@ -1633,7 +1633,7 @@ private fun ChatGptWaveformIcon(modifier: Modifier = Modifier) {
                     .width(2.2.dp)
                     .height(h)
                     .clip(CircleShape)
-                    .background(Color.White)
+                    .background(MaterialTheme.colorScheme.onPrimary)
             )
         }
     }

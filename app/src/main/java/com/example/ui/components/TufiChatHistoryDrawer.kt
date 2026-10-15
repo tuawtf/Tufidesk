@@ -126,7 +126,7 @@ fun TufiChatHistoryDrawer(
                     .fillMaxHeight()
                     .widthIn(max = 330.dp)
                     .fillMaxWidth(0.85f),
-                color = Color(0xFF0F1116)
+                color = MaterialTheme.colorScheme.surface
             ) {
                 Column(
                     modifier = Modifier
@@ -140,7 +140,7 @@ fun TufiChatHistoryDrawer(
                         text = "Conversations",
                         style = MaterialTheme.typography.headlineMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 28.sp
                         ),
                         modifier = Modifier.padding(top = 10.dp, bottom = 18.dp)
@@ -152,14 +152,14 @@ fun TufiChatHistoryDrawer(
                             .fillMaxWidth()
                             .height(46.dp)
                             .clip(RoundedCornerShape(23.dp))
-                            .background(Color(0xFF1B1E26))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
                             .padding(horizontal = 14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             imageVector = Icons.Default.Search,
                             contentDescription = "Search",
-                            tint = Color(0xFF7E8695),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(10.dp))
@@ -167,18 +167,18 @@ fun TufiChatHistoryDrawer(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
                             textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                color = Color.White,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 fontSize = 15.sp
                             ),
                             singleLine = true,
-                            cursorBrush = SolidColor(Color.White),
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                             modifier = Modifier.weight(1f),
                             decorationBox = { innerTextField ->
                                 if (searchQuery.isEmpty()) {
                                     Text(
                                         text = "Search conversations...",
                                         style = MaterialTheme.typography.bodyMedium.copy(
-                                            color = Color(0xFF7E8695),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             fontSize = 15.sp
                                         )
                                     )
@@ -194,7 +194,7 @@ fun TufiChatHistoryDrawer(
                                 Icon(
                                     imageVector = Icons.Default.Clear,
                                     contentDescription = "Clear",
-                                    tint = Color(0xFF7E8695),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
@@ -206,7 +206,7 @@ fun TufiChatHistoryDrawer(
                     // 3. Buton 1: Tasks (Koyu gri-mavi hap buton)
                     Surface(
                         shape = RoundedCornerShape(22.dp),
-                        color = Color(0xFF222B38),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(44.dp)
@@ -220,14 +220,14 @@ fun TufiChatHistoryDrawer(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.CompareArrows,
                                 contentDescription = "Tasks",
-                                tint = Color(0xFFCBD5E1),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(19.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "Tasks",
                                 style = MaterialTheme.typography.labelLarge.copy(
-                                    color = Color(0xFFCBD5E1),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 15.sp
                                 )
@@ -240,7 +240,7 @@ fun TufiChatHistoryDrawer(
                     // 4. Buton 2: + New Chat (Açık Mavi Pastel Hap Buton)
                     Surface(
                         shape = RoundedCornerShape(22.dp),
-                        color = Color(0xFF9EC5FE),
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(44.dp)
@@ -254,14 +254,14 @@ fun TufiChatHistoryDrawer(
                             Icon(
                                 imageVector = Icons.Default.Add,
                                 contentDescription = "New Chat",
-                                tint = Color(0xFF0F172A),
+                                tint = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "New Chat",
                                 style = MaterialTheme.typography.labelLarge.copy(
-                                    color = Color(0xFF0F172A),
+                                    color = MaterialTheme.colorScheme.onPrimary,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp
                                 )
@@ -288,7 +288,7 @@ fun TufiChatHistoryDrawer(
                                 ) {
                                     Text(
                                         text = if (searchQuery.isEmpty()) "Henüz kayıtlı bir sohbet yok." else "Aramaya uygun sohbet bulunamadı.",
-                                        color = Color(0xFF6B7280),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         fontSize = 14.sp
                                     )
                                 }
@@ -301,7 +301,7 @@ fun TufiChatHistoryDrawer(
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(12.dp))
                                         .background(
-                                            if (isActive) Color(0xFF1E293B) else Color.Transparent
+                                            if (isActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                                         )
                                         .clickable { onSessionSelected(session) }
                                         .padding(horizontal = 12.dp, vertical = 12.dp),
@@ -310,7 +310,7 @@ fun TufiChatHistoryDrawer(
                                     Text(
                                         text = session.title,
                                         style = MaterialTheme.typography.bodyLarge.copy(
-                                            color = if (isActive) Color(0xFF93C5FD) else Color(0xFFE2E8F0),
+                                            color = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
                                             fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
                                             fontSize = 15.5.sp
                                         ),
@@ -324,7 +324,7 @@ fun TufiChatHistoryDrawer(
                                         Icon(
                                             imageVector = Icons.Default.DeleteOutline,
                                             contentDescription = "Sil",
-                                            tint = Color(0xFF64748B),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(17.dp)
                                         )
                                     }
@@ -338,7 +338,7 @@ fun TufiChatHistoryDrawer(
                     // 6. En Altta Sabit "Settings" Butonu
                     Surface(
                         shape = RoundedCornerShape(22.dp),
-                        color = Color(0xFF222B38),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(44.dp)
@@ -352,14 +352,14 @@ fun TufiChatHistoryDrawer(
                             Icon(
                                 imageVector = Icons.Default.Settings,
                                 contentDescription = "Settings",
-                                tint = Color(0xFFCBD5E1),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "Settings",
                                 style = MaterialTheme.typography.labelLarge.copy(
-                                    color = Color(0xFFCBD5E1),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 15.sp
                                 )
@@ -375,9 +375,9 @@ fun TufiChatHistoryDrawer(
     if (sessionToDelete != null) {
         AlertDialog(
             onDismissRequest = { sessionToDelete = null },
-            title = { Text("Sohbeti Sil", color = Color.White) },
-            text = { Text("\"${sessionToDelete?.title}\" sohbetini silmek istediğinize emin misiniz?", color = Color(0xFFB0B0B0)) },
-            containerColor = Color(0xFF262626),
+            title = { Text("Sohbeti Sil") },
+            text = { Text("\"${sessionToDelete?.title}\" sohbetini silmek istediğinize emin misiniz?") },
+            containerColor = MaterialTheme.colorScheme.surface,
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -385,12 +385,12 @@ fun TufiChatHistoryDrawer(
                         sessionToDelete = null
                     }
                 ) {
-                    Text("Sil", color = Color(0xFFEF4444))
+                    Text("Sil", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { sessionToDelete = null }) {
-                    Text("Vazgeç", color = Color.White)
+                    Text("Vazgeç")
                 }
             }
         )
