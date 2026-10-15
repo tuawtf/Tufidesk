@@ -52,7 +52,11 @@ class NotesRepository(
         noteDao.deleteAllFolders()
     }
 
+    private var hasSeededNotes = false
+
     suspend fun seedInitialNotesIfNeeded(force: Boolean = false) = withContext(Dispatchers.IO) {
+        if (!force && hasSeededNotes) return@withContext
+
         if (force) {
             clearAll()
         }
@@ -117,9 +121,9 @@ class NotesRepository(
                     colorHex = "#F3E5F5", // Soft Purple
                     isPinned = false,
                     assignedTo = "Elif",
-                    type = NoteType.TEXT
                 )
             )
         }
+        hasSeededNotes = true
     }
 }

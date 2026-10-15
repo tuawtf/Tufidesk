@@ -1,6 +1,5 @@
 package com.example.ui.components
 
-import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -59,24 +59,18 @@ fun FilterBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Time Filters
-            TimeFilter.entries.forEach { tf ->
+            TimeFilter.values().forEach { tf ->
                 val isSelected = timeFilter == tf
                 FilterChip(
                     selected = isSelected,
                     onClick = { onTimeChange(tf) },
                     label = { Text(tf.title) },
-                    shape = RoundedCornerShape(18.dp),
-                    border = FilterChipDefaults.filterChipBorder(
-                        enabled = true,
-                        selected = isSelected,
-                        borderColor = MaterialTheme.colorScheme.outlineVariant,
-                        selectedBorderColor = Color.Transparent
-                    ),
+                    shape = RoundedCornerShape(10.dp),
                     colors = FilterChipDefaults.filterChipColors(
-                        containerColor = Color.Transparent,
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        selectedContainerColor = Color(0xFF3E3D73),
+                        selectedLabelColor = Color(0xFFFFFFFF),
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                        labelColor = MaterialTheme.colorScheme.onSurface
                     )
                 )
             }
@@ -88,24 +82,18 @@ fun FilterBar(
             )
 
             // Status Filters
-            StatusFilter.entries.forEach { sf ->
+            StatusFilter.values().forEach { sf ->
                 val isSelected = statusFilter == sf
                 FilterChip(
                     selected = isSelected,
                     onClick = { onStatusChange(sf) },
                     label = { Text(sf.title) },
-                    shape = RoundedCornerShape(18.dp),
-                    border = FilterChipDefaults.filterChipBorder(
-                        enabled = true,
-                        selected = isSelected,
-                        borderColor = MaterialTheme.colorScheme.outlineVariant,
-                        selectedBorderColor = Color.Transparent
-                    ),
+                    shape = RoundedCornerShape(10.dp),
                     colors = FilterChipDefaults.filterChipColors(
-                        containerColor = Color.Transparent,
-                        selectedContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        selectedContainerColor = Color(0xFF3E3D73),
+                        selectedLabelColor = Color(0xFFFFFFFF),
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                        labelColor = MaterialTheme.colorScheme.onSurface
                     )
                 )
             }
