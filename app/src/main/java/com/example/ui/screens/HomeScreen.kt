@@ -5,6 +5,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -112,15 +113,11 @@ fun HomeScreen(
 
     var completedExpanded by remember { mutableStateOf(true) }
 
-    val configuration = LocalConfiguration.current
-    val isTablet = configuration.screenWidthDp >= 600 || configuration.smallestScreenWidthDp >= 600
-    val listBottomPadding = if (isTablet) 200.dp else 96.dp
-
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
             .testTag("home_screen_list"),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = listBottomPadding),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Minimalist Material 3 Hero Greeting & Progress Header (Yana kaydırarak Tufi AI kartına geçilebilir)
@@ -267,8 +264,9 @@ fun MinimalHeroBanner(
             .testTag("hero_banner_card"),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
         ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(

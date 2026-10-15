@@ -961,20 +961,6 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                                 .padding(innerPadding)
                         ) {
                             screenContent()
-
-                            // Twilight teması seçildiğinde tablet ödevler kısmının alt-orta alanında yer alan özel illüstrasyon
-                            if (isTabletLayout && !isSettingsOpen && currentRoute == Screen.Home.route && activeTool == null && colorPalette == "TWILIGHT") {
-                                Image(
-                                    painter = painterResource(id = R.drawable.twilight_bottom_illustration),
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Fit,
-                                    modifier = Modifier
-                                        .align(Alignment.BottomCenter)
-                                        .fillMaxWidth(0.92f)
-                                        .heightIn(max = 210.dp)
-                                        .padding(bottom = 4.dp)
-                                )
-                            }
                         }
                     }
                 }

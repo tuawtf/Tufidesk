@@ -1,16 +1,13 @@
 package com.example.ui.components
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
-import com.example.R
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -24,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Logout
@@ -49,6 +47,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material.icons.filled.Assessment
@@ -90,19 +89,19 @@ fun TabletIslandNavigation(
     colorPalette: String = "DYNAMIC",
     modifier: Modifier = Modifier
 ) {
-    // Floating Island Navigation Card (Ada şeklinde sol menü)
+    // Floating Island Navigation Card (Material 3 Sidebar: surfaceContainerLow + outlineVariant border)
     Card(
         modifier = modifier
             .fillMaxHeight()
             .width(230.dp)
             .padding(start = 16.dp, top = 16.dp, bottom = 16.dp, end = 6.dp)
-            .shadow(elevation = 6.dp, shape = RoundedCornerShape(26.dp))
             .testTag("tablet_island_navigation"),
         shape = RoundedCornerShape(26.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
             modifier = Modifier
@@ -111,12 +110,12 @@ fun TabletIslandNavigation(
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Top Section: App Brand & "Yeni Ödev" Button
+            // Top Section: App Brand & Navigation
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Island Header (Eğer Twilight teması seçildiyse TWILIGHT + Şeffaf Logo, değilse standart TUFI DESK + Okul İkonu)
+                // Island Header (Clean M3 Tonal Branding - İllüstrasyon veya çizim olmadan sade)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -124,12 +123,20 @@ fun TabletIslandNavigation(
                         .padding(horizontal = 4.dp, vertical = 4.dp)
                 ) {
                     if (colorPalette == "TWILIGHT") {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_twilight_logo),
-                            contentDescription = "Twilight Logo",
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.size(38.dp)
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = "TWILIGHT",
@@ -275,18 +282,19 @@ fun TabletIslandNavigation(
                     testTag = "tablet_nav_item_settings"
                 )
 
-                // User Profile & Switch (En altta)
+                // User Profile & Switch (En altta: surface-container zemininde 16px köşelerle)
                 if (currentUser != null) {
                     Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
+                            .clip(RoundedCornerShape(16.dp))
                             .clickable { onSwitchProfile() }
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -296,10 +304,10 @@ fun TabletIslandNavigation(
                             ) {
                                 UserFlowerAvatar(
                                     user = currentUser,
-                                    size = 30.dp,
+                                    size = 32.dp,
                                     shape = CircleShape
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(10.dp))
                                 Column {
                                     Text(
                                         text = currentUser.name,
@@ -331,26 +339,27 @@ fun TabletNavItem(
     testTag: String,
     trailingIcon: ImageVector? = null
 ) {
+    // M3 Hap (Pill) Şekli: Seçili ise primary (#F03A7E) & on-primary (#FFFFFF), pasif ise şeffaf & on-surface-variant (#B3ADC2)
     val bgColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent,
+        targetValue = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
         label = "nav_bg"
     )
     val contentColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+        targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
         label = "nav_content"
     )
 
     Surface(
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(28.dp),
         color = bgColor,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(28.dp))
             .clickable { onClick() }
             .testTag(testTag)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
@@ -372,7 +381,7 @@ fun TabletNavItem(
                 Icon(
                     imageVector = trailingIcon,
                     contentDescription = null,
-                    tint = contentColor.copy(alpha = 0.8f),
+                    tint = contentColor.copy(alpha = 0.85f),
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -389,7 +398,7 @@ fun TabletSubNavItem(
     testTag: String
 ) {
     val bgColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f) else Color.Transparent,
+        targetValue = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
         label = "subnav_bg"
     )
     val contentColor by animateColorAsState(
@@ -398,16 +407,16 @@ fun TabletSubNavItem(
     )
 
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(20.dp),
         color = bgColor,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(20.dp))
             .clickable { onClick() }
             .testTag(testTag)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
