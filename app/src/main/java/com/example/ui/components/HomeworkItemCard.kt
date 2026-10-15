@@ -344,14 +344,14 @@ fun DueDateChip(
         )
         isSameDay -> Quadruple(
             "Bugün$timeSuffix",
-            MaterialTheme.colorScheme.tertiaryContainer,
-            MaterialTheme.colorScheme.onTertiaryContainer,
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.onPrimaryContainer,
             Icons.Default.AccessTime
         )
         isTomorrow -> Quadruple(
             "Yarın$timeSuffix",
-            MaterialTheme.colorScheme.primaryContainer,
-            MaterialTheme.colorScheme.onPrimaryContainer,
+            MaterialTheme.colorScheme.secondaryContainer,
+            MaterialTheme.colorScheme.onSecondaryContainer,
             Icons.Default.AccessTime
         )
         else -> Quadruple(

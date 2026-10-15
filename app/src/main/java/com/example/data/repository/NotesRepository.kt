@@ -53,11 +53,9 @@ class NotesRepository(
     }
 
     suspend fun seedInitialNotesIfNeeded(force: Boolean = false) = withContext(Dispatchers.IO) {
-        if (force) {
-            clearAll()
-        }
-        if (force || noteDao.getNotesCount() == 0) {
-            val mathFolderId = noteDao.insertFolder(
+        if (!force) return@withContext
+        clearAll()
+        val mathFolderId = noteDao.insertFolder(
                 NoteFolder(name = "Matematik", colorHex = "#1E88E5", iconName = "Calculate")
             )
             val scienceFolderId = noteDao.insertFolder(

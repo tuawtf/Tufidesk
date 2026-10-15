@@ -63,8 +63,7 @@ class HomeworkViewModel(
     init {
         viewModelScope.launch {
             repository.cleanupDuplicates()
-            repository.seedInitialDataIfNeeded()
-            notesRepository.seedInitialNotesIfNeeded()
+            // Do NOT auto-seed demo data on app launch so user's deletions persist permanently
             syncManager.startRealtimeListeners()
             syncManager.syncWithCloud(silent = true)
             repository.cleanupDuplicates()
@@ -284,6 +283,7 @@ class HomeworkViewModel(
     fun deleteNote(note: Note) {
         viewModelScope.launch {
             notesRepository.deleteNote(note)
+            syncManager.deleteNoteFromCloud(note.id)
         }
     }
 
@@ -311,6 +311,7 @@ class HomeworkViewModel(
                 selectedNoteFolderId.value = null
             }
             notesRepository.deleteFolder(folder)
+            syncManager.deleteFolderFromCloud(folder.id)
         }
     }
 

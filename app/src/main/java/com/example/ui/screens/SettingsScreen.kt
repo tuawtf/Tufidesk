@@ -324,9 +324,9 @@ fun SettingsScreen(
         MaterialPaletteOption(
             id = "TWILIGHT",
             name = "Twilight Sparkle",
-            description = "Gece mavisi (#363B75), lila ve ışıltılı pembe tonları",
-            primaryColor = Color(0xFF363B75),
-            secondaryColor = Color(0xFFD491EA)
+            description = "Gece moru, canlı fuşya ve lila tonları",
+            primaryColor = Color(0xFFF42B76),
+            secondaryColor = Color(0xFF382956)
         )
     )
 

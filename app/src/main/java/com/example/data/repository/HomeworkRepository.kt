@@ -126,13 +126,9 @@ class HomeworkRepository(
     }
 
     suspend fun seedInitialDataIfNeeded(force: Boolean = false) = withContext(Dispatchers.IO) {
+        if (!force) return@withContext
         cleanupDuplicates()
-
-        val courseCount = courseDao.getCourseCount()
-        val homeworkCount = homeworkDao.getHomeworkCount()
-        if (force || (courseCount == 0 && homeworkCount == 0)) {
-            seedDemoWeeklyData()
-        }
+        seedDemoWeeklyData()
     }
 
     private suspend fun seedDemoWeeklyData() {

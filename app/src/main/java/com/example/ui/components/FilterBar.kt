@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,16 +59,24 @@ fun FilterBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Time Filters
-            TimeFilter.values().forEach { tf ->
+            TimeFilter.entries.forEach { tf ->
                 val isSelected = timeFilter == tf
                 FilterChip(
                     selected = isSelected,
                     onClick = { onTimeChange(tf) },
                     label = { Text(tf.title) },
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = isSelected,
+                        borderColor = MaterialTheme.colorScheme.outlineVariant,
+                        selectedBorderColor = Color.Transparent
+                    ),
                     colors = FilterChipDefaults.filterChipColors(
+                        containerColor = Color.Transparent,
                         selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 )
             }
@@ -79,16 +88,24 @@ fun FilterBar(
             )
 
             // Status Filters
-            StatusFilter.values().forEach { sf ->
+            StatusFilter.entries.forEach { sf ->
                 val isSelected = statusFilter == sf
                 FilterChip(
                     selected = isSelected,
                     onClick = { onStatusChange(sf) },
                     label = { Text(sf.title) },
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = isSelected,
+                        borderColor = MaterialTheme.colorScheme.outlineVariant,
+                        selectedBorderColor = Color.Transparent
+                    ),
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        containerColor = Color.Transparent,
+                        selectedContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 )
             }

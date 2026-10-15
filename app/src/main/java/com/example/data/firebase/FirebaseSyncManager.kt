@@ -67,6 +67,84 @@ class FirebaseSyncManager(
     private var homeworksListener: ListenerRegistration? = null
     private var coursesListener: ListenerRegistration? = null
 
+    private val prefs = context.getSharedPreferences("tufidesk_sync_tombstones", Context.MODE_PRIVATE)
+
+    fun isHomeworkDeleted(id: Long): Boolean {
+        return prefs.getStringSet("deleted_homeworks", emptySet())?.contains(id.toString()) == true
+    }
+
+    fun isCourseDeleted(id: Long): Boolean {
+        return prefs.getStringSet("deleted_courses", emptySet())?.contains(id.toString()) == true
+    }
+
+    fun isNoteDeleted(id: Long): Boolean {
+        return prefs.getStringSet("deleted_notes", emptySet())?.contains(id.toString()) == true
+    }
+
+    fun isFolderDeleted(id: Long): Boolean {
+        return prefs.getStringSet("deleted_folders", emptySet())?.contains(id.toString()) == true
+    }
+
+    fun markHomeworkDeleted(id: Long) {
+        val current = prefs.getStringSet("deleted_homeworks", emptySet())?.toMutableSet() ?: mutableSetOf()
+        current.add(id.toString())
+        prefs.edit().putStringSet("deleted_homeworks", current).apply()
+    }
+
+    fun markCourseDeleted(id: Long) {
+        val current = prefs.getStringSet("deleted_courses", emptySet())?.toMutableSet() ?: mutableSetOf()
+        current.add(id.toString())
+        prefs.edit().putStringSet("deleted_courses", current).apply()
+    }
+
+    fun markNoteDeleted(id: Long) {
+        val current = prefs.getStringSet("deleted_notes", emptySet())?.toMutableSet() ?: mutableSetOf()
+        current.add(id.toString())
+        prefs.edit().putStringSet("deleted_notes", current).apply()
+    }
+
+    fun markFolderDeleted(id: Long) {
+        val current = prefs.getStringSet("deleted_folders", emptySet())?.toMutableSet() ?: mutableSetOf()
+        current.add(id.toString())
+        prefs.edit().putStringSet("deleted_folders", current).apply()
+    }
+
+    fun unmarkHomeworkDeleted(id: Long) {
+        val current = prefs.getStringSet("deleted_homeworks", emptySet())?.toMutableSet() ?: return
+        if (current.remove(id.toString())) {
+            prefs.edit().putStringSet("deleted_homeworks", current).apply()
+        }
+    }
+
+    fun unmarkCourseDeleted(id: Long) {
+        val current = prefs.getStringSet("deleted_courses", emptySet())?.toMutableSet() ?: return
+        if (current.remove(id.toString())) {
+            prefs.edit().putStringSet("deleted_courses", current).apply()
+        }
+    }
+
+    fun unmarkNoteDeleted(id: Long) {
+        val current = prefs.getStringSet("deleted_notes", emptySet())?.toMutableSet() ?: return
+        if (current.remove(id.toString())) {
+            prefs.edit().putStringSet("deleted_notes", current).apply()
+        }
+    }
+
+    fun unmarkFolderDeleted(id: Long) {
+        val current = prefs.getStringSet("deleted_folders", emptySet())?.toMutableSet() ?: return
+        if (current.remove(id.toString())) {
+            prefs.edit().putStringSet("deleted_folders", current).apply()
+        }
+    }
+
+    fun getLastWipeTime(): Long {
+        return prefs.getLong("last_data_wipe_timestamp", 0L)
+    }
+
+    fun setLastWipeTime(time: Long) {
+        prefs.edit().putLong("last_data_wipe_timestamp", time).apply()
+    }
+
     init {
         initFirebaseIfAvailable()
         startRealtimeListeners()
@@ -255,6 +333,11 @@ class FirebaseSyncManager(
                                         ?: createdAtMillis
                                     val assignedTo = doc.getString("assignedTo") ?: "Tuna"
 
+                                    if (isHomeworkDeleted(id) || (updatedAtMillis > 0 && updatedAtMillis <= getLastWipeTime())) {
+                                        try { doc.reference.delete() } catch (_: Exception) {}
+                                        continue
+                                    }
+
                                     val existing = localHomeworks.find { it.homework.id == id }
 
                                     // "Clickbox'lara veri yazan öncelikli olacak":
@@ -350,6 +433,12 @@ class FirebaseSyncManager(
                                     val teacher = doc.getString("teacher") ?: ""
                                     val colorHex = doc.getString("colorHex") ?: "#1B65D4"
                                     val iconName = doc.getString("iconName") ?: "menu_book"
+                                    val updatedAtMillis = doc.getLong("updatedAtMillis") ?: 0L
+
+                                    if (isCourseDeleted(id) || (updatedAtMillis > 0 && updatedAtMillis <= getLastWipeTime())) {
+                                        try { doc.reference.delete() } catch (_: Exception) {}
+                                        continue
+                                    }
 
                                     val existing = localCourses.find { it.id == id || it.name.trim().equals(name.trim(), ignoreCase = true) }
                                     if (existing == null || existing.name != name || existing.teacher != teacher || existing.colorHex != colorHex || existing.iconName != iconName) {
@@ -427,6 +516,7 @@ class FirebaseSyncManager(
                 "assignedTo" to hw.assignedTo,
                 "updatedAtMillis" to hw.updatedAtMillis
             )
+            unmarkHomeworkDeleted(hw.id)
             db.collection("homeworks").document(hw.id.toString())
                 .set(data, SetOptions.merge())
                 .await()
@@ -438,10 +528,14 @@ class FirebaseSyncManager(
     }
 
     suspend fun deleteHomeworkFromCloud(id: Long) {
-        if (!_isOnline.value) return
+        markHomeworkDeleted(id)
         val db = firestore ?: return
         try {
             db.collection("homeworks").document(id.toString()).delete().await()
+            val queryDocs = db.collection("homeworks").whereEqualTo("id", id).get().await()
+            for (d in queryDocs.documents) {
+                try { d.reference.delete().await() } catch (_: Exception) {}
+            }
             _lastSyncTime.value = System.currentTimeMillis()
         } catch (e: Exception) {
             Log.e(TAG, "Ödev buluttan silinemedi: ${e.message}", e)
@@ -457,8 +551,10 @@ class FirebaseSyncManager(
                 "name" to c.name,
                 "teacher" to c.teacher,
                 "colorHex" to c.colorHex,
-                "iconName" to c.iconName
+                "iconName" to c.iconName,
+                "updatedAtMillis" to System.currentTimeMillis()
             )
+            unmarkCourseDeleted(c.id)
             db.collection("courses").document(c.id.toString())
                 .set(data, SetOptions.merge())
                 .await()
@@ -469,13 +565,47 @@ class FirebaseSyncManager(
     }
 
     suspend fun deleteCourseFromCloud(id: Long) {
-        if (!_isOnline.value) return
+        markCourseDeleted(id)
         val db = firestore ?: return
         try {
             db.collection("courses").document(id.toString()).delete().await()
+            val queryDocs = db.collection("courses").whereEqualTo("id", id).get().await()
+            for (d in queryDocs.documents) {
+                try { d.reference.delete().await() } catch (_: Exception) {}
+            }
             _lastSyncTime.value = System.currentTimeMillis()
         } catch (e: Exception) {
             Log.e(TAG, "Ders buluttan silinemedi: ${e.message}", e)
+        }
+    }
+
+    suspend fun deleteNoteFromCloud(id: Long) {
+        markNoteDeleted(id)
+        val db = firestore ?: return
+        try {
+            db.collection("notes").document(id.toString()).delete().await()
+            val queryDocs = db.collection("notes").whereEqualTo("id", id).get().await()
+            for (d in queryDocs.documents) {
+                try { d.reference.delete().await() } catch (_: Exception) {}
+            }
+            _lastSyncTime.value = System.currentTimeMillis()
+        } catch (e: Exception) {
+            Log.e(TAG, "Not buluttan silinemedi: ${e.message}", e)
+        }
+    }
+
+    suspend fun deleteFolderFromCloud(id: Long) {
+        markFolderDeleted(id)
+        val db = firestore ?: return
+        try {
+            db.collection("note_folders").document(id.toString()).delete().await()
+            val queryDocs = db.collection("note_folders").whereEqualTo("id", id).get().await()
+            for (d in queryDocs.documents) {
+                try { d.reference.delete().await() } catch (_: Exception) {}
+            }
+            _lastSyncTime.value = System.currentTimeMillis()
+        } catch (e: Exception) {
+            Log.e(TAG, "Klasör buluttan silinemedi: ${e.message}", e)
         }
     }
 
@@ -507,6 +637,11 @@ class FirebaseSyncManager(
 
             for (doc in remoteCoursesSnapshot.documents) {
                 val id = doc.getLong("id") ?: continue
+                val updatedAt = doc.getLong("updatedAtMillis") ?: 0L
+                if (isCourseDeleted(id) || (updatedAt > 0 && updatedAt <= getLastWipeTime())) {
+                    try { doc.reference.delete() } catch (_: Exception) {}
+                    continue
+                }
                 val name = doc.getString("name") ?: ""
                 val teacher = doc.getString("teacher") ?: ""
                 val colorHex = doc.getString("colorHex") ?: "#1B65D4"
@@ -532,6 +667,17 @@ class FirebaseSyncManager(
 
             for (doc in remoteHomeworksSnapshot.documents) {
                 val id = doc.getLong("id") ?: continue
+                val createdAtMillis = doc.getLong("createdAtMillis") ?: System.currentTimeMillis()
+                val completedAtMillis = doc.getLong("completedAtMillis")?.takeIf { it > 0 }
+                val remoteUpdatedAt = doc.getLong("updatedAtMillis")
+                    ?: completedAtMillis
+                    ?: createdAtMillis
+
+                if (isHomeworkDeleted(id) || (remoteUpdatedAt > 0 && remoteUpdatedAt <= getLastWipeTime())) {
+                    try { doc.reference.delete() } catch (_: Exception) {}
+                    continue
+                }
+
                 val rawCourseId = doc.getLong("courseId") ?: 1L
                 val courseName = doc.getString("courseName") ?: ""
                 val courseId = resolveValidCourseId(rawCourseId, courseName)
@@ -542,11 +688,6 @@ class FirebaseSyncManager(
                 val priority = doc.getString("priority") ?: "MEDIUM"
                 val estimatedMinutes = doc.getLong("estimatedMinutes")?.toInt() ?: 0
                 val isCompleted = doc.getBoolean("isCompleted") ?: false
-                val createdAtMillis = doc.getLong("createdAtMillis") ?: System.currentTimeMillis()
-                val completedAtMillis = doc.getLong("completedAtMillis")?.takeIf { it > 0 }
-                val remoteUpdatedAt = doc.getLong("updatedAtMillis")
-                    ?: completedAtMillis
-                    ?: createdAtMillis
                 val assignedTo = doc.getString("assignedTo") ?: "Tuna"
 
                 try {
@@ -639,6 +780,15 @@ class FirebaseSyncManager(
         val db = firestore
 
         _syncState.value = SyncState.SYNCING
+        val now = System.currentTimeMillis()
+        setLastWipeTime(now)
+        prefs.edit()
+            .remove("deleted_homeworks")
+            .remove("deleted_courses")
+            .remove("deleted_notes")
+            .remove("deleted_folders")
+            .putLong("last_data_wipe_timestamp", now)
+            .apply()
 
         try {
             if (db != null) {

@@ -100,7 +100,7 @@ fun TabletIslandNavigation(
             .testTag("tablet_island_navigation"),
         shape = RoundedCornerShape(26.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = if (colorPalette == "TWILIGHT") Color(0xFF1D1F3E) else MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
