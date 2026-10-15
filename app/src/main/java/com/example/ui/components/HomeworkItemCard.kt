@@ -87,7 +87,7 @@ fun HomeworkItemCard(
         targetValue = if (homework.isCompleted) {
             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         } else {
-            MaterialTheme.colorScheme.surfaceContainer
+            MaterialTheme.colorScheme.surface
         },
         animationSpec = tween(durationMillis = 300),
         label = "cardBg"
@@ -99,9 +99,8 @@ fun HomeworkItemCard(
             .testTag("homework_card_${homework.id}"),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = cardBg),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = 0.dp
+            defaultElevation = if (homework.isCompleted) 1.dp else 3.dp
         )
     ) {
         Column(

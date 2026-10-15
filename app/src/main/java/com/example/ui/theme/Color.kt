@@ -347,70 +347,63 @@ val AmberDark = darkColorScheme(
 )
 
 // ==========================================
-// 7. TWILIGHT PALETTE (Material 3)
-// Primary (Fuşya / Pembe): #F03A7E
-// Secondary (Lavanta / Leylak): #B892D1
-// Tertiary (Gece Mavisi / İndigo): #2D396B
-// Surface: #131525, Surface-Container: #21233D, Outline: #3E3D5C
+// 7. TWILIGHT SPARKLE PALETTE (Material 3)
+// Main color: #363B75 (Koyu Gece Mavisi / Twilight Yelesi)
+// Second color: #D491EA (Lila / Lavanta)
+// Third color: #BA1B6C / #CC2D7A (Işıltılı Pembe / Magenta)
 // ==========================================
 val TwilightSparkleLight = lightColorScheme(
-    primary = Color(0xFFF03A7E),
+    primary = Color(0xFF363B75),
     onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFFFD9E2),
-    onPrimaryContainer = Color(0xFF55122F),
-    secondary = Color(0xFF7B4D97),
+    primaryContainer = Color(0xFFE0E0FF),
+    onPrimaryContainer = Color(0xFF000F41),
+    secondary = Color(0xFF8F46A1),
     onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFEEDBFF),
-    onSecondaryContainer = Color(0xFF2F1247),
-    tertiary = Color(0xFF2D396B),
+    secondaryContainer = Color(0xFFF9D8FF),
+    onSecondaryContainer = Color(0xFF370047),
+    tertiary = Color(0xFFBA1B6C),
     onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = Color(0xFFDDE1FF),
-    onTertiaryContainer = Color(0xFF001453),
+    tertiaryContainer = Color(0xFFFFD9E2),
+    onTertiaryContainer = Color(0xFF3F001F),
     error = Color(0xFFBA1A1A),
     onError = Color(0xFFFFFFFF),
     errorContainer = Color(0xFFFFDAD6),
     onErrorContainer = Color(0xFF410002),
     background = Color(0xFFFAF8FD),
-    onBackground = Color(0xFF1A1C2B),
+    onBackground = Color(0xFF1B1A20),
     surface = Color(0xFFFAF8FD),
-    onSurface = Color(0xFF1A1C2B),
-    surfaceVariant = Color(0xFFECE7F4),
-    onSurfaceVariant = Color(0xFF4C4758),
-    outline = Color(0xFF7D7789),
-    outlineVariant = Color(0xFF2E2D47)
+    onSurface = Color(0xFF1B1A20),
+    surfaceVariant = Color(0xFFE3E0EC),
+    onSurfaceVariant = Color(0xFF46454F),
+    outline = Color(0xFF777580),
+    outlineVariant = Color(0xFFC7C5D0)
 )
 
 val TwilightSparkleDark = darkColorScheme(
-    primary = Color(0xFFF03A7E),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFF55122F),
-    onPrimaryContainer = Color(0xFFFFD9E2),
-    secondary = Color(0xFFB892D1),
-    onSecondary = Color(0xFF2F1247),
-    secondaryContainer = Color(0xFF4B296B),
-    onSecondaryContainer = Color(0xFFEEDBFF),
-    tertiary = Color(0xFF2D396B),
-    onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = Color(0xFF3B4985),
-    onTertiaryContainer = Color(0xFFDDE1FF),
+    primary = Color(0xFFBCC2FF),
+    onPrimary = Color(0xFF04185E),
+    primaryContainer = Color(0xFF363B75),
+    onPrimaryContainer = Color(0xFFE0E0FF),
+    secondary = Color(0xFFD491EA),
+    onSecondary = Color(0xFF4C0E5F),
+    secondaryContainer = Color(0xFF662978),
+    onSecondaryContainer = Color(0xFFF9D8FF),
+    tertiary = Color(0xFFFFB0C9),
+    onTertiary = Color(0xFF5E0032),
+    tertiaryContainer = Color(0xFF830048),
+    onTertiaryContainer = Color(0xFFFFD9E2),
     error = Color(0xFFFFB4AB),
     onError = Color(0xFF690005),
     errorContainer = Color(0xFF93000A),
     onErrorContainer = Color(0xFFFFDAD6),
-    background = Color(0xFF131525),
-    onBackground = Color(0xFFF4F0F9),
-    surface = Color(0xFF131525),
-    onSurface = Color(0xFFF4F0F9),
-    surfaceVariant = Color(0xFF21233D),
-    onSurfaceVariant = Color(0xFFB3ADC2),
-    outline = Color(0xFF3E3D5C),
-    outlineVariant = Color(0xFF2E2D47),
-    surfaceDim = Color(0xFF0F101D),
-    surfaceContainerLowest = Color(0xFF0F101D),
-    surfaceContainerLow = Color(0xFF1A1C30),
-    surfaceContainer = Color(0xFF21233D),
-    surfaceContainerHigh = Color(0xFF2B2D4D),
-    surfaceContainerHighest = Color(0xFF35375C)
+    background = Color(0xFF131318),
+    onBackground = Color(0xFFE4E1E9),
+    surface = Color(0xFF1B1A22),
+    onSurface = Color(0xFFE4E1E9),
+    surfaceVariant = Color(0xFF46454F),
+    onSurfaceVariant = Color(0xFFC7C5D0),
+    outline = Color(0xFF908F9A),
+    outlineVariant = Color(0xFF46454F)
 )
 
 // Subject / Course Preset Colors (Expressive Material 3 Palette)
