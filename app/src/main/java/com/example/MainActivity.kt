@@ -18,11 +18,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -878,7 +881,8 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                             currentRoute = Screen.Tools.route
                             activeTool = toolKey
                         },
-                        currentRoute = currentRoute
+                        currentRoute = currentRoute,
+                        colorPalette = colorPalette
                     )
 
                     // Right Content Scaffold
@@ -957,6 +961,20 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                                 .padding(innerPadding)
                         ) {
                             screenContent()
+
+                            // Twilight teması seçildiğinde tablet ödevler kısmının alt-orta alanında yer alan özel illüstrasyon
+                            if (isTabletLayout && !isSettingsOpen && currentRoute == Screen.Home.route && activeTool == null && colorPalette == "TWILIGHT") {
+                                Image(
+                                    painter = painterResource(id = R.drawable.twilight_bottom_illustration),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .fillMaxWidth(0.92f)
+                                        .heightIn(max = 210.dp)
+                                        .padding(bottom = 4.dp)
+                                )
+                            }
                         }
                     }
                 }

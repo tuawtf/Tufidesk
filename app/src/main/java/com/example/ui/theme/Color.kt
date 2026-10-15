@@ -348,19 +348,19 @@ val AmberDark = darkColorScheme(
 
 // ==========================================
 // 7. TWILIGHT SPARKLE PALETTE (Material 3)
-// Main color: 4. renk (#D491EA - Lila / Lavanta)
-// Second color: 1. renk (#243870 - Gece / Çivit Mavisi)
-// Third color: 3. renk (#CC2D7A / #BA1B6C - Işıltılı Pembe / Magenta)
+// Main color: #363B75 (Koyu Gece Mavisi / Twilight Yelesi)
+// Second color: #D491EA (Lila / Lavanta)
+// Third color: #BA1B6C / #CC2D7A (Işıltılı Pembe / Magenta)
 // ==========================================
 val TwilightSparkleLight = lightColorScheme(
-    primary = Color(0xFF9048A2),
+    primary = Color(0xFF363B75),
     onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFF9D8FF),
-    onPrimaryContainer = Color(0xFF370047),
-    secondary = Color(0xFF243870),
+    primaryContainer = Color(0xFFE0E0FF),
+    onPrimaryContainer = Color(0xFF000F41),
+    secondary = Color(0xFF8F46A1),
     onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFDDE1FF),
-    onSecondaryContainer = Color(0xFF001453),
+    secondaryContainer = Color(0xFFF9D8FF),
+    onSecondaryContainer = Color(0xFF370047),
     tertiary = Color(0xFFBA1B6C),
     onTertiary = Color(0xFFFFFFFF),
     tertiaryContainer = Color(0xFFFFD9E2),
@@ -369,25 +369,25 @@ val TwilightSparkleLight = lightColorScheme(
     onError = Color(0xFFFFFFFF),
     errorContainer = Color(0xFFFFDAD6),
     onErrorContainer = Color(0xFF410002),
-    background = Color(0xFFFCF7FD),
-    onBackground = Color(0xFF1E1A20),
-    surface = Color(0xFFFCF7FD),
-    onSurface = Color(0xFF1E1A20),
-    surfaceVariant = Color(0xFFECDFED),
-    onSurfaceVariant = Color(0xFF4D4450),
-    outline = Color(0xFF7E7481),
-    outlineVariant = Color(0xFFD0C3D1)
+    background = Color(0xFFFAF8FD),
+    onBackground = Color(0xFF1B1A20),
+    surface = Color(0xFFFAF8FD),
+    onSurface = Color(0xFF1B1A20),
+    surfaceVariant = Color(0xFFE3E0EC),
+    onSurfaceVariant = Color(0xFF46454F),
+    outline = Color(0xFF777580),
+    outlineVariant = Color(0xFFC7C5D0)
 )
 
 val TwilightSparkleDark = darkColorScheme(
-    primary = Color(0xFFD491EA),
-    onPrimary = Color(0xFF4C0E5F),
-    primaryContainer = Color(0xFF662978),
-    onPrimaryContainer = Color(0xFFF9D8FF),
-    secondary = Color(0xFFB8C4FF),
-    onSecondary = Color(0xFF1E2F66),
-    secondaryContainer = Color(0xFF2A3D78),
-    onSecondaryContainer = Color(0xFFDDE1FF),
+    primary = Color(0xFFBCC2FF),
+    onPrimary = Color(0xFF04185E),
+    primaryContainer = Color(0xFF363B75),
+    onPrimaryContainer = Color(0xFFE0E0FF),
+    secondary = Color(0xFFD491EA),
+    onSecondary = Color(0xFF4C0E5F),
+    secondaryContainer = Color(0xFF662978),
+    onSecondaryContainer = Color(0xFFF9D8FF),
     tertiary = Color(0xFFFFB0C9),
     onTertiary = Color(0xFF5E0032),
     tertiaryContainer = Color(0xFF830048),
@@ -396,18 +396,19 @@ val TwilightSparkleDark = darkColorScheme(
     onError = Color(0xFF690005),
     errorContainer = Color(0xFF93000A),
     onErrorContainer = Color(0xFFFFDAD6),
-    background = Color(0xFF161218),
-    onBackground = Color(0xFFE9E0EA),
-    surface = Color(0xFF1E1922),
-    onSurface = Color(0xFFE9E0EA),
-    surfaceVariant = Color(0xFF4D4450),
-    onSurfaceVariant = Color(0xFFD0C3D1),
-    outline = Color(0xFF988E9B),
-    outlineVariant = Color(0xFF4D4450)
+    background = Color(0xFF131318),
+    onBackground = Color(0xFFE4E1E9),
+    surface = Color(0xFF1B1A22),
+    onSurface = Color(0xFFE4E1E9),
+    surfaceVariant = Color(0xFF46454F),
+    onSurfaceVariant = Color(0xFFC7C5D0),
+    outline = Color(0xFF908F9A),
+    outlineVariant = Color(0xFF46454F)
 )
 
 // Subject / Course Preset Colors (Expressive Material 3 Palette)
 val CourseColors = listOf(
+    "#363B75", // Twilight Mane Navy
     "#1B65D4", // Material Indigo
     "#006A60", // Material Teal
     "#6750A4", // Material Violet

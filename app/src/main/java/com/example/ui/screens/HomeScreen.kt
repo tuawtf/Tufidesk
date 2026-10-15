@@ -50,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -111,11 +112,15 @@ fun HomeScreen(
 
     var completedExpanded by remember { mutableStateOf(true) }
 
+    val configuration = LocalConfiguration.current
+    val isTablet = configuration.screenWidthDp >= 600 || configuration.smallestScreenWidthDp >= 600
+    val listBottomPadding = if (isTablet) 200.dp else 96.dp
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
             .testTag("home_screen_list"),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = listBottomPadding),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Minimalist Material 3 Hero Greeting & Progress Header (Yana kaydırarak Tufi AI kartına geçilebilir)

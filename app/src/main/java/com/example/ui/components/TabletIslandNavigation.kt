@@ -87,6 +87,7 @@ fun TabletIslandNavigation(
     activeTool: String? = null,
     onSelectTool: (String) -> Unit = {},
     currentRoute: String = Screen.Home.route,
+    colorPalette: String = "DYNAMIC",
     modifier: Modifier = Modifier
 ) {
     // Floating Island Navigation Card (Ada şeklinde sol menü)
@@ -115,29 +116,56 @@ fun TabletIslandNavigation(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Island Header (Twilight Logo & Title - Şeffaf ve yuvarlak çerçeve olmadan)
+                // Island Header (Eğer Twilight teması seçildiyse TWILIGHT + Şeffaf Logo, değilse standart TUFI DESK + Okul İkonu)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 4.dp, vertical = 4.dp)
                 ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_twilight_logo),
-                        contentDescription = "Twilight Logo",
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.size(38.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "TWILIGHT",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.5.sp
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f)
-                    )
+                    if (colorPalette == "TWILIGHT") {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_twilight_logo),
+                            contentDescription = "Twilight Logo",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.size(38.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "TWILIGHT",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.School,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "TUFI DESK",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
