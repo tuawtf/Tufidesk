@@ -960,6 +960,17 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                                 .fillMaxSize()
                                 .padding(innerPadding)
                         ) {
+                            if (colorPalette == "TWILIGHT") {
+                                Image(
+                                    painter = painterResource(id = R.drawable.twilight_bottom_illustration),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.FillWidth,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .align(Alignment.BottomCenter)
+                                )
+                            }
+
                             screenContent()
                         }
                     }
@@ -1090,6 +1101,17 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                             bottom = if (!floatingBottomBar) innerPadding.calculateBottomPadding() else 0.dp
                         )
                 ) {
+                    if (colorPalette == "TWILIGHT") {
+                        Image(
+                            painter = painterResource(id = R.drawable.twilight_bottom_illustration),
+                            contentDescription = null,
+                            contentScale = ContentScale.FillWidth,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.BottomCenter)
+                        )
+                    }
+
                     screenContent()
 
                     // Tamamen havada yüzen ada menüsü (Arkada hiçbir siyahlık veya şerit yok)
