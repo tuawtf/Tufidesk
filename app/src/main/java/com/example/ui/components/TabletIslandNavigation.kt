@@ -118,28 +118,27 @@ fun TabletIslandNavigation(
             ) {
                 // Island Header (Eğer Twilight teması seçildiyse TWILIGHT + Şeffaf Logo, değilse standart TUFI DESK + Okul İkonu)
                 if (colorPalette == "TWILIGHT") {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 4.dp, vertical = 4.dp)
+                            .padding(horizontal = 6.dp, vertical = 6.dp)
                     ) {
                         Image(
                             painter = painterResource(id = R.drawable.ic_twilight_logo),
                             contentDescription = "Twilight Logo",
                             contentScale = ContentScale.Fit,
-                            modifier = Modifier.size(46.dp)
+                            modifier = Modifier.size(42.dp)
                         )
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = "TWILIGHT",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.2.sp
                             ),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 } else {
