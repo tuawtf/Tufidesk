@@ -1058,15 +1058,21 @@ fun SettingsScreen(
             items(SettingsSection.entries.toTypedArray()) { section ->
                 val isSelected = selectedSectionName == section.name
                 val containerColor = if (isSelected) {
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                    MaterialTheme.colorScheme.primaryContainer
                 } else {
-                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                    Color(0xFF1E1D3B)
+                }
+                val cardBorder = if (isSelected) {
+                    BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+                } else {
+                    BorderStroke(1.dp, Color(0xFF2E2C56))
                 }
 
                 Card(
                     onClick = { onSectionClick(section) },
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = containerColor),
+                    border = cardBorder,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     ListItem(
@@ -1074,27 +1080,27 @@ fun SettingsScreen(
                             Text(
                                 text = section.title,
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else Color.White
                             )
                         },
                         supportingContent = {
                             Text(
                                 text = section.subtitle,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f) else Color(0xFFB8B0D0)
                             )
                         },
                         leadingContent = {
                             Surface(
                                 shape = CircleShape,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer,
+                                color = if (isSelected) Color.White.copy(alpha = 0.25f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
                                 modifier = Modifier.size(42.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         imageVector = section.icon,
                                         contentDescription = section.title,
-                                        tint = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                                        tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(22.dp)
                                     )
                                 }
@@ -1104,7 +1110,7 @@ fun SettingsScreen(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                                 contentDescription = "Aç",
-                                tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else Color(0xFFB8B0D0),
                                 modifier = Modifier.size(18.dp)
                             )
                         },
@@ -2239,7 +2245,8 @@ private fun SettingsCategoryCard(
         )
         Card(
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1B1A36)),
+            border = BorderStroke(1.dp, Color(0xFF2E2C56)),
             modifier = Modifier.fillMaxWidth()
         ) {
             content()

@@ -117,30 +117,39 @@ fun TabletIslandNavigation(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Island Header (Eğer Twilight teması seçildiyse TWILIGHT + Şeffaf Logo, değilse standart TUFI DESK + Okul İkonu)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp, vertical = 4.dp)
-                ) {
-                    if (colorPalette == "TWILIGHT") {
+                if (colorPalette == "TWILIGHT") {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp, vertical = 4.dp)
+                    ) {
                         Image(
                             painter = painterResource(id = R.drawable.ic_twilight_logo),
                             contentDescription = "Twilight Logo",
                             contentScale = ContentScale.Fit,
-                            modifier = Modifier.size(38.dp)
+                            modifier = Modifier.size(46.dp)
                         )
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "TWILIGHT",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.5.sp
+                                letterSpacing = 1.2.sp
                             ),
                             color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f)
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
-                    } else {
+                    }
+                } else {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Start,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp, vertical = 4.dp)
+                    ) {
                         Box(
                             modifier = Modifier
                                 .size(38.dp)
@@ -168,16 +177,19 @@ fun TabletIslandNavigation(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // Modern alt çizgi (<hr>) - kenarlarla birleşmeyen şık çizgi
+                // Modern alt çizgi (<hr>) - kenarlarla birleşmeyen şık ince beyaz şeffaf çizgi
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp)
-                        .height(1.5.dp)
+                        .padding(horizontal = 12.dp)
+                        .height(1.dp)
                         .clip(RoundedCornerShape(50))
-                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+                        .background(
+                            if (colorPalette == "TWILIGHT") Color.White.copy(alpha = 0.20f)
+                            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+                        )
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))

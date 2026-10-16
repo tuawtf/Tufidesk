@@ -369,8 +369,8 @@ fun QuickStatsRow(
                 title = "Bekleyen",
                 count = stats.pendingCount,
                 icon = Icons.Default.PendingActions,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                bgColor = MaterialTheme.colorScheme.secondaryContainer,
+                color = Color.White,
+                bgColor = Color(0xFF4A2E7A),
                 onClick = { onStatClick(TimeFilter.ALL) }
             )
         }
@@ -380,8 +380,8 @@ fun QuickStatsRow(
                 title = "Bugün",
                 count = stats.dueTodayCount,
                 icon = Icons.Default.NotificationsActive,
-                color = MaterialTheme.colorScheme.onPrimary,
-                bgColor = MaterialTheme.colorScheme.primary,
+                color = Color.White,
+                bgColor = Color(0xFFF42B76),
                 onClick = { onStatClick(TimeFilter.TODAY) }
             )
         }
@@ -391,8 +391,8 @@ fun QuickStatsRow(
                 title = "Tamamlanan",
                 count = stats.completedCount,
                 icon = Icons.Default.CheckCircle,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                bgColor = MaterialTheme.colorScheme.tertiaryContainer,
+                color = Color.White,
+                bgColor = Color(0xFF382956),
                 onClick = { onStatClick(TimeFilter.ALL) }
             )
         }

@@ -946,6 +946,16 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                                             }
                                             Icon(imageVector = syncIcon, contentDescription = "Eşitle", tint = syncColor)
                                         }
+
+                                        if (colorPalette == "TWILIGHT") {
+                                            Image(
+                                                painter = painterResource(id = R.drawable.ic_twilight_logo),
+                                                contentDescription = "Twilight Sparkle",
+                                                modifier = Modifier
+                                                    .padding(horizontal = 6.dp)
+                                                    .size(32.dp)
+                                            )
+                                        }
                                     },
                                     colors = TopAppBarDefaults.topAppBarColors(
                                         containerColor = MaterialTheme.colorScheme.background
@@ -960,11 +970,16 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                                 .fillMaxSize()
                                 .padding(innerPadding)
                         ) {
-                            if (colorPalette == "TWILIGHT") {
+                            val showTwilightIllustration = colorPalette == "TWILIGHT" &&
+                                !isSettingsOpen &&
+                                (currentRoute == Screen.Home.route || currentRoute == Screen.Calendar.route || currentRoute == Screen.Timer.route)
+
+                            if (showTwilightIllustration) {
                                 Image(
                                     painter = painterResource(id = R.drawable.twilight_bottom_illustration),
                                     contentDescription = null,
                                     contentScale = ContentScale.FillWidth,
+                                    alpha = 0.40f,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .align(Alignment.BottomCenter)
@@ -1042,6 +1057,16 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                                 Icon(imageVector = syncIcon, contentDescription = "Eşitle", tint = syncColor)
                             }
 
+                            if (colorPalette == "TWILIGHT") {
+                                Image(
+                                    painter = painterResource(id = R.drawable.ic_twilight_logo),
+                                    contentDescription = "Twilight Sparkle",
+                                    modifier = Modifier
+                                        .padding(horizontal = 4.dp)
+                                        .size(30.dp)
+                                )
+                            }
+
                             // Mobil için bulut simgesinin SAĞINDA Ayarlar butonu
                             IconButton(
                                 onClick = { isSettingsOpen = !isSettingsOpen },
@@ -1101,11 +1126,16 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                             bottom = if (!floatingBottomBar) innerPadding.calculateBottomPadding() else 0.dp
                         )
                 ) {
-                    if (colorPalette == "TWILIGHT") {
+                    val showTwilightIllustration = colorPalette == "TWILIGHT" &&
+                        !isSettingsOpen &&
+                        (currentRoute == Screen.Home.route || currentRoute == Screen.Calendar.route || currentRoute == Screen.Timer.route)
+
+                    if (showTwilightIllustration) {
                         Image(
                             painter = painterResource(id = R.drawable.twilight_bottom_illustration),
                             contentDescription = null,
                             contentScale = ContentScale.FillWidth,
+                            alpha = 0.40f,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .align(Alignment.BottomCenter)

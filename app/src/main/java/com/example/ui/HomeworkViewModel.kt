@@ -787,6 +787,7 @@ class HomeworkViewModel(
     fun clearAllData() {
         viewModelScope.launch {
             repository.clearAllData()
+            syncManager.clearAllFirebaseData()
         }
     }
 

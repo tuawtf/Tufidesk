@@ -123,6 +123,48 @@ class HomeworkRepository(
         } catch (e: Exception) {
             android.util.Log.e("HomeworkRepo", "Error cleaning up duplicates: ${e.message}", e)
         }
+
+        // Clean up removed courses and ensure modern required subjects exist
+        syncDefaultCoursesAndCleanRemoved()
+    }
+
+    suspend fun syncDefaultCoursesAndCleanRemoved() = withContext(Dispatchers.IO) {
+        try {
+            val allCourses = courseDao.getAllCoursesList()
+            val coursesToRemove = allCourses.filter { c ->
+                val name = c.name.trim().lowercase()
+                name == "fen bilimleri" || name == "genel" || name == "sosyal bilgiler" || name == "fen" || name == "sosyal"
+            }
+
+            // Remove unwanted courses
+            for (rem in coursesToRemove) {
+                homeworkDao.deleteHomeworksByCourse(rem.id)
+                courseDao.deleteCourse(rem)
+            }
+
+            // Desired default courses
+            val currentCourses = courseDao.getAllCoursesList()
+            val desiredCourses = listOf(
+                Course(name = "Matematik", teacher = "", colorHex = "#3B82F6", iconName = "Calculate"),
+                Course(name = "Fizik", teacher = "", colorHex = "#8B5CF6", iconName = "Bolt"),
+                Course(name = "Kimya", teacher = "", colorHex = "#06B6D4", iconName = "Science"),
+                Course(name = "Biyoloji", teacher = "", colorHex = "#10B981", iconName = "Biotech"),
+                Course(name = "Problem", teacher = "", colorHex = "#F59E0B", iconName = "Extension"),
+                Course(name = "Türkçe", teacher = "", colorHex = "#EF4444", iconName = "MenuBook"),
+                Course(name = "İngilizce", teacher = "", colorHex = "#EC4899", iconName = "Translate")
+            )
+
+            for (desired in desiredCourses) {
+                val existing = currentCourses.find { it.name.trim().equals(desired.name.trim(), ignoreCase = true) }
+                if (existing == null) {
+                    courseDao.insertCourse(desired)
+                } else if (existing.iconName != desired.iconName) {
+                    courseDao.updateCourse(existing.copy(iconName = desired.iconName))
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("HomeworkRepo", "Error syncing default courses: ${e.message}", e)
+        }
     }
 
     private var hasSeededDemoData = false
@@ -130,11 +172,8 @@ class HomeworkRepository(
     suspend fun seedInitialDataIfNeeded(force: Boolean = false) = withContext(Dispatchers.IO) {
         cleanupDuplicates()
 
-        if (!force && hasSeededDemoData) return@withContext
-
-        val courseCount = courseDao.getCourseCount()
-        val homeworkCount = homeworkDao.getHomeworkCount()
-        if (force || (courseCount == 0 && homeworkCount == 0)) {
+        // Never automatically inject demo data - only inject if user explicitly forced a reset!
+        if (force) {
             seedDemoWeeklyData()
         }
         hasSeededDemoData = true
@@ -144,14 +183,20 @@ class HomeworkRepository(
         val existing = courseDao.getAllCoursesList()
         val mathId = existing.find { it.name.equals("Matematik", ignoreCase = true) }?.id
             ?: courseDao.insertCourse(Course(name = "Matematik", teacher = "", colorHex = "#3B82F6", iconName = "Calculate"))
+        val physicsId = existing.find { it.name.equals("Fizik", ignoreCase = true) }?.id
+            ?: courseDao.insertCourse(Course(name = "Fizik", teacher = "", colorHex = "#8B5CF6", iconName = "Bolt"))
+        val chemistryId = existing.find { it.name.equals("Kimya", ignoreCase = true) }?.id
+            ?: courseDao.insertCourse(Course(name = "Kimya", teacher = "", colorHex = "#06B6D4", iconName = "Science"))
+        val biologyId = existing.find { it.name.equals("Biyoloji", ignoreCase = true) }?.id
+            ?: courseDao.insertCourse(Course(name = "Biyoloji", teacher = "", colorHex = "#10B981", iconName = "Biotech"))
+        val problemId = existing.find { it.name.equals("Problem", ignoreCase = true) }?.id
+            ?: courseDao.insertCourse(Course(name = "Problem", teacher = "", colorHex = "#F59E0B", iconName = "Extension"))
         val turkishId = existing.find { it.name.equals("Türkçe", ignoreCase = true) }?.id
             ?: courseDao.insertCourse(Course(name = "Türkçe", teacher = "", colorHex = "#EF4444", iconName = "MenuBook"))
-        val scienceId = existing.find { it.name.equals("Fen Bilimleri", ignoreCase = true) }?.id
-            ?: courseDao.insertCourse(Course(name = "Fen Bilimleri", teacher = "", colorHex = "#10B981", iconName = "Science"))
         val englishId = existing.find { it.name.equals("İngilizce", ignoreCase = true) }?.id
-            ?: courseDao.insertCourse(Course(name = "İngilizce", teacher = "", colorHex = "#8B5CF6", iconName = "Translate"))
-        val socialId = existing.find { it.name.equals("Sosyal Bilgiler", ignoreCase = true) }?.id
-            ?: courseDao.insertCourse(Course(name = "Sosyal Bilgiler", teacher = "", colorHex = "#F59E0B", iconName = "Public"))
+            ?: courseDao.insertCourse(Course(name = "İngilizce", teacher = "", colorHex = "#EC4899", iconName = "Translate"))
+        val scienceId = physicsId
+        val socialId = problemId
 
         // Pazar günlerini hesapla (Haftalık Pazar teslimleri)
         val now = Calendar.getInstance()

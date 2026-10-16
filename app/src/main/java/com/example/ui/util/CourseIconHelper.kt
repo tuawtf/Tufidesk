@@ -3,8 +3,10 @@ package com.example.ui.util
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Biotech
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Computer
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Palette
@@ -20,10 +22,11 @@ object CourseIconHelper {
     fun getIconForCourse(courseName: String): ImageVector {
         val lower = courseName.lowercase().trim()
         return when {
-            lower.contains("matematik") || lower.contains("geometri") || lower.contains("cebir") -> Icons.Default.Calculate
-            lower.contains("fizik") -> Icons.Default.Science
+            lower.contains("fizik") -> Icons.Default.Bolt
             lower.contains("kimya") -> Icons.Default.Science
-            lower.contains("biyoloji") || lower.contains("fen") -> Icons.Default.Biotech
+            lower.contains("biyoloji") -> Icons.Default.Biotech
+            lower.contains("problem") -> Icons.Default.Extension
+            lower.contains("matematik") || lower.contains("geometri") || lower.contains("cebir") -> Icons.Default.Calculate
             lower.contains("edebiyat") || lower.contains("türkçe") || lower.contains("dil ve anlatım") -> Icons.Default.MenuBook
             lower.contains("tarih") || lower.contains("inkılap") -> Icons.Default.AccountBalance
             lower.contains("coğrafya") -> Icons.Default.Public

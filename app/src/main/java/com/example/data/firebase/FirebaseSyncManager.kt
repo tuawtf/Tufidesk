@@ -430,12 +430,14 @@ class FirebaseSyncManager(
                             when (change.type) {
                                 DocumentChange.Type.ADDED, DocumentChange.Type.MODIFIED -> {
                                     val name = doc.getString("name") ?: ""
+                                    val cleanName = name.trim().lowercase()
+                                    val isRemovedCourse = cleanName == "fen bilimleri" || cleanName == "genel" || cleanName == "sosyal bilgiler" || cleanName == "fen" || cleanName == "sosyal"
                                     val teacher = doc.getString("teacher") ?: ""
                                     val colorHex = doc.getString("colorHex") ?: "#1B65D4"
                                     val iconName = doc.getString("iconName") ?: "menu_book"
                                     val updatedAtMillis = doc.getLong("updatedAtMillis") ?: 0L
 
-                                    if (isCourseDeleted(id) || (updatedAtMillis > 0 && updatedAtMillis <= getLastWipeTime())) {
+                                    if (isRemovedCourse || isCourseDeleted(id) || (updatedAtMillis > 0 && updatedAtMillis <= getLastWipeTime())) {
                                         try { doc.reference.delete() } catch (_: Exception) {}
                                         continue
                                     }
@@ -638,11 +640,14 @@ class FirebaseSyncManager(
             for (doc in remoteCoursesSnapshot.documents) {
                 val id = doc.getLong("id") ?: continue
                 val updatedAt = doc.getLong("updatedAtMillis") ?: 0L
-                if (isCourseDeleted(id) || (updatedAt > 0 && updatedAt <= getLastWipeTime())) {
+                val name = doc.getString("name") ?: ""
+                val cleanName = name.trim().lowercase()
+                val isRemovedCourse = cleanName == "fen bilimleri" || cleanName == "genel" || cleanName == "sosyal bilgiler" || cleanName == "fen" || cleanName == "sosyal"
+
+                if (isRemovedCourse || isCourseDeleted(id) || (updatedAt > 0 && updatedAt <= getLastWipeTime())) {
                     try { doc.reference.delete() } catch (_: Exception) {}
                     continue
                 }
-                val name = doc.getString("name") ?: ""
                 val teacher = doc.getString("teacher") ?: ""
                 val colorHex = doc.getString("colorHex") ?: "#1B65D4"
                 val iconName = doc.getString("iconName") ?: "menu_book"

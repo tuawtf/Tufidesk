@@ -64,13 +64,18 @@ fun FilterBar(
                 FilterChip(
                     selected = isSelected,
                     onClick = { onTimeChange(tf) },
-                    label = { Text(tf.title) },
+                    label = { Text(tf.title, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
                     shape = RoundedCornerShape(10.dp),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = isSelected,
+                        borderColor = if (isSelected) Color(0xFF8B5CF6).copy(alpha = 0.6f) else Color(0xFF2E2C56)
+                    ),
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Color(0xFF3E3D73),
-                        selectedLabelColor = Color(0xFFFFFFFF),
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                        labelColor = MaterialTheme.colorScheme.onSurface
+                        selectedContainerColor = Color(0xFF4A2E7A),
+                        selectedLabelColor = Color.White,
+                        containerColor = Color(0xFF1E1D3B),
+                        labelColor = Color(0xFFE2DCF0)
                     )
                 )
             }
@@ -78,7 +83,7 @@ fun FilterBar(
             Text(
                 text = "•",
                 modifier = Modifier.padding(horizontal = 2.dp),
-                color = MaterialTheme.colorScheme.outline
+                color = Color.White.copy(alpha = 0.3f)
             )
 
             // Status Filters
@@ -87,13 +92,18 @@ fun FilterBar(
                 FilterChip(
                     selected = isSelected,
                     onClick = { onStatusChange(sf) },
-                    label = { Text(sf.title) },
+                    label = { Text(sf.title, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
                     shape = RoundedCornerShape(10.dp),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = isSelected,
+                        borderColor = if (isSelected) Color(0xFF8B5CF6).copy(alpha = 0.6f) else Color(0xFF2E2C56)
+                    ),
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Color(0xFF3E3D73),
-                        selectedLabelColor = Color(0xFFFFFFFF),
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                        labelColor = MaterialTheme.colorScheme.onSurface
+                        selectedContainerColor = Color(0xFF4A2E7A),
+                        selectedLabelColor = Color.White,
+                        containerColor = Color(0xFF1E1D3B),
+                        labelColor = Color(0xFFE2DCF0)
                     )
                 )
             }
