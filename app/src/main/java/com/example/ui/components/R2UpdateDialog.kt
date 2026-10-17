@@ -125,7 +125,7 @@ fun R2DownloadingProgressDialog(
     val progressText = if (totalBytes > 0) {
         val currMb = downloadedBytes / (1024f * 1024f)
         val totalMb = totalBytes / (1024f * 1024f)
-        " %$percentage • %.1f MB / %.1f MB".format(Locale.US, currMb, totalMb)
+        " $percentage% • ${"%.1f".format(Locale.US, currMb)} MB / ${"%.1f".format(Locale.US, totalMb)} MB"
     } else {
         val currMb = downloadedBytes / (1024f * 1024f)
         " %.1f MB indirildi...".format(Locale.US, currMb)
