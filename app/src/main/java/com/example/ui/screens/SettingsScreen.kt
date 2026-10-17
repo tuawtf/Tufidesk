@@ -130,6 +130,8 @@ import com.example.ui.components.UserFlowerAvatar
 import com.example.ui.screens.settings.SearchableSettingItem
 import com.example.ui.screens.settings.SettingsSection
 import com.example.ui.screens.speech.SpeechSettingsSection
+import com.example.ui.screens.cloud.R2StorageSettingsCard
+import com.example.ui.HomeworkViewModel
 import com.google.firebase.FirebaseApp
 
 sealed class UpdateCheckResult {
@@ -181,6 +183,7 @@ fun SettingsScreen(
     onClearAllFirebaseData: ((Boolean, String) -> Unit) -> Unit = {},
     onExportFirebaseJson: ((Boolean, String) -> Unit) -> Unit = {},
     onImportFirebaseJson: (String, (Boolean, String) -> Unit) -> Unit = { _, _ -> },
+    viewModel: HomeworkViewModel? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -344,6 +347,7 @@ fun SettingsScreen(
             SearchableSettingItem("Tufi AI & API Anahtarı Ayarları", "DeepSeek / Gemini API anahtarı ve canlı model", SettingsSection.AI_AND_SPEECH, Icons.Default.AutoAwesome, listOf("ai", "yapay zeka", "tufi", "deepseek", "gemini", "api", "anahtar")),
             SearchableSettingItem("Sesli Dikte (Whisper)", "Bulut ve çevrimdışı Whisper ses-yazı tanıma motoru", SettingsSection.AI_AND_SPEECH, Icons.Default.AutoAwesome, listOf("ses", "dikte", "whisper", "mikrofon", "konuşma", "çevrimdışı")),
             SearchableSettingItem("Bulut Senkronizasyonu (Firebase)", "İnternet bağlantısı ve anlık senkronizasyon durumu", SettingsSection.DATA_AND_SYNC, Icons.Default.CloudSync, listOf("firebase", "bulut", "eşitleme", "online", "sync")),
+            SearchableSettingItem("Bulut Depolama (Cloudflare R2)", "Not görselleri için R2 Worker URL ve Token ayarları", SettingsSection.DATA_AND_SYNC, Icons.Default.CloudUpload, listOf("r2", "cloudflare", "worker", "depolama", "resim", "fotoğraf", "token", "cloud")),
             SearchableSettingItem("JSON Veri Yedekleme & Geri Yükleme", "Ders, ödev ve notları JSON ile dışa/içe aktar", SettingsSection.DATA_AND_SYNC, Icons.Default.CloudDownload, listOf("yedek", "json", "dışa aktar", "içe aktar", "export", "import")),
             SearchableSettingItem("Firebase Veritabanı Sıfırlama", "Buluttaki verileri silme veya demo yükleme", SettingsSection.DATA_AND_SYNC, Icons.Default.DeleteForever, listOf("sıfırla", "sil", "temizle", "firestore")),
             SearchableSettingItem("Geliştirici Ayarları & Teşhis Paneli", "Firebase logları, sistem teşhis raporu", SettingsSection.ADVANCED, Icons.Default.DeveloperMode, listOf("dev", "teşhis", "log", "hata", "bağlantı")),
@@ -804,6 +808,12 @@ fun SettingsScreen(
                             }
                         }
                     }
+                }
+
+                // Bulut Depolama (Cloudflare R2) Kartı
+                if (viewModel != null) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    R2StorageSettingsCard(viewModel = viewModel)
                 }
             }
             SettingsSection.ADVANCED -> {

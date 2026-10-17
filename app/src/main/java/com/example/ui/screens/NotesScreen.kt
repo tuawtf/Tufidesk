@@ -129,7 +129,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
+import com.example.R
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -2586,6 +2588,8 @@ fun GoogleKeepNoteCard(
                         AsyncImage(
                             model = note.imageUri,
                             contentDescription = note.title,
+                            placeholder = painterResource(id = R.drawable.ic_image_placeholder),
+                            error = painterResource(id = R.drawable.ic_broken_image),
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -3781,6 +3785,8 @@ fun KeepImageNoteEditDialog(
                         AsyncImage(
                             model = currentImageUri,
                             contentDescription = "Not Fotoğrafı",
+                            placeholder = painterResource(id = R.drawable.ic_image_placeholder),
+                            error = painterResource(id = R.drawable.ic_broken_image),
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
                         )

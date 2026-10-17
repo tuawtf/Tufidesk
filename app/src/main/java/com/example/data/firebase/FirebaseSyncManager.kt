@@ -13,6 +13,7 @@ import com.example.data.model.NoteFolder
 import com.example.data.model.NoteType
 import com.example.data.repository.HomeworkRepository
 import com.example.data.repository.NotesRepository
+import com.example.data.cloud.R2BlobManager
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FirebaseFirestore
@@ -581,6 +582,21 @@ class FirebaseSyncManager(
         }
     }
 
+    suspend fun uploadNoteToCloud(note: Note) {
+        if (!_isOnline.value) return
+        val db = firestore ?: return
+        try {
+            val data = R2BlobManager.resolveNoteDataForFirestore(context, note)
+            unmarkNoteDeleted(note.id)
+            db.collection("notes").document(note.id.toString())
+                .set(data, SetOptions.merge())
+                .await()
+            _lastSyncTime.value = System.currentTimeMillis()
+        } catch (e: Exception) {
+            Log.e(TAG, "Not buluta yüklenemedi: ${e.message}", e)
+        }
+    }
+
     suspend fun deleteNoteFromCloud(id: Long) {
         markNoteDeleted(id)
         val db = firestore ?: return
@@ -751,6 +767,77 @@ class FirebaseSyncManager(
                 val hw = hwWithCourse.homework
                 if (remoteHomeworksSnapshot.documents.none { it.getLong("id") == hw.id }) {
                     uploadHomeworkToCloud(hw)
+                }
+            }
+
+            // 3. Notes Sync
+            if (notesRepository != null) {
+                val localNotes = notesRepository.getAllNotesList()
+                val remoteNotesSnapshot = db.collection("notes").get().await()
+
+                for (doc in remoteNotesSnapshot.documents) {
+                    val id = doc.getLong("id") ?: continue
+                    val remoteUpdatedAt = doc.getLong("updatedAtMillis") ?: doc.getLong("createdAtMillis") ?: 0L
+
+                    if (isNoteDeleted(id) || (remoteUpdatedAt > 0 && remoteUpdatedAt <= getLastWipeTime())) {
+                        try { doc.reference.delete() } catch (_: Exception) {}
+                        continue
+                    }
+
+                    val title = doc.getString("title") ?: ""
+                    val content = doc.getString("content") ?: ""
+                    val folderId = doc.getLong("folderId")?.takeIf { it > 0 }
+                    val colorHex = doc.getString("colorHex") ?: "#FFFFFF"
+                    val imageUri = doc.getString("imageUri")
+                    val rawDrawingData = doc.getString("drawingData")
+                    val rawReportData = doc.getString("reportData")
+                    val isPinned = doc.getBoolean("isPinned") ?: false
+                    val isLocked = doc.getBoolean("isLocked") ?: false
+                    val assignedTo = doc.getString("assignedTo") ?: "Tuna"
+                    val createdAtMillis = doc.getLong("createdAtMillis") ?: System.currentTimeMillis()
+                    val typeName = doc.getString("type") ?: doc.getString("noteType") ?: NoteType.TEXT.name
+                    val type = try { NoteType.valueOf(typeName) } catch (_: Exception) { NoteType.TEXT }
+
+                    val existingNote = localNotes.find { it.id == id }
+
+                    // Resolve drawingData and reportData (download from R2 if "r2blob://")
+                    val resolvedDrawing = R2BlobManager.resolveRemoteBlobString(
+                        context, id, "drawing", rawDrawingData, existingNote?.drawingData
+                    )
+                    val resolvedReport = R2BlobManager.resolveRemoteBlobString(
+                        context, id, "report", rawReportData, existingNote?.reportData
+                    )
+
+                    val remoteNote = Note(
+                        id = id,
+                        title = title,
+                        content = content,
+                        folderId = folderId,
+                        colorHex = colorHex,
+                        imageUri = imageUri,
+                        drawingData = resolvedDrawing,
+                        reportData = resolvedReport,
+                        isPinned = isPinned,
+                        isLocked = isLocked,
+                        assignedTo = assignedTo,
+                        createdAtMillis = createdAtMillis,
+                        updatedAtMillis = remoteUpdatedAt,
+                        type = type
+                    )
+
+                    if (existingNote == null) {
+                        notesRepository.insertNote(remoteNote)
+                    } else if (remoteUpdatedAt >= existingNote.updatedAtMillis) {
+                        notesRepository.updateNote(remoteNote)
+                    } else if (existingNote.updatedAtMillis > remoteUpdatedAt) {
+                        uploadNoteToCloud(existingNote)
+                    }
+                }
+
+                for (n in localNotes) {
+                    if (remoteNotesSnapshot.documents.none { it.getLong("id") == n.id }) {
+                        uploadNoteToCloud(n)
+                    }
                 }
             }
 
@@ -929,24 +1016,8 @@ class FirebaseSyncManager(
 
             val localNotes = notesRepository?.getAllNotesList().orEmpty()
             for (n in localNotes) {
-                db.collection("notes").document(n.id.toString()).set(
-                    mapOf(
-                        "id" to n.id,
-                        "title" to n.title,
-                        "content" to n.content,
-                        "folderId" to (n.folderId ?: 0L),
-                        "colorHex" to n.colorHex,
-                        "isPinned" to n.isPinned,
-                        "isLocked" to n.isLocked,
-                        "noteType" to n.type.name,
-                        "createdAtMillis" to n.createdAtMillis,
-                        "updatedAtMillis" to n.updatedAtMillis,
-                        "assignedTo" to n.assignedTo,
-                        "drawingData" to (n.drawingData ?: ""),
-                        "reportData" to (n.reportData ?: ""),
-                        "imageUri" to (n.imageUri ?: "")
-                    )
-                ).await()
+                val data = R2BlobManager.resolveNoteDataForFirestore(context, n)
+                db.collection("notes").document(n.id.toString()).set(data).await()
             }
 
             _syncState.value = SyncState.SYNCED

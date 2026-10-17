@@ -177,7 +177,7 @@ class MainActivity : ComponentActivity() {
             CoroutineScope(Dispatchers.IO + SupervisorJob()),
             notesRepository
         )
-        HomeworkViewModelFactory(repository, authManager, syncManager, notesRepository)
+        HomeworkViewModelFactory(repository, authManager, syncManager, notesRepository, applicationContext)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -488,7 +488,8 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
             },
             onImportFirebaseJson = { jsonStr, onResult ->
                 viewModel.importFirebaseDataFromJson(jsonStr, onResult)
-            }
+            },
+            viewModel = viewModel
         )
     }
 

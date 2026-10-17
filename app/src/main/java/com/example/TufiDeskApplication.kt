@@ -4,9 +4,44 @@ import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import coil.ImageLoader
+import coil.ImageLoaderFactory
+import coil.disk.DiskCache
+import coil.memory.MemoryCache
+import com.example.data.cloud.R2AuthInterceptor
+import com.example.data.cloud.R2UriMapper
+import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
-class TufiDeskApplication : Application() {
+class TufiDeskApplication : Application(), ImageLoaderFactory {
+
+    override fun newImageLoader(): ImageLoader {
+        val okHttpClient = OkHttpClient.Builder()
+            .addInterceptor(R2AuthInterceptor(this))
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build()
+
+        return ImageLoader.Builder(this)
+            .components {
+                add(R2UriMapper(this@TufiDeskApplication))
+            }
+            .okHttpClient(okHttpClient)
+            .memoryCache {
+                MemoryCache.Builder(this)
+                    .maxSizePercent(0.25)
+                    .build()
+            }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(cacheDir.resolve("image_cache"))
+                    .maxSizeBytes(100L * 1024 * 1024) // 100 MB disk önbelleği (çevrimdışı erişim)
+                    .build()
+            }
+            .crossfade(true)
+            .build()
+    }
 
     override fun onCreate() {
         super.onCreate()

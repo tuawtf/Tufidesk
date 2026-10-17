@@ -1,9 +1,11 @@
 package com.example.ui
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.auth.AuthManager
+import com.example.data.cloud.R2ImageManager
 import com.example.data.firebase.FirebaseSyncManager
 import com.example.data.model.Course
 import com.example.data.model.Homework
@@ -57,7 +59,8 @@ class HomeworkViewModel(
     private val repository: HomeworkRepository,
     private val authManager: AuthManager,
     private val syncManager: FirebaseSyncManager,
-    private val notesRepository: NotesRepository
+    val notesRepository: NotesRepository,
+    private val appContext: Context? = null
 ) : ViewModel() {
 
     init {
@@ -268,22 +271,81 @@ class HomeworkViewModel(
         noteSearchQuery.value = query
     }
 
+    val isUploadingExistingNotes = MutableStateFlow(false)
+    val existingNotesUploadProgress = MutableStateFlow<Pair<Int, Int>?>(null)
+
     fun insertNote(note: Note) {
         viewModelScope.launch {
-            notesRepository.insertNote(note)
+            val processed = if (appContext != null) {
+                R2ImageManager.uploadNoteImageIfEligible(appContext, note)
+            } else {
+                note
+            }
+            val id = notesRepository.insertNote(processed)
+            val finalNote = processed.copy(id = if (processed.id == 0L) id else processed.id)
+            syncManager.uploadNoteToCloud(finalNote)
         }
     }
 
     fun updateNote(note: Note) {
         viewModelScope.launch {
-            notesRepository.updateNote(note)
+            val processed = if (appContext != null) {
+                R2ImageManager.uploadNoteImageIfEligible(appContext, note)
+            } else {
+                note
+            }
+            notesRepository.updateNote(processed)
+            syncManager.uploadNoteToCloud(processed)
         }
     }
 
     fun deleteNote(note: Note) {
         viewModelScope.launch {
+            if (appContext != null && note.imageUri?.startsWith("r2://") == true) {
+                R2ImageManager.deleteR2FileIfPresent(appContext, note.imageUri)
+            }
             notesRepository.deleteNote(note)
             syncManager.deleteNoteFromCloud(note.id)
+        }
+    }
+
+    /**
+     * Cihazdaki yerel resimli notları (content:// veya file://) sırayla sıkıştırıp Cloudflare R2'ye yükler.
+     */
+    fun uploadExistingLocalImageNotes(onComplete: (successCount: Int, totalCount: Int, message: String) -> Unit) {
+        val context = appContext ?: return
+        if (isUploadingExistingNotes.value) return
+        viewModelScope.launch {
+            isUploadingExistingNotes.value = true
+            existingNotesUploadProgress.value = null
+            try {
+                val allNotes = notesRepository.getAllNotesList()
+                val localImageNotes = allNotes.filter {
+                    val uri = it.imageUri
+                    !uri.isNullOrBlank() && (uri.startsWith("content://") || uri.startsWith("file://"))
+                }
+                if (localImageNotes.isEmpty()) {
+                    onComplete(0, 0, "Yüklenecek yerel resimli not bulunamadı (Tüm görseller zaten R2'de veya görsel yok).")
+                    return@launch
+                }
+                var successCount = 0
+                val total = localImageNotes.size
+                for ((index, note) in localImageNotes.withIndex()) {
+                    existingNotesUploadProgress.value = Pair(index + 1, total)
+                    val updated = R2ImageManager.uploadNoteImageIfEligible(context, note)
+                    if (updated.imageUri != note.imageUri && updated.imageUri?.startsWith("r2://") == true) {
+                        notesRepository.updateNote(updated)
+                        syncManager.uploadNoteToCloud(updated)
+                        successCount++
+                    }
+                }
+                onComplete(successCount, total, "Toplam $total yerel görselden $successCount tanesi başarıyla Cloudflare R2'ye yüklendi! ✅")
+            } catch (e: Exception) {
+                onComplete(0, 0, "Aktarım sırasında hata oluştu: ${e.localizedMessage}")
+            } finally {
+                isUploadingExistingNotes.value = false
+                existingNotesUploadProgress.value = null
+            }
         }
     }
 
@@ -870,12 +932,13 @@ class HomeworkViewModelFactory(
     private val repository: HomeworkRepository,
     private val authManager: AuthManager,
     private val syncManager: FirebaseSyncManager,
-    private val notesRepository: NotesRepository
+    private val notesRepository: NotesRepository,
+    private val context: Context? = null
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(HomeworkViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return HomeworkViewModel(repository, authManager, syncManager, notesRepository) as T
+            return HomeworkViewModel(repository, authManager, syncManager, notesRepository, context) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
