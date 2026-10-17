@@ -74,6 +74,7 @@ jobs:
         run: |
           mkdir -p release-output
           cp app/build/outputs/apk/debug/*.apk "release-output/Tufidesk-v${{ env.VERSION_NAME }}-stable.apk"
+  
       - name: R2'ye Guncelleme Yukle
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
