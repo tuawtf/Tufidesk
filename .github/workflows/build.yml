@@ -36,9 +36,20 @@ jobs:
           sed -i 's/versionName = .*/versionName = "'"$VERSION_NAME"'"/' app/build.gradle.kts
 
       - name: Kasadan Kalici Anahtari Cikar
+        env:
+          R2_WORKER_URL: ${{ secrets.R2_WORKER_URL }}
+          R2_API_TOKEN: ${{ secrets.R2_API_TOKEN }}
         run: |
           if [ -f ".env.example" ] && [ ! -f ".env" ]; then
             cp .env.example .env
+          fi
+
+          # R2 yapilandirmasi (GitHub Secrets'tan)
+          if [ -n "$R2_WORKER_URL" ] && [ -n "$R2_API_TOKEN" ]; then
+            echo "" >> .env
+            sed -i '/^R2_WORKER_URL=/d;/^R2_API_TOKEN=/d' .env
+            echo "R2_WORKER_URL=$R2_WORKER_URL" >> .env
+            echo "R2_API_TOKEN=$R2_API_TOKEN" >> .env
           fi
 
           # Kasadaki sabit anahtari cozer
