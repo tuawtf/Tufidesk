@@ -74,7 +74,26 @@ jobs:
         run: |
           mkdir -p release-output
           cp app/build/outputs/apk/debug/*.apk "release-output/Tufidesk-v${{ env.VERSION_NAME }}-stable.apk"
-
+      - name: R2'ye Guncelleme Yukle
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          VC: ${{ github.run_number }}
+        run: |
+          APK="release-output/Tufidesk-v${VERSION_NAME}-stable.apk"
+          KEY="updates/Tufidesk-v${VERSION_NAME}.apk"
+          SHA=$(sha256sum "$APK" | cut -d' ' -f1)
+          SIZE=$(stat -c%s "$APK")
+          aws s3 cp "$APK" "s3://tufidesk-files/$KEY" --endpoint-url "$R2_ENDPOINT"
+          printf '{"versionName":"%s","versionCode":%s,"apkKey":"%s","sha256":"%s","size":%s}' \
+            "$VERSION_NAME" "$VC" "$KEY" "$SHA" "$SIZE" > latest.json
+          aws s3 cp latest.json "s3://tufidesk-files/updates/latest.json" \
+            --endpoint-url "$R2_ENDPOINT" --content-type application/json
+            
       - name: Otomatik Release Olustur ve Paylas
         uses: softprops/action-gh-release@v2
         with:
