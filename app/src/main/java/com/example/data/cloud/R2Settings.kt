@@ -17,6 +17,8 @@ object R2Settings {
     private const val KEY_WORKER_TOKEN = "pref_r2_worker_token"
     private const val KEY_UPLOAD_IMAGE_NOTES = "pref_r2_upload_image_notes"
     private const val KEY_UPLOAD_LARGE_BLOBS = "pref_r2_upload_large_blobs"
+    private const val KEY_AUTO_UPDATE_CHECK = "pref_r2_auto_update_check"
+    private const val KEY_LAST_UPDATE_CHECK_MILLIS = "pref_r2_last_update_check_millis"
 
     @Volatile
     private var sharedPreferences: SharedPreferences? = null
@@ -132,6 +134,39 @@ object R2Settings {
 
     fun setLargeBlobUploadEnabled(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_UPLOAD_LARGE_BLOBS, enabled).apply()
+    }
+
+    /**
+     * Açılışta otomatik güncelleme kontrolü yapılması açık mı? (Varsayılan: true)
+     */
+    fun isAutoUpdateCheckEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_AUTO_UPDATE_CHECK, true)
+    }
+
+    fun setAutoUpdateCheckEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_AUTO_UPDATE_CHECK, enabled).apply()
+    }
+
+    /**
+     * Son otomatik güncelleme kontrolü zamanı (milisaniye).
+     */
+    fun getLastUpdateCheckMillis(context: Context): Long {
+        return getPrefs(context).getLong(KEY_LAST_UPDATE_CHECK_MILLIS, 0L)
+    }
+
+    fun setLastUpdateCheckMillis(context: Context, millis: Long) {
+        getPrefs(context).edit().putLong(KEY_LAST_UPDATE_CHECK_MILLIS, millis).apply()
+    }
+
+    /**
+     * Günde en fazla 1 kez otomatik kontrol yapılması gerektiğini sorgular.
+     */
+    fun shouldRunAutoCheck(context: Context): Boolean {
+        if (!isAutoUpdateCheckEnabled(context) || !isR2Configured(context)) return false
+        val lastCheck = getLastUpdateCheckMillis(context)
+        val now = System.currentTimeMillis()
+        val oneDayMillis = 24 * 60 * 60 * 1000L
+        return (now - lastCheck) >= oneDayMillis
     }
 
     /**

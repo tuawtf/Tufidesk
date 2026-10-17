@@ -438,6 +438,53 @@ fun R2StorageSettingsCard(
                 }
             }
 
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // 5. "Açılışta otomatik kontrol et" Switch'i
+            var isAutoUpdateCheckEnabled by remember {
+                mutableStateOf(R2Settings.isAutoUpdateCheckEnabled(context))
+            }
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Açılışta otomatik güncelleme kontrolü et",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Uygulama açıldığında günde en fazla bir kez R2 üzerinden yeni sürüm denetimi yapılır.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Switch(
+                        checked = isAutoUpdateCheckEnabled,
+                        onCheckedChange = { checked ->
+                            isAutoUpdateCheckEnabled = checked
+                            R2Settings.setAutoUpdateCheckEnabled(context, checked)
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.primary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                        )
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(14.dp))
 
             // 5. "Mevcut resim notlarını yükle" Butonu ve İlerleme Göstergesi

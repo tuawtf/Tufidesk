@@ -222,6 +222,13 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
     val localView = LocalView.current
 
     var crashReportToShow by remember { mutableStateOf<String?>(null) }
+    var autoUpdateAvailableInfo by remember { mutableStateOf<com.example.data.cloud.UpdateInfo?>(null) }
+    var isAutoDownloadingApk by remember { mutableStateOf(false) }
+    var autoDownloadProgressPair by remember { mutableStateOf<Pair<Long, Long>?>(null) }
+    var activeAutoDownloadJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    var showAutoUnknownSourcesDialog by remember { mutableStateOf(false) }
+    var autoUpdateErrorMessage by remember { mutableStateOf<String?>(null) }
+
     LaunchedEffect(Unit) {
         try {
             val crashPrefs = context.getSharedPreferences("crash_recovery_prefs", Context.MODE_PRIVATE)
@@ -231,6 +238,14 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                 crashReportToShow = "HATA MESAJI:\n$err\n\nDETAYLI STACK TRACE:\n$stack"
             }
         } catch (_: Exception) {}
+
+        if (com.example.data.cloud.R2Settings.shouldRunAutoCheck(context)) {
+            com.example.data.cloud.R2Settings.setLastUpdateCheckMillis(context, System.currentTimeMillis())
+            val status = com.example.data.cloud.R2UpdateManager.checkForUpdate(context)
+            if (status is com.example.data.cloud.UpdateCheckStatus.NewVersionAvailable) {
+                autoUpdateAvailableInfo = status.updateInfo
+            }
+        }
     }
 
     val showNotification: (String, IslandNotificationType, String?) -> Unit = { msg, type, title ->
@@ -1322,6 +1337,88 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                     Text("Kapat")
                 }
             }
+        )
+    }
+
+    // Açılışta otomatik güncelleme diyalogları
+    autoUpdateAvailableInfo?.let { info ->
+        com.example.ui.components.R2NewVersionAvailableDialog(
+            updateInfo = info,
+            onStartDownload = {
+                val infoToDownload = info
+                autoUpdateAvailableInfo = null
+                isAutoDownloadingApk = true
+                autoDownloadProgressPair = Pair(0L, infoToDownload.size)
+
+                activeAutoDownloadJob = coroutineScope.launch {
+                    val result = com.example.data.cloud.R2UpdateManager.downloadApk(
+                        context = context,
+                        apkKey = infoToDownload.apkKey,
+                        expectedSha256 = infoToDownload.sha256,
+                        onProgress = { curr, total ->
+                            autoDownloadProgressPair = Pair(curr, total)
+                        }
+                    )
+
+                    isAutoDownloadingApk = false
+                    when (result) {
+                        is com.example.data.cloud.DownloadStatus.Success -> {
+                            val installResult = com.example.data.cloud.R2UpdateManager.installApk(context, result.apkFile)
+                            if (installResult == "PERMISSION_REQUIRED") {
+                                showAutoUnknownSourcesDialog = true
+                            } else if (installResult != null) {
+                                autoUpdateErrorMessage = installResult
+                            }
+                        }
+                        is com.example.data.cloud.DownloadStatus.Error -> {
+                            autoUpdateErrorMessage = result.message
+                        }
+                        else -> {}
+                    }
+                }
+            },
+            onDismiss = { autoUpdateAvailableInfo = null }
+        )
+    }
+
+    if (isAutoDownloadingApk) {
+        val (curr, total) = autoDownloadProgressPair ?: Pair(0L, 0L)
+        com.example.ui.components.R2DownloadingProgressDialog(
+            downloadedBytes = curr,
+            totalBytes = total,
+            onCancel = {
+                activeAutoDownloadJob?.cancel()
+                isAutoDownloadingApk = false
+                com.example.data.cloud.R2UpdateManager.clearUpdatesCache(context)
+                Toast.makeText(context, "İndirme iptal edildi.", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    if (showAutoUnknownSourcesDialog) {
+        com.example.ui.components.R2UnknownSourcesPermissionDialog(
+            onOpenSettings = {
+                showAutoUnknownSourcesDialog = false
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    val settingsIntent = android.content.Intent(
+                        android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        android.net.Uri.parse("package:${context.packageName}")
+                    ).apply {
+                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(settingsIntent)
+                }
+            },
+            onDismiss = { showAutoUnknownSourcesDialog = false }
+        )
+    }
+
+    autoUpdateErrorMessage?.let { msg ->
+        com.example.ui.components.R2UpdateMessageDialog(
+            title = "Güncelleme Hatası",
+            message = msg,
+            isSuccess = false,
+            onDismiss = { autoUpdateErrorMessage = null }
         )
     }
 }

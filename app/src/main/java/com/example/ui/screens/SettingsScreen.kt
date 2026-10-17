@@ -119,26 +119,33 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+import android.os.Build
+import android.provider.Settings
 import com.example.CrashActivity
 import com.example.data.ai.TufiAIService
+import com.example.data.cloud.R2Settings
+import com.example.data.cloud.R2UpdateManager
+import com.example.data.cloud.UpdateCheckStatus
+import com.example.data.cloud.DownloadStatus
+import com.example.data.cloud.UpdateInfo
 import com.example.data.firebase.SyncState
 import com.example.data.model.UserAccount
 import com.example.ui.components.TufiAISettingsDialog
 import com.example.ui.components.UserFlowerAvatar
+import com.example.ui.components.R2NewVersionAvailableDialog
+import com.example.ui.components.R2DownloadingProgressDialog
+import com.example.ui.components.R2UnknownSourcesPermissionDialog
+import com.example.ui.components.R2UpdateMessageDialog
 import com.example.ui.screens.settings.SearchableSettingItem
 import com.example.ui.screens.settings.SettingsSection
 import com.example.ui.screens.speech.SpeechSettingsSection
 import com.example.ui.screens.cloud.R2StorageSettingsCard
 import com.example.ui.HomeworkViewModel
 import com.google.firebase.FirebaseApp
-
-sealed class UpdateCheckResult {
-    data class NewVersion(val version: String, val releaseUrl: String) : UpdateCheckResult()
-    data class UpToDate(val version: String) : UpdateCheckResult()
-    data class Error(val message: String) : UpdateCheckResult()
-}
 
 data class MaterialPaletteOption(
     val id: String,
@@ -202,43 +209,74 @@ fun SettingsScreen(
         }
     }
 
-    // Güncelleme kontrolü durumu
+    // R2 Güncelleme State'leri
     var isCheckingUpdate by remember { mutableStateOf(false) }
-    var updateCheckResult by remember { mutableStateOf<UpdateCheckResult?>(null) }
+    var updateInfoAvailable by remember { mutableStateOf<UpdateInfo?>(null) }
+    var isDownloadingApk by remember { mutableStateOf(false) }
+    var downloadProgressPair by remember { mutableStateOf<Pair<Long, Long>?>(null) }
+    var activeDownloadJob by remember { mutableStateOf<Job?>(null) }
+    var showUnknownSourcesDialog by remember { mutableStateOf(false) }
+    var updateStatusMessage by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
 
-    fun checkForUpdates() {
-        isCheckingUpdate = true
-        coroutineScope.launch {
-            try {
-                val (latestTag, htmlUrl) = withContext(Dispatchers.IO) {
-                    val url = java.net.URL("https://api.github.com/repos/tuawtf/Tufidesk/releases/latest")
-                    val conn = url.openConnection() as java.net.HttpURLConnection
-                    conn.requestMethod = "GET"
-                    conn.setRequestProperty("Accept", "application/vnd.github.v3+json")
-                    conn.setRequestProperty("User-Agent", "Tufidesk-Android-App")
-                    conn.connectTimeout = 8000
-                    conn.readTimeout = 8000
-                    val responseCode = conn.responseCode
-                    if (responseCode == 200) {
-                        val stream = conn.inputStream.bufferedReader().use { it.readText() }
-                        val json = org.json.JSONObject(stream)
-                        val tagName = json.optString("tag_name", "").removePrefix("v").trim()
-                        val urlStr = json.optString("html_url", "https://github.com/tuawtf/Tufidesk/releases")
-                        Pair(tagName, urlStr)
-                    } else {
-                        throw Exception("Sunucu yanıt vermedi (Kod: $responseCode)")
+    fun startApkDownload(info: UpdateInfo) {
+        updateInfoAvailable = null
+        isDownloadingApk = true
+        downloadProgressPair = Pair(0L, info.size)
+
+        activeDownloadJob = coroutineScope.launch {
+            val result = R2UpdateManager.downloadApk(
+                context = context,
+                apkKey = info.apkKey,
+                expectedSha256 = info.sha256,
+                onProgress = { curr, total ->
+                    downloadProgressPair = Pair(curr, total)
+                }
+            )
+
+            isDownloadingApk = false
+            when (result) {
+                is DownloadStatus.Success -> {
+                    val installResult = R2UpdateManager.installApk(context, result.apkFile)
+                    if (installResult == "PERMISSION_REQUIRED") {
+                        showUnknownSourcesDialog = true
+                    } else if (installResult != null) {
+                        updateStatusMessage = Pair(false, installResult)
                     }
                 }
-                val currentClean = appVersion.removePrefix("v").trim()
-                if (latestTag.isNotEmpty() && latestTag != currentClean) {
-                    updateCheckResult = UpdateCheckResult.NewVersion(latestTag, htmlUrl)
-                } else {
-                    updateCheckResult = UpdateCheckResult.UpToDate(appVersion)
+                is DownloadStatus.Error -> {
+                    updateStatusMessage = Pair(false, result.message)
                 }
-            } catch (e: Exception) {
-                updateCheckResult = UpdateCheckResult.Error("Güncelleme kontrolü başarısız oldu: ${e.localizedMessage ?: "Bağlantı hatası"}")
-            } finally {
-                isCheckingUpdate = false
+                else -> {}
+            }
+        }
+    }
+
+    fun checkForUpdates() {
+        if (!R2Settings.isR2Configured(context)) {
+            updateStatusMessage = Pair(
+                false,
+                "Cloudflare R2 (Worker URL ve Token) yapılandırılmamış. Lütfen Ayarlar > Bulut Depolama (R2) bölümünden R2 ayarlarını tamamlayın."
+            )
+            return
+        }
+
+        isCheckingUpdate = true
+        coroutineScope.launch {
+            val status = R2UpdateManager.checkForUpdate(context)
+            isCheckingUpdate = false
+            when (status) {
+                is UpdateCheckStatus.NewVersionAvailable -> {
+                    updateInfoAvailable = status.updateInfo
+                }
+                is UpdateCheckStatus.UpToDate -> {
+                    updateStatusMessage = Pair(
+                        true,
+                        "TufiDESK güncel! 🎉\nMevcut sürümünüz: v${status.currentVersionName} (Sürüm kodu: ${status.currentVersionCode})"
+                    )
+                }
+                is UpdateCheckStatus.Error -> {
+                    updateStatusMessage = Pair(false, status.message)
+                }
             }
         }
     }
@@ -993,7 +1031,11 @@ fun SettingsScreen(
 
                     SettingsClickableItem(
                         title = "Güncellemeleri Kontrol Et",
-                        subtitle = if (isCheckingUpdate) "Kontrol ediliyor..." else "En son sürümü GitHub üzerinden denetle",
+                        subtitle = when {
+                            isCheckingUpdate -> "Kontrol ediliyor..."
+                            !R2Settings.isR2Configured(context) -> "Önce Bulut Depolama'yı yapılandır"
+                            else -> "En son sürümü R2 bulut depolama üzerinden denetle"
+                        },
                         icon = Icons.Default.CloudDownload,
                         onClick = { if (!isCheckingUpdate) checkForUpdates() }
                     )
@@ -2131,108 +2173,54 @@ fun SettingsScreen(
         )
     }
 
-    // 9. Güncelleme Kontrolü Dialogu
-    updateCheckResult?.let { result ->
-        when (result) {
-            is UpdateCheckResult.NewVersion -> {
-                AlertDialog(
-                    onDismissRequest = { updateCheckResult = null },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.CloudDownload,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    },
-                    title = {
-                        Text(
-                            text = "Yeni Sürüm Mevcut!",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                        )
-                    },
-                    text = {
-                        Text(
-                            text = "TufiDESK v${result.version} yayınlandı.\nMevcut sürümünüz: v$appVersion.\n\nİndirmek için GitHub release sayfasını açabilirsiniz.",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    },
-                    confirmButton = {
-                        Button(
-                            onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(result.releaseUrl))
-                                context.startActivity(intent)
-                                updateCheckResult = null
-                            }
-                        ) {
-                            Text("İndir")
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { updateCheckResult = null }) {
-                            Text("Daha Sonra")
-                        }
-                    }
-                )
+    // 9. R2 Güncelleme Diyalogları
+    updateInfoAvailable?.let { info ->
+        R2NewVersionAvailableDialog(
+            updateInfo = info,
+            onStartDownload = { startApkDownload(info) },
+            onDismiss = { updateInfoAvailable = null }
+        )
+    }
+
+    if (isDownloadingApk) {
+        val (curr, total) = downloadProgressPair ?: Pair(0L, 0L)
+        R2DownloadingProgressDialog(
+            downloadedBytes = curr,
+            totalBytes = total,
+            onCancel = {
+                activeDownloadJob?.cancel()
+                isDownloadingApk = false
+                R2UpdateManager.clearUpdatesCache(context)
+                Toast.makeText(context, "İndirme iptal edildi.", Toast.LENGTH_SHORT).show()
             }
-            is UpdateCheckResult.UpToDate -> {
-                AlertDialog(
-                    onDismissRequest = { updateCheckResult = null },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = null,
-                            tint = Color(0xFF10B981)
-                        )
-                    },
-                    title = {
-                        Text(
-                            text = "Uygulamanız Güncel",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                        )
-                    },
-                    text = {
-                        Text(
-                            text = "En son sürümü (v${result.version}) kullanıyorsunuz.",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    },
-                    confirmButton = {
-                        TextButton(onClick = { updateCheckResult = null }) {
-                            Text("Tamam")
-                        }
+        )
+    }
+
+    if (showUnknownSourcesDialog) {
+        R2UnknownSourcesPermissionDialog(
+            onOpenSettings = {
+                showUnknownSourcesDialog = false
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    val settingsIntent = Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:${context.packageName}")
+                    ).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
-                )
-            }
-            is UpdateCheckResult.Error -> {
-                AlertDialog(
-                    onDismissRequest = { updateCheckResult = null },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.ErrorOutline,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                    },
-                    title = {
-                        Text(
-                            text = "Güncelleme Kontrolü",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                        )
-                    },
-                    text = {
-                        Text(
-                            text = result.message,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    },
-                    confirmButton = {
-                        TextButton(onClick = { updateCheckResult = null }) {
-                            Text("Tamam")
-                        }
-                    }
-                )
-            }
-        }
+                    context.startActivity(settingsIntent)
+                }
+            },
+            onDismiss = { showUnknownSourcesDialog = false }
+        )
+    }
+
+    updateStatusMessage?.let { (isSuccess, msg) ->
+        R2UpdateMessageDialog(
+            title = if (isSuccess) "Güncelleme Kontrolü" else "Hata",
+            message = msg,
+            isSuccess = isSuccess,
+            onDismiss = { updateStatusMessage = null }
+        )
     }
 }
 
