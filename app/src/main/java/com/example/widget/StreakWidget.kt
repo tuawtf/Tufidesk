@@ -60,7 +60,7 @@ class StreakWidget : GlanceAppWidget() {
 
 @Composable
 fun StreakWidgetContent(data: StreakWidgetData) {
-    // Main Container (4x2 layout with shorter top/bottom padding)
+    // Main Container (4x2 layout with tight vertical spacing)
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
@@ -68,12 +68,12 @@ fun StreakWidgetContent(data: StreakWidgetData) {
             .cornerRadius(28.dp)
             .clickable(actionStartActivity<MainActivity>())
     ) {
-        // 1. Left Section (Content Column with compact top/bottom padding)
+        // 1. Left Section (Tight content column centered vertically without giant gaps)
         Column(
             modifier = GlanceModifier
                 .fillMaxHeight()
-                .padding(start = 18.dp, top = 10.dp, bottom = 10.dp, end = 110.dp),
-            verticalAlignment = Alignment.Top,
+                .padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 105.dp),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalAlignment = Alignment.Start
         ) {
             // Upper Part: Flame Icon + Streak Count
@@ -126,16 +126,15 @@ fun StreakWidgetContent(data: StreakWidgetData) {
                 )
             }
 
-            // Flexible vertical spacer pushing the weekly table to the very bottom
-            Spacer(modifier = GlanceModifier.defaultWeight())
+            Spacer(modifier = GlanceModifier.height(6.dp))
 
-            // Lower Part: Weekly Streak Table at the bottom
+            // Lower Part: Weekly Streak Table
             Row(
                 modifier = GlanceModifier
                     .fillMaxWidth()
                     .background(Color(0xFFE8DEF8))
                     .cornerRadius(16.dp)
-                    .padding(horizontal = 12.dp, vertical = 5.dp),
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -185,7 +184,7 @@ fun StreakWidgetContent(data: StreakWidgetData) {
             }
         }
 
-        // 2. Right Section (Pony Illustration - Compact vertical size)
+        // 2. Right Section (Pony Illustration)
         Box(
             modifier = GlanceModifier.fillMaxSize(),
             contentAlignment = Alignment.BottomEnd
@@ -194,8 +193,8 @@ fun StreakWidgetContent(data: StreakWidgetData) {
                 provider = ImageProvider(R.drawable.twilight_bottom_illustration),
                 contentDescription = "Twilight Sparkle",
                 modifier = GlanceModifier
-                    .width(100.dp)
-                    .height(105.dp),
+                    .width(105.dp)
+                    .height(115.dp),
                 contentScale = ContentScale.Fit
             )
         }
