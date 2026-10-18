@@ -2,22 +2,43 @@ package com.example.data.repository
 
 import com.example.data.dao.CourseDao
 import com.example.data.dao.HomeworkDao
+import com.example.data.dao.HomeworkVerificationDao
 import com.example.data.model.Course
 import com.example.data.model.Homework
+import com.example.data.model.HomeworkVerification
 import com.example.data.model.HomeworkWithCourse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 
 class HomeworkRepository(
     private val courseDao: CourseDao,
-    private val homeworkDao: HomeworkDao
+    private val homeworkDao: HomeworkDao,
+    private val verificationDao: HomeworkVerificationDao? = null
 ) {
     val allHomeworks: Flow<List<HomeworkWithCourse>> = homeworkDao.getAllHomeworksWithCourse()
     val allCourses: Flow<List<Course>> = courseDao.getAllCourses().map { list ->
         list.distinctBy { it.name.trim().lowercase() }
+    }
+    val allVerifications: Flow<List<HomeworkVerification>> = verificationDao?.getAllVerificationsFlow() ?: flowOf(emptyList())
+
+    suspend fun insertVerification(verification: HomeworkVerification) = withContext(Dispatchers.IO) {
+        verificationDao?.insertVerification(verification)
+    }
+
+    suspend fun insertVerifications(verifications: List<HomeworkVerification>) = withContext(Dispatchers.IO) {
+        verificationDao?.insertVerifications(verifications)
+    }
+
+    suspend fun getVerificationsForHomework(homeworkId: Long): List<HomeworkVerification> = withContext(Dispatchers.IO) {
+        verificationDao?.getVerificationsForHomework(homeworkId) ?: emptyList()
+    }
+
+    suspend fun getAllVerificationHashes(): List<Long> = withContext(Dispatchers.IO) {
+        verificationDao?.getAllHashes() ?: emptyList()
     }
 
     suspend fun insertCourse(course: Course): Long = withContext(Dispatchers.IO) {

@@ -26,7 +26,12 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material.icons.filled.GppMaybe
 import androidx.compose.material.icons.filled.Warning
+import com.example.data.verification.HomeworkVerificationSettings
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -68,12 +73,16 @@ fun HomeworkItemCard(
     onToggleComplete: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onVerifyWithPhoto: (() -> Unit)? = null,
+    verificationStatus: String? = null,
     canManage: Boolean = true,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val homework = item.homework
     val course = item.course
     var menuExpanded by remember { mutableStateOf(false) }
+    val isPhotoVerificationEnabled = remember { HomeworkVerificationSettings.isPhotoVerificationEnabled(context) }
 
     val courseColor = remember(course?.colorHex) {
         try {
@@ -163,6 +172,22 @@ fun HomeworkItemCard(
                                 expanded = menuExpanded,
                                 onDismissRequest = { menuExpanded = false }
                             ) {
+                                if (!homework.isCompleted && isPhotoVerificationEnabled && onVerifyWithPhoto != null) {
+                                    DropdownMenuItem(
+                                        text = { Text("Fotoğrafla onayla") },
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.Default.PhotoCamera,
+                                                contentDescription = "Fotoğrafla onayla",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        },
+                                        onClick = {
+                                            menuExpanded = false
+                                            onVerifyWithPhoto()
+                                        }
+                                    )
+                                }
                                 DropdownMenuItem(
                                     text = { Text("Düzenle") },
                                     leadingIcon = {
@@ -293,6 +318,57 @@ fun HomeworkItemCard(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                        }
+                    }
+                }
+
+                // Doğrulama Rozeti
+                if (homework.isCompleted && verificationStatus != null) {
+                    if (verificationStatus == "VERIFIED") {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.VerifiedUser,
+                                    contentDescription = "Doğrulandı",
+                                    modifier = Modifier.size(13.dp),
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Doğrulandı",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    } else if (verificationStatus == "UNVERIFIED") {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.GppMaybe,
+                                    contentDescription = "Doğrulanamadı",
+                                    modifier = Modifier.size(13.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Doğrulanamadı",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }

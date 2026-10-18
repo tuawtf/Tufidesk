@@ -99,6 +99,8 @@ fun HomeScreen(
     onSwitchProfile: () -> Unit = {},
     courses: List<Course> = emptyList(),
     onNavigateToTufiAI: () -> Unit = {},
+    onVerifyWithPhoto: ((Homework) -> Unit)? = null,
+    verificationStatusMap: Map<Long, String> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
     val todayFormatted = remember {
@@ -193,6 +195,8 @@ fun HomeScreen(
                     onToggleComplete = { onToggleComplete(item.homework) },
                     onEdit = { onEditHomework(item.homework) },
                     onDelete = { onDeleteHomework(item.homework) },
+                    onVerifyWithPhoto = onVerifyWithPhoto?.let { cb -> { cb(item.homework) } },
+                    verificationStatus = verificationStatusMap[item.homework.id],
                     canManage = canManage
                 )
             }
@@ -247,6 +251,8 @@ fun HomeScreen(
                         onToggleComplete = { onToggleComplete(item.homework) },
                         onEdit = { onEditHomework(item.homework) },
                         onDelete = { onDeleteHomework(item.homework) },
+                        onVerifyWithPhoto = null,
+                        verificationStatus = verificationStatusMap[item.homework.id],
                         canManage = canManage
                     )
                 }

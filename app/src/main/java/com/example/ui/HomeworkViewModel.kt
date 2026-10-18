@@ -13,6 +13,7 @@ import com.example.data.model.HomeworkWithCourse
 import com.example.data.model.Note
 import com.example.data.model.NoteFolder
 import com.example.data.model.UserAccount
+import com.example.data.model.HomeworkVerification
 import com.example.data.repository.HomeworkRepository
 import com.example.data.repository.NotesRepository
 import kotlinx.coroutines.delay
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -739,6 +741,60 @@ class HomeworkViewModel(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = HomeworkStats()
     )
+
+    // Ödev Fotoğraf Doğrulama Durumları
+    val allVerifications: StateFlow<List<HomeworkVerification>> = repository.allVerifications
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val verificationStatusMap: StateFlow<Map<Long, String>> = allVerifications.map { list ->
+        val map = mutableMapOf<Long, String>()
+        val grouped = list.groupBy { it.homeworkId }
+        for ((hwId, vers) in grouped) {
+            val allApproved = vers.isNotEmpty() && vers.all { it.status == "APPROVED" }
+            map[hwId] = if (allApproved) "VERIFIED" else "UNVERIFIED"
+        }
+        map
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyMap()
+    )
+
+    suspend fun getAllVerificationHashes(): List<Long> {
+        return repository.getAllVerificationHashes()
+    }
+
+    fun completeWithVerification(homework: Homework, verifications: List<HomeworkVerification>) {
+        viewModelScope.launch {
+            repository.insertVerifications(verifications)
+            if (!homework.isCompleted) {
+                toggleCompletion(homework)
+            }
+        }
+    }
+
+    fun forceCompleteWithoutVerification(homework: Homework, pages: List<Int>) {
+        viewModelScope.launch {
+            val list = pages.map { page ->
+                HomeworkVerification(
+                    homeworkId = homework.id,
+                    page = page,
+                    hash = 0L,
+                    status = "FORCE_COMPLETED"
+                )
+            }
+            if (list.isNotEmpty()) {
+                repository.insertVerifications(list)
+            }
+            if (!homework.isCompleted) {
+                toggleCompletion(homework)
+            }
+        }
+    }
 
     // Actions
     fun toggleCompletion(homework: Homework) {

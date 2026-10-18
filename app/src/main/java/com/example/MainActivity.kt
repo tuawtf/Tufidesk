@@ -132,6 +132,7 @@ import com.example.ui.components.StreakBadge
 import com.example.ui.components.StreakDetailBottomSheet
 import com.example.ui.components.StreakDetailDialog
 import com.example.ui.components.StreakCelebrationDialog
+import com.example.ui.components.PhotoVerificationDialog
 import kotlinx.coroutines.delay
 import com.example.ui.screens.CalendarScreen
 import com.example.ui.screens.CoursesScreen
@@ -173,7 +174,7 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: HomeworkViewModel by viewModels {
         val database = AppDatabase.getInstance(applicationContext)
-        val repository = HomeworkRepository(database.courseDao(), database.homeworkDao())
+        val repository = HomeworkRepository(database.courseDao(), database.homeworkDao(), database.homeworkVerificationDao())
         val notesRepository = NotesRepository(database.noteDao())
         val authManager = AuthManager(applicationContext)
         val syncManager = FirebaseSyncManager(
@@ -283,6 +284,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
     val hideCompleted by viewModel.hideCompleted.collectAsStateWithLifecycle()
     val streakState by viewModel.streakState.collectAsStateWithLifecycle()
     val showStreakBadge by viewModel.showStreakBadge.collectAsStateWithLifecycle()
+    val verificationStatusMap by viewModel.verificationStatusMap.collectAsStateWithLifecycle()
 
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val isOnline by viewModel.isOnline.collectAsStateWithLifecycle()
@@ -334,6 +336,9 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
     var courseToEdit by remember { mutableStateOf<Course?>(null) }
 
     var showSwitchProfileDialog by remember { mutableStateOf(false) }
+
+    var homeworkToVerify by remember { mutableStateOf<Homework?>(null) }
+    var existingHashesForVerification by remember { mutableStateOf<List<Long>>(emptyList()) }
 
     var showStreakDetail by remember { mutableStateOf(false) }
     var celebrationMilestone by remember { mutableStateOf<Int?>(null) }
@@ -573,7 +578,14 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                         adminAssignedFilter = adminAssignedFilter,
                         onAdminAssignedFilterChange = { viewModel.setAdminAssignedFilter(it) },
                         courses = courses,
-                        onNavigateToTufiAI = { currentRoute = Screen.TufiAI.route }
+                        onNavigateToTufiAI = { currentRoute = Screen.TufiAI.route },
+                        onVerifyWithPhoto = { hw ->
+                            coroutineScope.launch {
+                                existingHashesForVerification = viewModel.getAllVerificationHashes()
+                                homeworkToVerify = hw
+                            }
+                        },
+                        verificationStatusMap = verificationStatusMap
                     )
 
                     Screen.Calendar -> CalendarScreen(
@@ -853,7 +865,14 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                         adminAssignedFilter = adminAssignedFilter,
                         onAdminAssignedFilterChange = { viewModel.setAdminAssignedFilter(it) },
                         courses = courses,
-                        onNavigateToTufiAI = { currentRoute = Screen.TufiAI.route }
+                        onNavigateToTufiAI = { currentRoute = Screen.TufiAI.route },
+                        onVerifyWithPhoto = { hw ->
+                            coroutineScope.launch {
+                                existingHashesForVerification = viewModel.getAllVerificationHashes()
+                                homeworkToVerify = hw
+                            }
+                        },
+                        verificationStatusMap = verificationStatusMap
                     )
                 }
             }
@@ -1483,6 +1502,26 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
         StreakCelebrationDialog(
             milestoneDays = milestone,
             onDismiss = { celebrationMilestone = null }
+        )
+    }
+
+    homeworkToVerify?.let { hw ->
+        PhotoVerificationDialog(
+            homework = hw,
+            existingHashes = existingHashesForVerification,
+            onCompleteWithVerification = { verifications ->
+                viewModel.completeWithVerification(hw, verifications)
+                val msg = "Tebrikler! Ödev doğrulandı ve tamamlandı 🎉"
+                showNotification(msg, IslandNotificationType.SUCCESS, "Ödev Doğrulandı")
+                homeworkToVerify = null
+            },
+            onForceCompleteWithoutVerification = { pages ->
+                viewModel.forceCompleteWithoutVerification(hw, pages)
+                val msg = "Ödev tamamlandı (doğrulanamadı)"
+                showNotification(msg, IslandNotificationType.INFO, "Ödev Tamamlandı")
+                homeworkToVerify = null
+            },
+            onDismiss = { homeworkToVerify = null }
         )
     }
 }

@@ -72,7 +72,14 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.QueryStats
+import androidx.compose.material.icons.filled.CheckCircleOutline
 import androidx.compose.material.icons.filled.Warning
+import com.example.data.verification.HomeworkVerificationSettings
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material.icons.filled.SystemUpdate
@@ -221,6 +228,26 @@ fun SettingsScreen(
     var activeDownloadJob by remember { mutableStateOf<Job?>(null) }
     var showUnknownSourcesDialog by remember { mutableStateOf(false) }
     var updateStatusMessage by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
+
+    // Fotoğrafla Doğrulama Ayar State'leri
+    var isPhotoVerificationEnabled by remember {
+        mutableStateOf(HomeworkVerificationSettings.isPhotoVerificationEnabled(context))
+    }
+    var verificationModel by remember {
+        mutableStateOf(HomeworkVerificationSettings.getVerificationModel(context))
+    }
+    var isGalleryAllowed by remember {
+        mutableStateOf(HomeworkVerificationSettings.isGalleryAllowed(context))
+    }
+    var isHandwritingRequired by remember {
+        mutableStateOf(HomeworkVerificationSettings.isHandwritingRequired(context))
+    }
+    var isForceCompleteAllowed by remember {
+        mutableStateOf(HomeworkVerificationSettings.isForceCompleteAllowed(context))
+    }
+    var showModelEditDialog by remember { mutableStateOf(false) }
+    var tempModelInput by remember { mutableStateOf("") }
+
 
     fun startApkDownload(info: UpdateInfo) {
         updateInfoAvailable = null
@@ -573,6 +600,142 @@ fun SettingsScreen(
                         checked = showStreakBadge,
                         onCheckedChange = onShowStreakBadgeChange
                     )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                SettingsCategoryCard(title = "Fotoğrafla Ödev Onayı") {
+                    SettingsSwitchItem(
+                        icon = Icons.Default.PhotoCamera,
+                        title = "Fotoğrafla Ödev Onayı",
+                        subtitle = "Ödev kartları menüsünde yapay zeka ile fotoğraflı onay seçeneği sunulsun",
+                        checked = isPhotoVerificationEnabled,
+                        onCheckedChange = {
+                            isPhotoVerificationEnabled = it
+                            HomeworkVerificationSettings.setPhotoVerificationEnabled(context, it)
+                        }
+                    )
+
+                    if (isPhotoVerificationEnabled) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    tempModelInput = verificationModel
+                                    showModelEditDialog = true
+                                },
+                            color = Color.Transparent
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    modifier = Modifier.size(36.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.AutoAwesome,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Doğrulama Modeli",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = verificationModel,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+
+                        SettingsSwitchItem(
+                            icon = Icons.Default.PhotoLibrary,
+                            title = "Galeriden Seçmeye İzin Ver",
+                            subtitle = "Kamera çekimi yerine galeriden önceden çekilmiş fotoğraf seçilebilsin",
+                            checked = isGalleryAllowed,
+                            onCheckedChange = {
+                                isGalleryAllowed = it
+                                HomeworkVerificationSettings.setGalleryAllowed(context, it)
+                            }
+                        )
+
+                        SettingsSwitchItem(
+                            icon = Icons.Default.Edit,
+                            title = "El Yazısı Ara",
+                            subtitle = "Ödev sayfasında doldurulmuş el yazısı olması zorunlu olsun",
+                            checked = isHandwritingRequired,
+                            onCheckedChange = {
+                                isHandwritingRequired = it
+                                HomeworkVerificationSettings.setHandwritingRequired(context, it)
+                            }
+                        )
+
+                        SettingsSwitchItem(
+                            icon = Icons.Default.CheckCircleOutline,
+                            title = "Doğrulanamazsa Tamamlamaya İzin Ver",
+                            subtitle = "Sayfa doğrulanamadığında 'Yine de tamamla (doğrulanamadı)' seçeneğini göster",
+                            checked = isForceCompleteAllowed,
+                            onCheckedChange = {
+                                isForceCompleteAllowed = it
+                                HomeworkVerificationSettings.setForceCompleteAllowed(context, it)
+                            }
+                        )
+
+                        val currentMonthlyCount = HomeworkVerificationSettings.getMonthlyCheckedPhotoCount(context)
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = Color.Transparent
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    modifier = Modifier.size(36.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.QueryStats,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.secondary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Bu Ay Kontrol Edilen Fotoğraflar",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "$currentMonthlyCount adet fotoğraf kontrol edildi",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
             SettingsSection.NOTES -> {
@@ -2262,6 +2425,47 @@ fun SettingsScreen(
             onDismiss = { updateStatusMessage = null }
         )
     }
+
+    if (showModelEditDialog) {
+        AlertDialog(
+            onDismissRequest = { showModelEditDialog = false },
+            title = { Text("Doğrulama Modeli") },
+            text = {
+                Column {
+                    Text(
+                        text = "OpenRouter üzerinde fotoğraf doğrulaması için kullanılacak vision modelini belirleyin:",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    OutlinedTextField(
+                        value = tempModelInput,
+                        onValueChange = { tempModelInput = it },
+                        label = { Text("Model ID") },
+                        placeholder = { Text(HomeworkVerificationSettings.DEFAULT_MODEL) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val cleaned = tempModelInput.trim().ifBlank { HomeworkVerificationSettings.DEFAULT_MODEL }
+                        verificationModel = cleaned
+                        HomeworkVerificationSettings.setVerificationModel(context, cleaned)
+                        showModelEditDialog = false
+                    }
+                ) {
+                    Text("Kaydet")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showModelEditDialog = false }) {
+                    Text("İptal")
+                }
+            }
+        )
+    }
 }
 
 // ==========================================
@@ -2684,3 +2888,4 @@ fun DeveloperSettingsContent(
         }
     }
 }
+
