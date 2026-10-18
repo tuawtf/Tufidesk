@@ -60,143 +60,134 @@ class StreakWidget : GlanceAppWidget() {
 
 @Composable
 fun StreakWidgetContent(data: StreakWidgetData) {
-    // Main Container (4x2 layout with tight vertical spacing)
+    // Outer Container (Centers the 140dp card frame)
     Box(
         modifier = GlanceModifier
-            .fillMaxSize()
-            .background(Color(0xFFF3EFFB))
-            .cornerRadius(28.dp)
-            .clickable(actionStartActivity<MainActivity>())
+            .fillMaxSize(),
+        contentAlignment = Alignment.Center
     ) {
-        // 1. Left Section (Tight content column centered vertically without giant gaps)
-        Column(
+        // Inner Widget Card (Fixed height = 140.dp, fillMaxWidth)
+        Box(
             modifier = GlanceModifier
-                .fillMaxHeight()
-                .padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 105.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalAlignment = Alignment.Start
+                .fillMaxWidth()
+                .height(140.dp)
+                .background(Color(0xFF7C3AED))
+                .cornerRadius(28.dp)
+                .clickable(actionStartActivity<MainActivity>())
         ) {
-            // Upper Part: Flame Icon + Streak Count
-            Row(
-                verticalAlignment = Alignment.CenterVertically
+            // 1. Left Content Column
+            Column(
+                modifier = GlanceModifier
+                    .fillMaxHeight()
+                    .padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 120.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalAlignment = Alignment.Start
             ) {
-                Image(
-                    provider = ImageProvider(
-                        if (data.todayDone) R.drawable.ic_widget_flame else R.drawable.ic_widget_flame_outline
-                    ),
-                    contentDescription = "Alev",
-                    modifier = GlanceModifier.size(30.dp),
-                    colorFilter = ColorFilter.tint(ColorProvider(Color(0xFF6750A4)))
-                )
-
-                Spacer(modifier = GlanceModifier.width(8.dp))
-
-                Text(
-                    text = "${data.currentStreak} gün",
-                    style = TextStyle(
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = ColorProvider(Color(0xFF1D1B20))
+                // Row 1: Flame Icon + Streak Count
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Image(
+                        provider = ImageProvider(
+                            if (data.todayDone) R.drawable.ic_widget_flame else R.drawable.ic_widget_flame_outline
+                        ),
+                        contentDescription = "Alev",
+                        modifier = GlanceModifier.size(30.dp),
+                        colorFilter = ColorFilter.tint(ColorProvider(Color.White))
                     )
-                )
-            }
 
-            Spacer(modifier = GlanceModifier.height(4.dp))
+                    Spacer(modifier = GlanceModifier.width(8.dp))
 
-            // Middle Part: Homework Status (Clock + text)
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Image(
-                    provider = ImageProvider(R.drawable.ic_widget_clock),
-                    contentDescription = "Saat",
-                    modifier = GlanceModifier.size(13.dp),
-                    colorFilter = ColorFilter.tint(ColorProvider(Color(0xFF49454F)))
-                )
+                    Text(
+                        text = "${data.currentStreak} gün",
+                        style = TextStyle(
+                            fontSize = 25.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = ColorProvider(Color.White)
+                        )
+                    )
+                }
 
-                Spacer(modifier = GlanceModifier.width(5.dp))
+                Spacer(modifier = GlanceModifier.height(4.dp))
 
+                // Row 2: Homework Status
                 Text(
                     text = "Bugün ${data.completedTodayCount} tamamlandı, ${data.pendingTodayCount} bekliyor",
                     style = TextStyle(
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Normal,
-                        color = ColorProvider(Color(0xFF49454F))
+                        color = ColorProvider(Color(0xEEFFFFFF))
                     )
                 )
-            }
 
-            Spacer(modifier = GlanceModifier.height(6.dp))
+                Spacer(modifier = GlanceModifier.height(8.dp))
 
-            // Lower Part: Weekly Streak Table
-            Row(
-                modifier = GlanceModifier
-                    .fillMaxWidth()
-                    .background(Color(0xFFE8DEF8))
-                    .cornerRadius(16.dp)
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                val weekDays = getWeekDaysList(data.days)
-                weekDays.forEachIndexed { index, day ->
-                    if (index > 0) {
-                        Spacer(modifier = GlanceModifier.defaultWeight())
-                    }
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = day.dayLabel,
-                            style = TextStyle(
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = ColorProvider(Color(0xFF49454F))
-                            )
-                        )
-
-                        Spacer(modifier = GlanceModifier.height(2.dp))
-
-                        if (day.isCompleted) {
-                            Box(
-                                modifier = GlanceModifier
-                                    .size(20.dp)
-                                    .background(Color(0xFF7C5DFA))
-                                    .cornerRadius(10.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Image(
-                                    provider = ImageProvider(R.drawable.ic_widget_check),
-                                    contentDescription = "Tamamlandı",
-                                    modifier = GlanceModifier.size(12.dp)
+                // Row 3: 5 Days Row
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    val weekDays = getWeekDaysList(data.days)
+                    weekDays.forEachIndexed { index, day ->
+                        if (index > 0) {
+                            Spacer(modifier = GlanceModifier.width(8.dp))
+                        }
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = day.dayLabel,
+                                style = TextStyle(
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = ColorProvider(Color(0xEEFFFFFF))
                                 )
+                            )
+
+                            Spacer(modifier = GlanceModifier.height(3.dp))
+
+                            if (day.isCompleted) {
+                                Box(
+                                    modifier = GlanceModifier
+                                        .size(20.dp)
+                                        .background(Color(0x40FFFFFF))
+                                        .cornerRadius(10.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Image(
+                                        provider = ImageProvider(R.drawable.ic_widget_check),
+                                        contentDescription = "Tamamlandı",
+                                        modifier = GlanceModifier.size(12.dp),
+                                        colorFilter = ColorFilter.tint(ColorProvider(Color.White))
+                                    )
+                                }
+                            } else {
+                                Box(
+                                    modifier = GlanceModifier
+                                        .size(20.dp)
+                                        .background(Color(0x33000000))
+                                        .cornerRadius(10.dp)
+                                ) {}
                             }
-                        } else {
-                            Box(
-                                modifier = GlanceModifier
-                                    .size(20.dp)
-                                    .background(Color(0xFFD0BCFF))
-                                    .cornerRadius(10.dp)
-                            ) {}
                         }
                     }
                 }
             }
-        }
 
-        // 2. Right Section (Pony Illustration)
-        Box(
-            modifier = GlanceModifier.fillMaxSize(),
-            contentAlignment = Alignment.BottomEnd
-        ) {
-            Image(
-                provider = ImageProvider(R.drawable.twilight_bottom_illustration),
-                contentDescription = "Twilight Sparkle",
-                modifier = GlanceModifier
-                    .width(105.dp)
-                    .height(115.dp),
-                contentScale = ContentScale.Fit
-            )
+            // 2. Right Section (Twilight Sparkle Pony Illustration)
+            Box(
+                modifier = GlanceModifier.fillMaxSize(),
+                contentAlignment = Alignment.BottomEnd
+            ) {
+                Image(
+                    provider = ImageProvider(R.drawable.twilight_bottom_illustration),
+                    contentDescription = "Twilight Sparkle",
+                    modifier = GlanceModifier
+                        .width(120.dp)
+                        .height(135.dp),
+                    contentScale = ContentScale.Fit
+                )
+            }
         }
     }
 }
