@@ -3,7 +3,6 @@ package com.example.widget
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.ColorFilter
@@ -28,6 +27,7 @@ import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.fillMaxSize
+import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
@@ -46,12 +46,7 @@ class StreakWidgetReceiver : GlanceAppWidgetReceiver() {
 
 class StreakWidget : GlanceAppWidget() {
 
-    override val sizeMode: SizeMode = SizeMode.Responsive(
-        setOf(
-            DpSize(100.dp, 100.dp),
-            DpSize(220.dp, 100.dp)
-        )
-    )
+    override val sizeMode: SizeMode = SizeMode.Single
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val data = StreakWidgetCache.get(context)
@@ -65,7 +60,7 @@ class StreakWidget : GlanceAppWidget() {
 
 @Composable
 fun StreakWidgetContent(data: StreakWidgetData) {
-    // Main Container (Outer Box - Clipping overflow)
+    // Main Container (4x2 layout with shorter top/bottom padding)
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
@@ -73,59 +68,81 @@ fun StreakWidgetContent(data: StreakWidgetData) {
             .cornerRadius(28.dp)
             .clickable(actionStartActivity<MainActivity>())
     ) {
-        // 1. Left Section (Content Column)
+        // 1. Left Section (Content Column with compact top/bottom padding)
         Column(
             modifier = GlanceModifier
                 .fillMaxHeight()
-                .padding(start = 18.dp, top = 16.dp, bottom = 16.dp, end = 100.dp),
+                .padding(start = 18.dp, top = 10.dp, bottom = 10.dp, end = 110.dp),
             verticalAlignment = Alignment.Top,
             horizontalAlignment = Alignment.Start
         ) {
-            // Upper Part: Streak Counter
+            // Upper Part: Flame Icon + Streak Count
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = GlanceModifier
-                        .size(44.dp)
-                        .background(Color(0xFFE2D5F8))
-                        .cornerRadius(22.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        provider = ImageProvider(R.drawable.ic_widget_flame),
-                        contentDescription = "Alev",
-                        modifier = GlanceModifier.size(24.dp),
-                        colorFilter = ColorFilter.tint(ColorProvider(Color(0xFF6750A4)))
-                    )
-                }
+                Image(
+                    provider = ImageProvider(
+                        if (data.todayDone) R.drawable.ic_widget_flame else R.drawable.ic_widget_flame_outline
+                    ),
+                    contentDescription = "Alev",
+                    modifier = GlanceModifier.size(30.dp),
+                    colorFilter = ColorFilter.tint(ColorProvider(Color(0xFF6750A4)))
+                )
 
-                Spacer(modifier = GlanceModifier.width(12.dp))
+                Spacer(modifier = GlanceModifier.width(8.dp))
 
                 Text(
                     text = "${data.currentStreak} gün",
                     style = TextStyle(
-                        fontSize = 26.sp,
+                        fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                         color = ColorProvider(Color(0xFF1D1B20))
                     )
                 )
             }
 
-            Spacer(modifier = GlanceModifier.height(10.dp))
+            Spacer(modifier = GlanceModifier.height(4.dp))
 
-            // Middle Part: Weekly Days Capsule
+            // Middle Part: Homework Status (Clock + text)
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Image(
+                    provider = ImageProvider(R.drawable.ic_widget_clock),
+                    contentDescription = "Saat",
+                    modifier = GlanceModifier.size(13.dp),
+                    colorFilter = ColorFilter.tint(ColorProvider(Color(0xFF49454F)))
+                )
+
+                Spacer(modifier = GlanceModifier.width(5.dp))
+
+                Text(
+                    text = "Bugün ${data.completedTodayCount} tamamlandı, ${data.pendingTodayCount} bekliyor",
+                    style = TextStyle(
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = ColorProvider(Color(0xFF49454F))
+                    )
+                )
+            }
+
+            // Flexible vertical spacer pushing the weekly table to the very bottom
+            Spacer(modifier = GlanceModifier.defaultWeight())
+
+            // Lower Part: Weekly Streak Table at the bottom
             Row(
                 modifier = GlanceModifier
+                    .fillMaxWidth()
                     .background(Color(0xFFE8DEF8))
-                    .cornerRadius(18.dp)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .cornerRadius(16.dp)
+                    .padding(horizontal = 12.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 val weekDays = getWeekDaysList(data.days)
                 weekDays.forEachIndexed { index, day ->
                     if (index > 0) {
-                        Spacer(modifier = GlanceModifier.width(8.dp))
+                        Spacer(modifier = GlanceModifier.defaultWeight())
                     }
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -139,61 +156,36 @@ fun StreakWidgetContent(data: StreakWidgetData) {
                             )
                         )
 
-                        Spacer(modifier = GlanceModifier.height(4.dp))
+                        Spacer(modifier = GlanceModifier.height(2.dp))
 
                         if (day.isCompleted) {
                             Box(
                                 modifier = GlanceModifier
-                                    .size(24.dp)
+                                    .size(20.dp)
                                     .background(Color(0xFF7C5DFA))
-                                    .cornerRadius(12.dp),
+                                    .cornerRadius(10.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Image(
                                     provider = ImageProvider(R.drawable.ic_widget_check),
                                     contentDescription = "Tamamlandı",
-                                    modifier = GlanceModifier.size(14.dp)
+                                    modifier = GlanceModifier.size(12.dp)
                                 )
                             }
                         } else {
                             Box(
                                 modifier = GlanceModifier
-                                    .size(24.dp)
+                                    .size(20.dp)
                                     .background(Color(0xFFD0BCFF))
-                                    .cornerRadius(12.dp)
+                                    .cornerRadius(10.dp)
                             ) {}
                         }
                     }
                 }
             }
-
-            Spacer(modifier = GlanceModifier.height(10.dp))
-
-            // Lower Part: Homework Status
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Image(
-                    provider = ImageProvider(R.drawable.ic_widget_clock),
-                    contentDescription = "Saat",
-                    modifier = GlanceModifier.size(16.dp),
-                    colorFilter = ColorFilter.tint(ColorProvider(Color(0xFF49454F)))
-                )
-
-                Spacer(modifier = GlanceModifier.width(6.dp))
-
-                Text(
-                    text = "Bugün ${data.completedTodayCount} ödev tamamlandı, ${data.pendingTodayCount} ödev bekliyor",
-                    style = TextStyle(
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Normal,
-                        color = ColorProvider(Color(0xFF49454F))
-                    )
-                )
-            }
         }
 
-        // 2. Right Section (Pony Illustration - Strictly within boundaries)
+        // 2. Right Section (Pony Illustration - Compact vertical size)
         Box(
             modifier = GlanceModifier.fillMaxSize(),
             contentAlignment = Alignment.BottomEnd
@@ -202,8 +194,8 @@ fun StreakWidgetContent(data: StreakWidgetData) {
                 provider = ImageProvider(R.drawable.twilight_bottom_illustration),
                 contentDescription = "Twilight Sparkle",
                 modifier = GlanceModifier
-                    .width(115.dp)
-                    .height(130.dp),
+                    .width(100.dp)
+                    .height(105.dp),
                 contentScale = ContentScale.Fit
             )
         }
