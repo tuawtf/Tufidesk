@@ -1,7 +1,6 @@
 package com.example.widget
 
 import android.content.Context
-import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.DpSize
@@ -13,22 +12,22 @@ import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
 import androidx.glance.Image
 import androidx.glance.ImageProvider
-import androidx.glance.LocalContext
-import androidx.glance.LocalSize
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
+import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
+import androidx.glance.layout.ContentScale
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
+import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.fillMaxSize
-import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
@@ -49,8 +48,8 @@ class StreakWidget : GlanceAppWidget() {
 
     override val sizeMode: SizeMode = SizeMode.Responsive(
         setOf(
-            DpSize(100.dp, 100.dp), // 2x2 Small
-            DpSize(220.dp, 100.dp)  // 4x2 Wide
+            DpSize(100.dp, 100.dp),
+            DpSize(220.dp, 100.dp)
         )
     )
 
@@ -66,204 +65,164 @@ class StreakWidget : GlanceAppWidget() {
 
 @Composable
 fun StreakWidgetContent(data: StreakWidgetData) {
-    val size = LocalSize.current
-    val isWide = size.width >= 200.dp
-
-    val flameColor = ColorProvider(Color(0xFFE65100))
-
+    // Main Container (Outer Box - Clipping overflow)
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(GlanceTheme.colors.surface)
-            .padding(12.dp)
+            .background(Color(0xFFF3EFFB))
+            .cornerRadius(28.dp)
             .clickable(actionStartActivity<MainActivity>())
     ) {
-        if (isWide) {
-            WideWidgetLayout(data = data, flameColor = flameColor)
-        } else {
-            SmallWidgetLayout(data = data, flameColor = flameColor)
-        }
-    }
-}
-
-@Composable
-fun SmallWidgetLayout(data: StreakWidgetData, flameColor: ColorProvider) {
-    Column(
-        modifier = GlanceModifier.fillMaxSize(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // Flame Icon
-        Image(
-            provider = ImageProvider(
-                if (data.todayDone) R.drawable.ic_widget_flame else R.drawable.ic_widget_flame_outline
-            ),
-            contentDescription = "Alev",
-            modifier = GlanceModifier.size(32.dp),
-            colorFilter = ColorFilter.tint(flameColor)
-        )
-
-        Spacer(modifier = GlanceModifier.height(4.dp))
-
-        // Big streak number
-        Text(
-            text = "${data.currentStreak}",
-            style = TextStyle(
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = GlanceTheme.colors.onSurface
-            )
-        )
-
-        // Subtitle
-        Text(
-            text = "günlük seri",
-            style = TextStyle(
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Normal,
-                color = GlanceTheme.colors.onSurfaceVariant
-            )
-        )
-
-        Spacer(modifier = GlanceModifier.height(6.dp))
-
-        // Status text
-        val statusText = if (data.todayDone) {
-            "Bugün tamam"
-        } else if (data.pendingTodayCount > 0) {
-            "Bugün ${data.pendingTodayCount} ödev yap"
-        } else {
-            "Bugün 1 ödev yap"
-        }
-
-        val statusColor = if (data.todayDone) {
-            flameColor
-        } else {
-            GlanceTheme.colors.onSurfaceVariant
-        }
-
-        Text(
-            text = statusText,
-            style = TextStyle(
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                color = statusColor
-            )
-        )
-    }
-}
-
-@Composable
-fun WideWidgetLayout(data: StreakWidgetData, flameColor: ColorProvider) {
-    Column(
-        modifier = GlanceModifier.fillMaxSize(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Upper section: Left (Flame + count), Right (7 days status)
-        Row(
-            modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
-            verticalAlignment = Alignment.CenterVertically
+        // 1. Left Section (Content Column)
+        Column(
+            modifier = GlanceModifier
+                .fillMaxHeight()
+                .padding(start = 18.dp, top = 16.dp, bottom = 16.dp, end = 100.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalAlignment = Alignment.Start
         ) {
-            // Left side
-            Column(
-                modifier = GlanceModifier.defaultWeight(),
-                horizontalAlignment = Alignment.Start
+            // Upper Part: Streak Counter
+            Row(
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    modifier = GlanceModifier
+                        .size(44.dp)
+                        .background(Color(0xFFE2D5F8))
+                        .cornerRadius(22.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     Image(
-                        provider = ImageProvider(
-                            if (data.todayDone) R.drawable.ic_widget_flame else R.drawable.ic_widget_flame_outline
-                        ),
+                        provider = ImageProvider(R.drawable.ic_widget_flame),
                         contentDescription = "Alev",
-                        modifier = GlanceModifier.size(28.dp),
-                        colorFilter = ColorFilter.tint(flameColor)
-                    )
-
-                    Spacer(modifier = GlanceModifier.width(6.dp))
-
-                    Text(
-                        text = "${data.currentStreak}",
-                        style = TextStyle(
-                            fontSize = 26.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = GlanceTheme.colors.onSurface
-                        )
+                        modifier = GlanceModifier.size(24.dp),
+                        colorFilter = ColorFilter.tint(ColorProvider(Color(0xFF6750A4)))
                     )
                 }
 
-                Spacer(modifier = GlanceModifier.height(2.dp))
+                Spacer(modifier = GlanceModifier.width(12.dp))
 
                 Text(
-                    text = "günlük seri",
+                    text = "${data.currentStreak} gün",
                     style = TextStyle(
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Normal,
-                        color = GlanceTheme.colors.onSurfaceVariant
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = ColorProvider(Color(0xFF1D1B20))
                     )
                 )
             }
 
-            // Right side: 7 Days Row
+            Spacer(modifier = GlanceModifier.height(10.dp))
+
+            // Middle Part: Weekly Days Capsule
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalAlignment = Alignment.End
+                modifier = GlanceModifier
+                    .background(Color(0xFFE8DEF8))
+                    .cornerRadius(18.dp)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                val daysToShow = data.days.take(7)
-                for (day in daysToShow) {
-                    DayCircleItem(day = day, flameColor = flameColor)
-                    Spacer(modifier = GlanceModifier.width(4.dp))
+                val weekDays = getWeekDaysList(data.days)
+                weekDays.forEachIndexed { index, day ->
+                    if (index > 0) {
+                        Spacer(modifier = GlanceModifier.width(8.dp))
+                    }
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = day.dayLabel,
+                            style = TextStyle(
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = ColorProvider(Color(0xFF49454F))
+                            )
+                        )
+
+                        Spacer(modifier = GlanceModifier.height(4.dp))
+
+                        if (day.isCompleted) {
+                            Box(
+                                modifier = GlanceModifier
+                                    .size(24.dp)
+                                    .background(Color(0xFF7C5DFA))
+                                    .cornerRadius(12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    provider = ImageProvider(R.drawable.ic_widget_check),
+                                    contentDescription = "Tamamlandı",
+                                    modifier = GlanceModifier.size(14.dp)
+                                )
+                            }
+                        } else {
+                            Box(
+                                modifier = GlanceModifier
+                                    .size(24.dp)
+                                    .background(Color(0xFFD0BCFF))
+                                    .cornerRadius(12.dp)
+                            ) {}
+                        }
+                    }
                 }
+            }
+
+            Spacer(modifier = GlanceModifier.height(10.dp))
+
+            // Lower Part: Homework Status
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Image(
+                    provider = ImageProvider(R.drawable.ic_widget_clock),
+                    contentDescription = "Saat",
+                    modifier = GlanceModifier.size(16.dp),
+                    colorFilter = ColorFilter.tint(ColorProvider(Color(0xFF49454F)))
+                )
+
+                Spacer(modifier = GlanceModifier.width(6.dp))
+
+                Text(
+                    text = "Bugün ${data.completedTodayCount} ödev tamamlandı, ${data.pendingTodayCount} ödev bekliyor",
+                    style = TextStyle(
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = ColorProvider(Color(0xFF49454F))
+                    )
+                )
             }
         }
 
-        Spacer(modifier = GlanceModifier.height(6.dp))
-
-        // Bottom section: "Bugün X ödev tamamlandı, Y ödev bekliyor"
-        val bottomMsg = "Bugün ${data.completedTodayCount} ödev tamamlandı, ${data.pendingTodayCount} ödev bekliyor"
-        Text(
-            text = bottomMsg,
-            style = TextStyle(
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Normal,
-                color = GlanceTheme.colors.onSurfaceVariant
+        // 2. Right Section (Pony Illustration - Strictly within boundaries)
+        Box(
+            modifier = GlanceModifier.fillMaxSize(),
+            contentAlignment = Alignment.BottomEnd
+        ) {
+            Image(
+                provider = ImageProvider(R.drawable.twilight_bottom_illustration),
+                contentDescription = "Twilight Sparkle",
+                modifier = GlanceModifier
+                    .width(115.dp)
+                    .height(130.dp),
+                contentScale = ContentScale.Fit
             )
-        )
+        }
     }
 }
 
-@Composable
-fun DayCircleItem(day: StreakDay, flameColor: ColorProvider) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = day.dayLabel,
-            style = TextStyle(
-                fontSize = 9.sp,
-                color = GlanceTheme.colors.onSurfaceVariant
-            )
-        )
-
-        Spacer(modifier = GlanceModifier.height(2.dp))
-
-        val iconRes = when {
-            day.isCompleted -> R.drawable.ic_widget_circle_filled
-            day.isToday -> R.drawable.ic_widget_circle_outline
-            else -> R.drawable.ic_widget_circle_empty
-        }
-
-        val colorFilter = when {
-            day.isCompleted || day.isToday -> ColorFilter.tint(flameColor)
-            else -> ColorFilter.tint(GlanceTheme.colors.onSurfaceVariant)
-        }
-
-        Image(
-            provider = ImageProvider(iconRes),
-            contentDescription = day.dayLabel,
-            modifier = GlanceModifier.size(16.dp),
-            colorFilter = colorFilter
+private fun getWeekDaysList(dataDays: List<StreakDay>): List<StreakDay> {
+    if (dataDays.size >= 5) {
+        return dataDays.take(5)
+    }
+    val fallbackLabels = listOf("Pzt", "Sal", "Çar", "Per", "Cum")
+    return fallbackLabels.map { label ->
+        StreakDay(
+            dayLabel = label,
+            dayNumber = 0,
+            dateMillis = 0L,
+            isCompleted = false,
+            isToday = false,
+            isFuture = false
         )
     }
 }
