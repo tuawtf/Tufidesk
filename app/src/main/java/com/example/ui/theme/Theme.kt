@@ -7,7 +7,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
+
+val LocalIsTwilightNight = staticCompositionLocalOf { false }
 
 @Composable
 fun MyApplicationTheme(
@@ -35,12 +39,17 @@ fun MyApplicationTheme(
         colorPalette == "FOREST" -> if (isDark) ForestDark else ForestLight
         colorPalette == "AMBER" -> if (isDark) AmberDark else AmberLight
         colorPalette == "TWILIGHT" -> if (isDark) TwilightSparkleDark else TwilightSparkleLight
+        colorPalette == "TWILIGHT_NIGHT" -> TwilightNightDark
         else -> if (isDark) IndigoDark else IndigoLight
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    val isTwilightNight = colorPalette == "TWILIGHT_NIGHT"
+
+    CompositionLocalProvider(LocalIsTwilightNight provides isTwilightNight) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }

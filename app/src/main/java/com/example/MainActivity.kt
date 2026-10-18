@@ -128,6 +128,11 @@ import com.example.ui.components.AddEditHomeworkDialog
 import com.example.ui.components.DynamicIslandController
 import com.example.ui.components.DynamicIslandOverlay
 import com.example.ui.components.IslandNotificationType
+import com.example.ui.components.StreakBadge
+import com.example.ui.components.StreakDetailBottomSheet
+import com.example.ui.components.StreakDetailDialog
+import com.example.ui.components.StreakCelebrationDialog
+import kotlinx.coroutines.delay
 import com.example.ui.screens.CalendarScreen
 import com.example.ui.screens.CoursesScreen
 import com.example.ui.screens.DenemeExamScreen
@@ -276,6 +281,8 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val colorPalette by viewModel.colorPalette.collectAsStateWithLifecycle()
     val hideCompleted by viewModel.hideCompleted.collectAsStateWithLifecycle()
+    val streakState by viewModel.streakState.collectAsStateWithLifecycle()
+    val showStreakBadge by viewModel.showStreakBadge.collectAsStateWithLifecycle()
 
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val isOnline by viewModel.isOnline.collectAsStateWithLifecycle()
@@ -327,6 +334,22 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
     var courseToEdit by remember { mutableStateOf<Course?>(null) }
 
     var showSwitchProfileDialog by remember { mutableStateOf(false) }
+
+    var showStreakDetail by remember { mutableStateOf(false) }
+    var celebrationMilestone by remember { mutableStateOf<Int?>(null) }
+    var isFlameAnimating by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        viewModel.streakIncreaseEvent.collect { newStreak ->
+            isFlameAnimating = true
+            snackbarHostState.showSnackbar("$newStreak günlük seri")
+            if (newStreak in listOf(7, 30, 100, 365)) {
+                celebrationMilestone = newStreak
+            }
+            delay(500)
+            isFlameAnimating = false
+        }
+    }
 
     var isSettingsOpen by rememberSaveable { mutableStateOf(false) }
     var activeTool by rememberSaveable { mutableStateOf<String?>(null) }
@@ -450,6 +473,8 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
             onColorPaletteChange = { viewModel.setColorPalette(it) },
             hideCompleted = hideCompleted,
             onHideCompletedChange = { viewModel.setHideCompleted(it) },
+            showStreakBadge = showStreakBadge,
+            onShowStreakBadgeChange = { viewModel.setShowStreakBadge(it) },
             isFullScreen = isFullScreen,
             onFullScreenChange = { isFullScreen = it },
             floatingBottomBar = floatingBottomBar,
@@ -906,7 +931,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                         modifier = Modifier
                             .fillMaxHeight()
                             .weight(1f),
-                        snackbarHost = {},
+                        snackbarHost = { SnackbarHost(snackbarHostState) },
                         topBar = {
                             if (!isSettingsOpen && !isTufiActive) {
                                 TopAppBar(
@@ -939,6 +964,15 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                                             }
                                         }
 
+                                        if (showStreakBadge) {
+                                            StreakBadge(
+                                                streak = streakState,
+                                                onClick = { showStreakDetail = true },
+                                                isAnimating = isFlameAnimating,
+                                                modifier = Modifier.padding(end = 4.dp)
+                                            )
+                                        }
+
                                         IconButton(onClick = {
                                             viewModel.syncCloudNow()
                                             if (!isOnline) {
@@ -963,7 +997,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                                             Icon(imageVector = syncIcon, contentDescription = "Eşitle", tint = syncColor)
                                         }
 
-                                        if (colorPalette == "TWILIGHT") {
+                                        if (colorPalette == "TWILIGHT" || colorPalette == "TWILIGHT_NIGHT") {
                                             Image(
                                                 painter = painterResource(id = R.drawable.ic_twilight_logo),
                                                 contentDescription = "Twilight Sparkle",
@@ -976,7 +1010,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                                     colors = TopAppBarDefaults.topAppBarColors(
                                         containerColor = MaterialTheme.colorScheme.background
                                     )
-                                )
+                                 )
                             }
                         },
                         containerColor = MaterialTheme.colorScheme.background
@@ -986,7 +1020,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                                 .fillMaxSize()
                                 .padding(innerPadding)
                         ) {
-                            val showTwilightIllustration = colorPalette == "TWILIGHT" &&
+                            val showTwilightIllustration = (colorPalette == "TWILIGHT" || colorPalette == "TWILIGHT_NIGHT") &&
                                 !isSettingsOpen &&
                                 (currentRoute == Screen.Home.route || currentRoute == Screen.Calendar.route || currentRoute == Screen.Timer.route)
 
@@ -1012,7 +1046,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
                 contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                snackbarHost = {},
+                snackbarHost = { SnackbarHost(snackbarHostState) },
                 topBar = {
                     if (!isSettingsOpen && !isTufiActive) {
                         TopAppBar(
@@ -1040,6 +1074,15 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                                         contentDescription = "Filtreyi Kaldır"
                                     )
                                 }
+                            }
+
+                            if (showStreakBadge) {
+                                StreakBadge(
+                                    streak = streakState,
+                                    onClick = { showStreakDetail = true },
+                                    isAnimating = isFlameAnimating,
+                                    modifier = Modifier.padding(end = 4.dp)
+                                )
                             }
 
                             // Cloud Sync status icon button
@@ -1073,7 +1116,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                                 Icon(imageVector = syncIcon, contentDescription = "Eşitle", tint = syncColor)
                             }
 
-                            if (colorPalette == "TWILIGHT") {
+                            if (colorPalette == "TWILIGHT" || colorPalette == "TWILIGHT_NIGHT") {
                                 Image(
                                     painter = painterResource(id = R.drawable.ic_twilight_logo),
                                     contentDescription = "Twilight Sparkle",
@@ -1142,7 +1185,7 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
                             bottom = if (!floatingBottomBar) innerPadding.calculateBottomPadding() else 0.dp
                         )
                 ) {
-                    val showTwilightIllustration = colorPalette == "TWILIGHT" &&
+                    val showTwilightIllustration = (colorPalette == "TWILIGHT" || colorPalette == "TWILIGHT_NIGHT") &&
                         !isSettingsOpen &&
                         (currentRoute == Screen.Home.route || currentRoute == Screen.Calendar.route || currentRoute == Screen.Timer.route)
 
@@ -1419,6 +1462,27 @@ fun HomeworkApp(viewModel: HomeworkViewModel) {
             message = msg,
             isSuccess = false,
             onDismiss = { autoUpdateErrorMessage = null }
+        )
+    }
+
+    if (showStreakDetail) {
+        if (isTabletLayout) {
+            StreakDetailDialog(
+                streak = streakState,
+                onDismiss = { showStreakDetail = false }
+            )
+        } else {
+            StreakDetailBottomSheet(
+                streak = streakState,
+                onDismiss = { showStreakDetail = false }
+            )
+        }
+    }
+
+    celebrationMilestone?.let { milestone ->
+        StreakCelebrationDialog(
+            milestoneDays = milestone,
+            onDismiss = { celebrationMilestone = null }
         )
     }
 }

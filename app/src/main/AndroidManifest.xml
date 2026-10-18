@@ -47,6 +47,18 @@
             android:process=":crash_process"
             android:label="Hata Raporu"
             android:theme="@style/Theme.MyApplication" />
+
+        <receiver
+            android:name=".widget.StreakWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_streak_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/streak_widget_info" />
+        </receiver>
     </application>
 
 </manifest>

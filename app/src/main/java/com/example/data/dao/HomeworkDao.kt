@@ -18,6 +18,10 @@ interface HomeworkDao {
     fun getAllHomeworksWithCourse(): Flow<List<HomeworkWithCourse>>
 
     @Transaction
+    @Query("SELECT * FROM homeworks ORDER BY isCompleted ASC, dueDateMillis ASC")
+    suspend fun getAllHomeworksWithCourseList(): List<HomeworkWithCourse>
+
+    @Transaction
     @Query("SELECT * FROM homeworks WHERE id = :id LIMIT 1")
     suspend fun getHomeworkWithCourseById(id: Long): HomeworkWithCourse?
 

@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Course
 import com.example.data.model.Homework
+import com.example.ui.theme.LocalIsTwilightNight
 import com.example.data.model.HomeworkWithCourse
 import com.example.data.model.UserAccount
 import com.example.ui.HomeworkStats
@@ -360,6 +361,7 @@ fun QuickStatsRow(
     stats: HomeworkStats,
     onStatClick: (TimeFilter) -> Unit
 ) {
+    val isTwilightNight = LocalIsTwilightNight.current
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxWidth()
@@ -369,8 +371,8 @@ fun QuickStatsRow(
                 title = "Bekleyen",
                 count = stats.pendingCount,
                 icon = Icons.Default.PendingActions,
-                color = Color.White,
-                bgColor = Color(0xFF4A2E7A),
+                color = if (isTwilightNight) MaterialTheme.colorScheme.onTertiaryContainer else Color.White,
+                bgColor = if (isTwilightNight) MaterialTheme.colorScheme.tertiaryContainer else Color(0xFF4A2E7A),
                 onClick = { onStatClick(TimeFilter.ALL) }
             )
         }
@@ -380,8 +382,8 @@ fun QuickStatsRow(
                 title = "Bugün",
                 count = stats.dueTodayCount,
                 icon = Icons.Default.NotificationsActive,
-                color = Color.White,
-                bgColor = Color(0xFFF42B76),
+                color = if (isTwilightNight) MaterialTheme.colorScheme.onPrimary else Color.White,
+                bgColor = if (isTwilightNight) MaterialTheme.colorScheme.primary else Color(0xFFF42B76),
                 onClick = { onStatClick(TimeFilter.TODAY) }
             )
         }
@@ -391,8 +393,8 @@ fun QuickStatsRow(
                 title = "Tamamlanan",
                 count = stats.completedCount,
                 icon = Icons.Default.CheckCircle,
-                color = Color.White,
-                bgColor = Color(0xFF382956),
+                color = if (isTwilightNight) MaterialTheme.colorScheme.onSecondaryContainer else Color.White,
+                bgColor = if (isTwilightNight) MaterialTheme.colorScheme.secondaryContainer else Color(0xFF382956),
                 onClick = { onStatClick(TimeFilter.ALL) }
             )
         }

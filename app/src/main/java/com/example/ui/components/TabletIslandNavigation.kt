@@ -1,6 +1,7 @@
 package com.example.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
@@ -100,8 +101,13 @@ fun TabletIslandNavigation(
             .testTag("tablet_island_navigation"),
         shape = RoundedCornerShape(26.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (colorPalette == "TWILIGHT") Color(0xFF1D1F3E) else MaterialTheme.colorScheme.surface
+            containerColor = when (colorPalette) {
+                "TWILIGHT" -> Color(0xFF1D1F3E)
+                "TWILIGHT_NIGHT" -> MaterialTheme.colorScheme.surfaceContainerHigh
+                else -> MaterialTheme.colorScheme.surface
+            }
         ),
+        border = if (colorPalette == "TWILIGHT_NIGHT") BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null,
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
@@ -117,7 +123,7 @@ fun TabletIslandNavigation(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Island Header (Eğer Twilight teması seçildiyse TWILIGHT + Şeffaf Logo, değilse standart TUFI DESK + Okul İkonu)
-                if (colorPalette == "TWILIGHT") {
+                if (colorPalette == "TWILIGHT" || colorPalette == "TWILIGHT_NIGHT") {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center,
@@ -187,6 +193,7 @@ fun TabletIslandNavigation(
                         .clip(RoundedCornerShape(50))
                         .background(
                             if (colorPalette == "TWILIGHT") Color.White.copy(alpha = 0.20f)
+                            else if (colorPalette == "TWILIGHT_NIGHT") MaterialTheme.colorScheme.outlineVariant
                             else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
                         )
                 )

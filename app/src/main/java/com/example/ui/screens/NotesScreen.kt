@@ -132,6 +132,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
 import com.example.R
+import com.example.ui.theme.LocalIsTwilightNight
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -4003,7 +4004,9 @@ fun KeepCreateFolderDialog(
                                 .background(c)
                                 .border(
                                     width = if (selectedColor == hex) 3.dp else 1.dp,
-                                    color = if (selectedColor == hex) Color.Black else Color.Transparent,
+                                    color = if (selectedColor == hex) {
+                                        if (LocalIsTwilightNight.current) MaterialTheme.colorScheme.onSurface else Color.Black
+                                    } else Color.Transparent,
                                     shape = CircleShape
                                 )
                                 .clickable { selectedColor = hex }

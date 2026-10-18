@@ -71,6 +71,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.WifiOff
@@ -145,6 +146,7 @@ import com.example.ui.screens.settings.SettingsSection
 import com.example.ui.screens.speech.SpeechSettingsSection
 import com.example.ui.screens.cloud.R2StorageSettingsCard
 import com.example.ui.HomeworkViewModel
+import com.example.ui.theme.LocalIsTwilightNight
 import com.google.firebase.FirebaseApp
 
 data class MaterialPaletteOption(
@@ -165,6 +167,8 @@ fun SettingsScreen(
     onColorPaletteChange: (String) -> Unit,
     hideCompleted: Boolean,
     onHideCompletedChange: (Boolean) -> Unit,
+    showStreakBadge: Boolean = true,
+    onShowStreakBadgeChange: (Boolean) -> Unit = {},
     isFullScreen: Boolean = false,
     onFullScreenChange: (Boolean) -> Unit = {},
     floatingBottomBar: Boolean = true,
@@ -368,6 +372,13 @@ fun SettingsScreen(
             description = "Gece moru, canlı fuşya ve lila tonları",
             primaryColor = Color(0xFFF42B76),
             secondaryColor = Color(0xFF382956)
+        ),
+        MaterialPaletteOption(
+            id = "TWILIGHT_NIGHT",
+            name = "Twilight Night",
+            description = "Düzeltilmiş kontrastlı gece moru, fuşya ve lila",
+            primaryColor = Color(0xFFF42B76),
+            secondaryColor = Color(0xFF3F3170)
         )
     )
 
@@ -380,6 +391,7 @@ fun SettingsScreen(
             SearchableSettingItem("Tam Ekran Yap", "Durum ve gezinme çubuklarını gizler", SettingsSection.APPEARANCE, Icons.Default.Fullscreen, listOf("statusbar", "odaklanma", "ekran")),
             SearchableSettingItem("Alt Gezinme Barı Görünümü", "Yüzen ada kapsülü veya sabit alt bar", SettingsSection.APPEARANCE, Icons.Default.Layers, listOf("ada", "navigasyon", "bar")),
             SearchableSettingItem("Tamamlananları Gizle", "Tamamlanan ödevler ana listede gizlensin", SettingsSection.HOMEWORK, Icons.Default.VisibilityOff, listOf("ödev", "gizle", "tamamlanan")),
+            SearchableSettingItem("Seri Rozetini Göster", "Ana ekran üst çubuğunda günlük seri alevi", SettingsSection.HOMEWORK, Icons.Default.LocalFireDepartment, listOf("seri", "streak", "alev", "rozet", "duolingo")),
             SearchableSettingItem("2 Sütunlu Kılavuz (Grid)", "Notlar çift sütunlu düzen veya tek sütun liste", SettingsSection.NOTES, Icons.Default.GridView, listOf("not", "ızgara", "sütun", "liste")),
             SearchableSettingItem("İşaretlenen Öğeleri En Alta Taşı", "Tamamlanan kontrol listesi maddeleri otomatik alta taşınsın", SettingsSection.NOTES, Icons.Default.Check, listOf("madde", "kontrol", "yapılacak")),
             SearchableSettingItem("Tufi AI & API Anahtarı Ayarları", "DeepSeek / Gemini API anahtarı ve canlı model", SettingsSection.AI_AND_SPEECH, Icons.Default.AutoAwesome, listOf("ai", "yapay zeka", "tufi", "deepseek", "gemini", "api", "anahtar")),
@@ -554,6 +566,13 @@ fun SettingsScreen(
                         checked = hideCompleted,
                         onCheckedChange = onHideCompletedChange
                     )
+                    SettingsSwitchItem(
+                        icon = Icons.Default.LocalFireDepartment,
+                        title = "Seri Rozetini Göster",
+                        subtitle = "Ana ekran üst çubuğunda günlük seri alevi gösterilsin",
+                        checked = showStreakBadge,
+                        onCheckedChange = onShowStreakBadgeChange
+                    )
                 }
             }
             SettingsSection.NOTES -> {
@@ -611,7 +630,11 @@ fun SettingsScreen(
                                 Text(
                                     text = if (isAiConfigured) "🟢 Canlı API Bağlantısı Aktif" else "⚠️ API Anahtarı Tanımlı Değil (Çevrimdışı Mod)",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = if (isAiConfigured) Color(0xFF065F46) else Color(0xFF92400E)
+                                    color = if (LocalIsTwilightNight.current) {
+                                        if (isAiConfigured) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.tertiary
+                                    } else {
+                                        if (isAiConfigured) Color(0xFF065F46) else Color(0xFF92400E)
+                                    }
                                 )
                             }
                             Text(
@@ -1042,6 +1065,22 @@ fun SettingsScreen(
 
                     Spacer(modifier = Modifier.height(4.dp))
 
+                    var isAutoUpdateEnabled by remember {
+                        mutableStateOf(R2Settings.isAutoUpdateCheckEnabled(context))
+                    }
+                    SettingsSwitchItem(
+                        icon = Icons.Default.CloudSync,
+                        title = "Açılışta otomatik kontrol et",
+                        subtitle = "Günde en fazla bir kez yeni güncellemeleri sessizce denetler",
+                        checked = isAutoUpdateEnabled,
+                        onCheckedChange = {
+                            isAutoUpdateEnabled = it
+                            R2Settings.setAutoUpdateCheckEnabled(context, it)
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
                     SettingsClickableItem(
                         title = "GitHub'da Görüntüle",
                         subtitle = "tuawtf/Tufidesk açık kaynak projesi",
@@ -1109,15 +1148,16 @@ fun SettingsScreen(
         ) {
             items(SettingsSection.entries.toTypedArray()) { section ->
                 val isSelected = selectedSectionName == section.name
+                val isTwilightNight = LocalIsTwilightNight.current
                 val containerColor = if (isSelected) {
                     MaterialTheme.colorScheme.primaryContainer
                 } else {
-                    Color(0xFF1E1D3B)
+                    if (isTwilightNight) MaterialTheme.colorScheme.surfaceContainerHigh else Color(0xFF1E1D3B)
                 }
                 val cardBorder = if (isSelected) {
                     BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
                 } else {
-                    BorderStroke(1.dp, Color(0xFF2E2C56))
+                    if (isTwilightNight) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else BorderStroke(1.dp, Color(0xFF2E2C56))
                 }
 
                 Card(
@@ -1132,14 +1172,14 @@ fun SettingsScreen(
                             Text(
                                 text = section.title,
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else Color.White
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else if (isTwilightNight) MaterialTheme.colorScheme.onSurface else Color.White
                             )
                         },
                         supportingContent = {
                             Text(
                                 text = section.subtitle,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f) else Color(0xFFB8B0D0)
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f) else if (isTwilightNight) MaterialTheme.colorScheme.onSurfaceVariant else Color(0xFFB8B0D0)
                             )
                         },
                         leadingContent = {
@@ -1162,7 +1202,7 @@ fun SettingsScreen(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                                 contentDescription = "Aç",
-                                tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else Color(0xFFB8B0D0),
+                                tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else if (isTwilightNight) MaterialTheme.colorScheme.onSurfaceVariant else Color(0xFFB8B0D0),
                                 modifier = Modifier.size(18.dp)
                             )
                         },
@@ -2241,10 +2281,16 @@ private fun SettingsCategoryCard(
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
         )
+        val isTwilightNight = LocalIsTwilightNight.current
         Card(
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1B1A36)),
-            border = BorderStroke(1.dp, Color(0xFF2E2C56)),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isTwilightNight) MaterialTheme.colorScheme.surfaceContainer else Color(0xFF1B1A36)
+            ),
+            border = BorderStroke(
+                1.dp,
+                if (isTwilightNight) MaterialTheme.colorScheme.outlineVariant else Color(0xFF2E2C56)
+            ),
             modifier = Modifier.fillMaxWidth()
         ) {
             content()

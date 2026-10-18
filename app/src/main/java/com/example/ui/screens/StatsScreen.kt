@@ -58,6 +58,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import com.example.ui.theme.LocalIsTwilightNight
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -403,21 +404,22 @@ fun StatsScreen(
                                     value = stats.totalCount.toString(),
                                     color = MaterialTheme.colorScheme.primary
                                 )
+                                val isTwilightNight = LocalIsTwilightNight.current
                                 StatRowItem(
                                     label = "Teslim Edilen",
                                     value = stats.completedCount.toString(),
-                                    color = Color(0xFF10B981)
+                                    color = if (isTwilightNight) MaterialTheme.colorScheme.secondary else Color(0xFF10B981)
                                 )
                                 StatRowItem(
                                     label = "Bekleyen",
                                     value = stats.pendingCount.toString(),
-                                    color = Color(0xFFD97706)
+                                    color = if (isTwilightNight) MaterialTheme.colorScheme.tertiary else Color(0xFFD97706)
                                 )
                                 if (stats.overdueCount > 0) {
                                     StatRowItem(
                                         label = "Geciken",
                                         value = stats.overdueCount.toString(),
-                                        color = Color(0xFFDC2626)
+                                        color = if (isTwilightNight) MaterialTheme.colorScheme.error else Color(0xFFDC2626)
                                     )
                                 }
                             }
@@ -1171,11 +1173,13 @@ fun DenemeAnalysisChartSection(
                     }
                 }
 
+                val isTwilightNight = LocalIsTwilightNight.current
+
                 // Zirve Net
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFF10B981).copy(alpha = 0.12f),
-                    border = BorderStroke(0.5.dp, Color(0xFF10B981).copy(alpha = 0.25f)),
+                    color = if (isTwilightNight) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f) else Color(0xFF10B981).copy(alpha = 0.12f),
+                    border = BorderStroke(0.5.dp, if (isTwilightNight) MaterialTheme.colorScheme.outlineVariant else Color(0xFF10B981).copy(alpha = 0.25f)),
                     modifier = Modifier.weight(1f)
                 ) {
                     Column(
@@ -1186,7 +1190,7 @@ fun DenemeAnalysisChartSection(
                             Icon(
                                 imageVector = Icons.Default.EmojiEvents,
                                 contentDescription = null,
-                                tint = Color(0xFF10B981),
+                                tint = if (isTwilightNight) MaterialTheme.colorScheme.secondary else Color(0xFF10B981),
                                 modifier = Modifier.size(13.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
@@ -1200,7 +1204,7 @@ fun DenemeAnalysisChartSection(
                         Text(
                             text = String.format(Locale.getDefault(), "%.1f", maxNet),
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                            color = Color(0xFF10B981)
+                            color = if (isTwilightNight) MaterialTheme.colorScheme.secondary else Color(0xFF10B981)
                         )
                     }
                 }
@@ -1208,8 +1212,8 @@ fun DenemeAnalysisChartSection(
                 // Son Sınav
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFF6366F1).copy(alpha = 0.12f),
-                    border = BorderStroke(0.5.dp, Color(0xFF6366F1).copy(alpha = 0.25f)),
+                    color = if (isTwilightNight) MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.35f) else Color(0xFF6366F1).copy(alpha = 0.12f),
+                    border = BorderStroke(0.5.dp, if (isTwilightNight) MaterialTheme.colorScheme.outlineVariant else Color(0xFF6366F1).copy(alpha = 0.25f)),
                     modifier = Modifier.weight(1f)
                 ) {
                     Column(
@@ -1220,7 +1224,7 @@ fun DenemeAnalysisChartSection(
                             Icon(
                                 imageVector = Icons.Default.Timeline,
                                 contentDescription = null,
-                                tint = Color(0xFF6366F1),
+                                tint = if (isTwilightNight) MaterialTheme.colorScheme.tertiary else Color(0xFF6366F1),
                                 modifier = Modifier.size(13.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
@@ -1234,7 +1238,7 @@ fun DenemeAnalysisChartSection(
                         Text(
                             text = String.format(Locale.getDefault(), "%.1f", latestNet),
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                            color = Color(0xFF6366F1)
+                            color = if (isTwilightNight) MaterialTheme.colorScheme.tertiary else Color(0xFF6366F1)
                         )
                     }
                 }

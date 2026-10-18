@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">TufiDESK</string>
+    <string name="widget_streak_description">TufiDESK seri</string>
+    <string name="widget_streak_title">TufiDESK Seri Takibi</string>
 </resources>

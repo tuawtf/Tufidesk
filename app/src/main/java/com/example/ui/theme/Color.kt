@@ -403,8 +403,52 @@ val TwilightSparkleDark = darkColorScheme(
     surfaceVariant = Color(0xFF232244),
     onSurfaceVariant = Color(0xFFB8B0D0),
     outline = Color(0xFF3B375C),
-    outlineVariant = Color(0xFF28264A)
 )
+
+// ==========================================
+// 8. TWILIGHT NIGHT PALETTE (Material 3)
+// High-contrast, accessibility-corrected dark palette
+// ==========================================
+val TwilightNightDark = darkColorScheme(
+    primary = Color(0xFFF42B76),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFF42B76),
+    onPrimaryContainer = Color(0xFFFFFFFF),
+    secondary = Color(0xFFC798EB),
+    onSecondary = Color(0xFF111025),
+    secondaryContainer = Color(0xFF3F3170),
+    onSecondaryContainer = Color(0xFFEADBFA),
+    tertiary = Color(0xFFD491EA),
+    onTertiary = Color(0xFF2B1B3F),
+    tertiaryContainer = Color(0xFF4A2E7A),
+    onTertiaryContainer = Color(0xFFF1DCFF),
+    error = Color(0xFFFF4D6D),
+    onError = Color(0xFFFFFFFF),
+    errorContainer = Color(0xFF5C1024),
+    onErrorContainer = Color(0xFFFFD9E2),
+    background = Color(0xFF111025),
+    onBackground = Color(0xFFEDE8F8),
+    surface = Color(0xFF1B1A36),
+    onSurface = Color(0xFFFFFFFF),
+    surfaceVariant = Color(0xFF27254C),
+    onSurfaceVariant = Color(0xFFB8B0D0),
+    surfaceDim = Color(0xFF0D0C1E),
+    surfaceBright = Color(0xFF34315F),
+    surfaceContainerLowest = Color(0xFF0D0C1E),
+    surfaceContainerLow = Color(0xFF181735),
+    surfaceContainer = Color(0xFF1F1E40),
+    surfaceContainerHigh = Color(0xFF27254C),
+    surfaceContainerHighest = Color(0xFF302E58),
+    outline = Color(0xFF7A75A8),
+    outlineVariant = Color(0xFF4A4678),
+    inverseSurface = Color(0xFFEDE8F8),
+    inverseOnSurface = Color(0xFF111025),
+    inversePrimary = Color(0xFF8F0A42),
+    surfaceTint = Color(0xFFF42B76),
+    scrim = Color(0xFF000000)
+)
+
+val TwilightNightLight = TwilightNightDark
 
 // Subject / Course Preset Colors (Expressive Material 3 Palette)
 val CourseColors = listOf(

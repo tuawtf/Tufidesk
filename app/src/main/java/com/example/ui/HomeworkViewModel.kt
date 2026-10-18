@@ -16,13 +16,20 @@ import com.example.data.model.UserAccount
 import com.example.data.repository.HomeworkRepository
 import com.example.data.repository.NotesRepository
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import com.example.data.model.StreakState
+import com.example.data.model.StreakCalculator
+import com.example.widget.StreakWidgetCache
+import com.example.widget.StreakWidget
+import androidx.glance.appwidget.updateAll
 import java.util.Calendar
 
 enum class StatusFilter(val title: String) {
@@ -454,6 +461,74 @@ class HomeworkViewModel(
         initialValue = emptyList()
     )
 
+    private fun updateWidgetCacheAndGlance(
+        homeworks: List<HomeworkWithCourse>,
+        user: UserAccount?,
+        streak: StreakState
+    ) {
+        val context = appContext ?: return
+        viewModelScope.launch {
+            try {
+                val activeProfile = user?.name?.trim() ?: "Tuna"
+                val todayStart = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
+                val todayEnd = todayStart + 86_400_000L
+
+                var completedToday = 0
+                var pendingToday = 0
+
+                for (item in homeworks) {
+                    val hw = item.homework
+                    val isAssigned = hw.assignedTo.equals(activeProfile, ignoreCase = true) ||
+                            hw.assignedTo.equals("Herkes", ignoreCase = true) ||
+                            hw.assignedTo.isBlank()
+                    if (!isAssigned) continue
+
+                    if (hw.isCompleted) {
+                        val completedTime = hw.completedAtMillis ?: hw.updatedAtMillis
+                        if (completedTime in todayStart until todayEnd) {
+                            completedToday++
+                        }
+                    } else {
+                        if (hw.dueDateMillis in todayStart until todayEnd || hw.dueDateMillis < todayStart || hw.dueDateMillis == 0L) {
+                            pendingToday++
+                        }
+                    }
+                }
+
+                StreakWidgetCache.save(
+                    context,
+                    streak,
+                    completedToday,
+                    pendingToday
+                )
+
+                StreakWidget().updateAll(context)
+            } catch (_: Exception) {}
+        }
+    }
+
+    // Duolingo benzeri Seri (Streak) StateFlow
+    val streakState: StateFlow<StreakState> = combine(
+        allHomeworks,
+        currentUser
+    ) { homeworks, user ->
+        val calculated = StreakCalculator.calculate(homeworks, user)
+        updateWidgetCacheAndGlance(homeworks, user, calculated)
+        calculated
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = StreakState()
+    )
+
+    private val _streakIncreaseEvent = MutableSharedFlow<Int>(replay = 0, extraBufferCapacity = 1)
+    val streakIncreaseEvent = _streakIncreaseEvent.asSharedFlow()
+
     private data class FilterBase(
         val query: String,
         val status: StatusFilter,
@@ -670,8 +745,20 @@ class HomeworkViewModel(
         viewModelScope.launch {
             val now = System.currentTimeMillis()
             val newStatus = !homework.isCompleted
+
+            // Eğer ödev tamamlandı olarak işaretleniyorsa ve bugün henüz tamamlanan yoksa seri bugün ilk kez artar
+            val currentStreak = streakState.value
+            val isFirstTodayIncrease = newStatus && !currentStreak.todayDone
+            val predictedNewStreak = if (isFirstTodayIncrease) {
+                currentStreak.current + 1
+            } else null
+
             repository.toggleComplete(homework.id, newStatus, now)
             syncManager.updateHomeworkCompletionInCloud(homework.id, newStatus, now)
+
+            if (predictedNewStreak != null) {
+                _streakIncreaseEvent.emit(predictedNewStreak)
+            }
         }
     }
 
@@ -825,7 +912,7 @@ class HomeworkViewModel(
     }
 
     val themeMode = MutableStateFlow("SYSTEM") // "SYSTEM", "LIGHT", "DARK"
-    val colorPalette = MutableStateFlow("DYNAMIC") // "DYNAMIC", "INDIGO", "TEAL", "VIOLET", "ROSE", "FOREST", "AMBER", "TWILIGHT"
+    val colorPalette = MutableStateFlow("DYNAMIC") // "DYNAMIC", "INDIGO", "TEAL", "VIOLET", "ROSE", "FOREST", "AMBER", "TWILIGHT", "TWILIGHT_NIGHT"
     val hideCompleted = MutableStateFlow(false)
 
     fun setThemeMode(mode: String) {
@@ -838,6 +925,16 @@ class HomeworkViewModel(
 
     fun setHideCompleted(hide: Boolean) {
         hideCompleted.value = hide
+    }
+
+    private val streakPrefs = appContext?.getSharedPreferences("tufidesk_streak_prefs", Context.MODE_PRIVATE)
+    val showStreakBadge = MutableStateFlow(
+        streakPrefs?.getBoolean("pref_show_streak_badge", true) ?: true
+    )
+
+    fun setShowStreakBadge(show: Boolean) {
+        showStreakBadge.value = show
+        streakPrefs?.edit()?.putBoolean("pref_show_streak_badge", show)?.apply()
     }
 
     fun resetToDemoData() {

@@ -46,6 +46,12 @@ class TufiDeskApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
 
+        try {
+            com.example.widget.StreakWidgetScheduler.scheduleDailyUpdate(this)
+        } catch (e: Exception) {
+            Log.e("TufiDeskApplication", "Failed to schedule streak widget update: ${e.message}", e)
+        }
+
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
 
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
